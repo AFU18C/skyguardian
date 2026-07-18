@@ -22,13 +22,30 @@
     @else
         <div class="source-grid">
             @foreach ($sources as $source)
-                <section class="panel source-card">
+                @php
+                    $manualStatus = $source->manual_check_status;
+                    $statusIcon = match ($manualStatus) {
+                        'available' => '🟢',
+                        'unavailable' => '🔴',
+                        default => '⚪',
+                    };
+                    $statusText = match ($manualStatus) {
+                        'available' => 'Доступен',
+                        'unavailable' => 'Недоступен',
+                        default => 'Не проверялся',
+                    };
+                    $checkedAt = $source->manual_checked_at
+                        ? \Illuminate\Support\Carbon::parse($source->manual_checked_at)->format('d.m.Y H:i:s')
+                        : '—';
+                @endphp
+
+                <section class="panel source-card" data-source-card>
                     <div class="source-card-header">
                         <div>
                             <h2>{{ $source->name }}</h2>
                             <div class="source-meta">
                                 <span>{{ strtoupper($source->type) }}</span>
-                                <span>Каждые {{ $source->check_interval }} мин.</span>
+                                <span>Каждые {{ $source->check_interval }} сек.</span>
                             </div>
                         </div>
 
@@ -54,16 +71,18 @@
                                     <span>Открыть</span>
                                 </a>
 
-                                <button
-                                    class="action-menu-item"
-                                    type="button"
-                                    role="menuitem"
-                                    data-source-test
-                                    data-test-url="{{ route('alerts.sources.test', $source) }}"
-                                >
-                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path></svg>
-                                    <span data-source-test-label>Проверить сейчас</span>
-                                </button>
+                                @if ($source->type === 'telegram')
+                                    <button
+                                        class="action-menu-item"
+                                        type="button"
+                                        role="menuitem"
+                                        data-source-test
+                                        data-test-url="{{ route('alerts.sources.test', $source) }}"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path></svg>
+                                        <span data-source-test-label>Проверить сейчас</span>
+                                    </button>
+                                @endif
 
                                 <a class="action-menu-item" role="menuitem" href="{{ route('alerts.sources.edit', $source) }}">
                                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16.862 3.487 3.651 3.651M18.688 1.661a2.582 2.582 0 1 1 3.651 3.651L8.25 19.401l-4.875 1.224 1.224-4.875L18.688 1.661Z"></path></svg>
@@ -87,6 +106,11 @@
                     <dl class="source-details">
                         <div><dt>Источник</dt><dd>{{ $source->address }}</dd></div>
                         <div><dt>Публикация</dt><dd>{{ $source->publication_chat }}</dd></div>
+                        <div>
+                            <dt>Ручной статус</dt>
+                            <dd><span data-manual-status-icon>{{ $statusIcon }}</span> <span data-manual-status-text>{{ $statusText }}</span></dd>
+                        </div>
+                        <div><dt>Последняя ручная проверка</dt><dd data-manual-checked-at>{{ $checkedAt }}</dd></div>
                     </dl>
                 </section>
             @endforeach
@@ -140,6 +164,22 @@
             message.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         };
 
+        const updateCardStatus = (button, data) => {
+            const card = button.closest('[data-source-card]');
+            const icon = card?.querySelector('[data-manual-status-icon]');
+            const text = card?.querySelector('[data-manual-status-text]');
+            const checkedAt = card?.querySelector('[data-manual-checked-at]');
+
+            if (!card || !icon || !text || !checkedAt || !data.manual_status) {
+                return;
+            }
+
+            const available = data.manual_status === 'available';
+            icon.textContent = available ? '🟢' : '🔴';
+            text.textContent = available ? 'Доступен' : 'Недоступен';
+            checkedAt.textContent = data.manual_checked_at || '—';
+        };
+
         document.querySelectorAll('[data-source-test]').forEach((button) => {
             button.addEventListener('click', async () => {
                 const label = button.querySelector('[data-source-test-label]');
@@ -160,6 +200,7 @@
                     });
 
                     const data = await response.json().catch(() => ({}));
+                    updateCardStatus(button, data);
                     showTestMessage(data.message || 'Не удалось проверить источник.', response.ok && data.ok === true);
                 } catch (error) {
                     showTestMessage('Ошибка соединения с сервером SkyGuardian.', false);
