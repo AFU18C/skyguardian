@@ -7,6 +7,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Throwable;
 
@@ -32,12 +33,20 @@ class AlertBotSettingsController extends Controller
 
         $settings = AlertBotSetting::query()->firstOrNew();
         $token = trim((string) ($validated['telegram_bot_token'] ?? ''));
+        $isEnabled = $request->boolean('is_enabled');
+        $storedToken = trim((string) ($settings->telegram_bot_token ?? ''));
+
+        if ($isEnabled && $token === '' && $storedToken === '') {
+            throw ValidationException::withMessages([
+                'telegram_bot_token' => 'Чтобы включить бота, сначала укажите Telegram Bot Token.',
+            ]);
+        }
 
         if ($token !== '') {
             $settings->telegram_bot_token = $token;
         }
 
-        $settings->is_enabled = $request->boolean('is_enabled');
+        $settings->is_enabled = $isEnabled;
         $settings->save();
 
         return to_route('alerts.settings')->with('success', 'Настройки бота сохранены.');
