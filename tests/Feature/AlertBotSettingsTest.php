@@ -24,6 +24,32 @@ class AlertBotSettingsTest extends TestCase
         $this->assertTrue($settings->is_enabled);
     }
 
+    public function test_bot_cannot_be_enabled_without_a_token(): void
+    {
+        $this->from('/alerts/settings')->post('/alerts/settings', [
+            'telegram_bot_token' => '',
+            'is_enabled' => '1',
+        ])->assertRedirect('/alerts/settings')
+            ->assertSessionHasErrors('telegram_bot_token');
+
+        $this->assertDatabaseCount('alert_bot_settings', 0);
+    }
+
+    public function test_existing_token_allows_bot_to_be_enabled(): void
+    {
+        AlertBotSetting::query()->create([
+            'telegram_bot_token' => '123456:existing-token',
+            'is_enabled' => false,
+        ]);
+
+        $this->post('/alerts/settings', [
+            'telegram_bot_token' => '',
+            'is_enabled' => '1',
+        ])->assertRedirect('/alerts/settings');
+
+        $this->assertTrue(AlertBotSetting::query()->firstOrFail()->is_enabled);
+    }
+
     public function test_saved_token_is_displayed_only_as_a_mask(): void
     {
         AlertBotSetting::query()->create([
