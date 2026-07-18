@@ -56,8 +56,9 @@
         </label>
 
         <label>
-            <span>Интервал проверки новых сообщений, минут</span>
-            <input type="number" name="check_interval" min="1" max="1440" value="{{ old('check_interval', $source?->check_interval ?? 5) }}" required>
+            <span>Интервал проверки, секунд</span>
+            <input type="number" name="check_interval" min="1" max="86400" value="{{ old('check_interval', $source?->check_interval ?? 60) }}" required>
+            <small class="field-help">Допустимое значение: от 1 секунды до 24 часов.</small>
         </label>
 
         <div class="form-actions">
@@ -82,7 +83,7 @@
         telegram: {
             label: 'Ссылка на Telegram-канал',
             placeholder: 'https://t.me/channel_name',
-            help: 'Используйте HTTPS-ссылку вида https://t.me/channel_name.'
+            help: 'Используйте публичную HTTPS-ссылку вида https://t.me/channel_name.'
         },
         website: {
             label: 'URL сайта',
