@@ -17,7 +17,7 @@ class AlertSourcesTest extends TestCase
             'type' => 'telegram',
             'address' => 'https://t.me/test_source',
             'publication_chat' => 'https://t.me/test_publication',
-            'check_interval' => 5,
+            'check_interval' => 60,
         ]);
 
         $response->assertRedirect(route('alerts.sources'));
@@ -31,7 +31,7 @@ class AlertSourcesTest extends TestCase
             'type' => 'telegram',
             'address' => 'https://example.com/channel',
             'publication_chat' => 'https://t.me/test_publication',
-            'check_interval' => 5,
+            'check_interval' => 60,
         ]);
 
         $response->assertRedirect(route('alerts.sources.create'));
