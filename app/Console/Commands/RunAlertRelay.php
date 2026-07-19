@@ -10,7 +10,7 @@ use Throwable;
 
 class RunAlertRelay extends Command
 {
-    protected $signature = 'alerts:relay {--once : Выполнить один цикл и завершить} {--sleep=2 : Пауза между циклами в секундах}';
+    protected $signature = 'alerts:relay {--once : Выполнить один цикл и завершить} {--sleep=1 : Пауза служебного цикла в секундах}';
 
     protected $description = 'Получает новые сообщения из Telegram-источников и публикует их в назначенные чаты';
 
@@ -57,6 +57,15 @@ class RunAlertRelay extends Command
             ->get();
 
         foreach ($sources as $source) {
+            $interval = min(43200, max(3, (int) ($source->poll_interval_seconds ?: 3)));
+
+            if ($source->last_polled_at
+                && $source->last_polled_at->copy()->addSeconds($interval)->isFuture()) {
+                continue;
+            }
+
+            $source->update(['last_polled_at' => now()]);
+
             try {
                 $result = $telethon->relayOnce($source);
                 $lastMessageId = (int) ($result['last_message_id'] ?? $source->last_source_message_id ?? 0);
