@@ -97,7 +97,10 @@ async def delete_messages(client, chat_ref: str, period: str):
     admin_rights = getattr(permissions, "admin_rights", None)
 
     if isinstance(entity, (Channel, Chat)):
-        can_delete = bool(is_creator or (is_admin and getattr(admin_rights, "delete_messages", False)))
+        can_delete = bool(
+            is_creator
+            or (is_admin and getattr(admin_rights, "delete_messages", False))
+        )
         if not can_delete:
             respond(False, message="У технического аккаунта нет права удаления сообщений в этом чате.")
             return
@@ -106,17 +109,21 @@ async def delete_messages(client, chat_ref: str, period: str):
     if period in {"1", "10"}:
         cutoff = datetime.now(timezone.utc) - timedelta(days=int(period))
 
-    ids = []
+    deleted = 0
+    batch = []
+
     async for message in client.iter_messages(entity):
         if cutoff and message.date < cutoff:
             break
-        ids.append(message.id)
 
-    deleted = 0
-    for offset in range(0, len(ids), 100):
-        batch = ids[offset:offset + 100]
-        if not batch:
-            continue
+        batch.append(message.id)
+
+        if len(batch) >= 100:
+            await client.delete_messages(entity, batch, revoke=True)
+            deleted += len(batch)
+            batch = []
+
+    if batch:
         await client.delete_messages(entity, batch, revoke=True)
         deleted += len(batch)
 
