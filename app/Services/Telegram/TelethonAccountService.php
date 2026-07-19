@@ -53,6 +53,13 @@ class TelethonAccountService
         return $this->run(['check-chat', '--chat', $chat, '--mode', $mode], $account);
     }
 
+    public function latestMessageId(TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account, string $chat): int
+    {
+        $result = $this->run(['latest-message', '--chat', $chat], $account);
+
+        return max(0, (int) ($result['latest_message_id'] ?? 0));
+    }
+
     public function relayOnce(AlertSource|NewsSource $source): array
     {
         $source->loadMissing(['readerAccount.telegramApiCredential', 'publisherAccount.telegramApiCredential']);
