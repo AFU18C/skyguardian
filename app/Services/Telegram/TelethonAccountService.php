@@ -40,6 +40,11 @@ class TelethonAccountService
         return $this->run(['status'], $account);
     }
 
+    public function checkChat(TechnicalTelegramAccount $account, string $chat, string $mode): array
+    {
+        return $this->run(['check-chat', '--chat', $chat, '--mode', $mode], $account);
+    }
+
     public function logout(TechnicalTelegramAccount $account): array
     {
         return $this->run(['logout'], $account);
