@@ -58,10 +58,16 @@ class RunAlertRelay extends Command
 
         foreach ($sources as $source) {
             $source->refresh();
+            $source->loadMissing([
+                'readerAccount.telegramApiCredential',
+                'publisherAccount.telegramApiCredential',
+            ]);
 
             if (! $source->autopublish_enabled
                 || $source->source_status !== 'available'
-                || $source->destination_status !== 'available') {
+                || $source->destination_status !== 'available'
+                || $source->readerAccount?->status === 'disabled'
+                || $source->publisherAccount?->status === 'disabled') {
                 continue;
             }
 
@@ -74,8 +80,11 @@ class RunAlertRelay extends Command
 
             $source->update(['last_polled_at' => now()]);
             $source->refresh();
+            $source->loadMissing(['readerAccount', 'publisherAccount']);
 
-            if (! $source->autopublish_enabled) {
+            if (! $source->autopublish_enabled
+                || $source->readerAccount?->status === 'disabled'
+                || $source->publisherAccount?->status === 'disabled') {
                 continue;
             }
 
