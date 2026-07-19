@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\AlertBotSetting;
 use App\Models\NewsBotSetting;
+use App\Services\Telegram\TelegramComponentPowerStore;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class BotProfileController extends Controller
 {
-    public function updateAlert(Request $request): RedirectResponse
+    public function updateAlert(Request $request, TelegramComponentPowerStore $power): RedirectResponse
     {
         $validated = $this->validateProfile($request);
         $settings = AlertBotSetting::query()->firstOrCreate([]);
@@ -19,7 +20,7 @@ class BotProfileController extends Controller
         if ($request->boolean('remove_bot_token')) {
             $settings->bot_token = null;
             $settings->bot_status = 'not_configured';
-            $this->setBotEnabled($settings, false);
+            $power->setBotEnabled('alerts', false);
         } else {
             if ($request->filled('bot_token')) {
                 $settings->bot_token = trim($validated['bot_token']);
@@ -27,17 +28,18 @@ class BotProfileController extends Controller
 
             $enabled = filled($settings->bot_token) && $request->boolean('bot_enabled');
             $settings->bot_status = $enabled ? 'active' : 'stopped';
-            $this->setBotEnabled($settings, $enabled);
+            $power->setBotEnabled('alerts', $enabled);
         }
 
         $settings->save();
+        $enabled = $power->botEnabled('alerts', filled($settings->bot_token));
 
         return back()->with('status', $request->boolean('remove_bot_token')
             ? 'Токен Telegram-бота удалён.'
-            : ($this->botEnabled($settings) ? 'Telegram-бот включён.' : 'Telegram-бот полностью остановлен.'));
+            : ($enabled ? 'Telegram-бот включён.' : 'Telegram-бот полностью остановлен.'));
     }
 
-    public function updateNews(Request $request): RedirectResponse
+    public function updateNews(Request $request, TelegramComponentPowerStore $power): RedirectResponse
     {
         $validated = $this->validateProfile($request);
         $settings = NewsBotSetting::query()->firstOrCreate([], ['service_status' => 'stopped']);
@@ -47,7 +49,7 @@ class BotProfileController extends Controller
         if ($request->boolean('remove_bot_token')) {
             $settings->bot_token = null;
             $settings->service_status = 'stopped';
-            $this->setBotEnabled($settings, false);
+            $power->setBotEnabled('news', false);
         } else {
             if ($request->filled('bot_token')) {
                 $settings->bot_token = trim($validated['bot_token']);
@@ -55,14 +57,15 @@ class BotProfileController extends Controller
 
             $enabled = filled($settings->bot_token) && $request->boolean('bot_enabled');
             $settings->service_status = $enabled ? 'running' : 'stopped';
-            $this->setBotEnabled($settings, $enabled);
+            $power->setBotEnabled('news', $enabled);
         }
 
         $settings->save();
+        $enabled = $power->botEnabled('news', filled($settings->bot_token));
 
         return back()->with('status', $request->boolean('remove_bot_token')
             ? 'Токен Telegram-бота удалён.'
-            : ($this->botEnabled($settings) ? 'Telegram-бот включён.' : 'Telegram-бот полностью остановлен.'));
+            : ($enabled ? 'Telegram-бот включён.' : 'Telegram-бот полностью остановлен.'));
     }
 
     private function validateProfile(Request $request): array
@@ -77,20 +80,6 @@ class BotProfileController extends Controller
             'bot_token.regex' => 'Токен Telegram-бота имеет неверный формат.',
             'administrator_telegram_id.regex' => 'Telegram ID должен содержать только цифры и при необходимости начинаться с минуса.',
         ]);
-    }
-
-    private function setBotEnabled(AlertBotSetting|NewsBotSetting $settings, bool $enabled): void
-    {
-        $extra = is_array($settings->extra_settings) ? $settings->extra_settings : [];
-        $extra['bot_enabled'] = $enabled;
-        $settings->extra_settings = $extra;
-    }
-
-    private function botEnabled(AlertBotSetting|NewsBotSetting $settings): bool
-    {
-        $extra = is_array($settings->extra_settings) ? $settings->extra_settings : [];
-
-        return filled($settings->bot_token) && (bool) ($extra['bot_enabled'] ?? true);
     }
 
     private function nullableTrimmed(?string $value): ?string
