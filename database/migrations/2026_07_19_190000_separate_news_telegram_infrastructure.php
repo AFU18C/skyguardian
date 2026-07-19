@@ -36,6 +36,8 @@ return new class extends Migration
         Schema::table('news_sources', function (Blueprint $table): void {
             $table->dropForeign(['reader_account_id']);
             $table->dropForeign(['publisher_account_id']);
+            $table->unsignedBigInteger('reader_account_id')->nullable()->change();
+            $table->unsignedBigInteger('publisher_account_id')->nullable()->change();
         });
 
         DB::table('news_sources')->update([
@@ -47,8 +49,6 @@ return new class extends Migration
         ]);
 
         Schema::table('news_sources', function (Blueprint $table): void {
-            $table->unsignedBigInteger('reader_account_id')->nullable()->change();
-            $table->unsignedBigInteger('publisher_account_id')->nullable()->change();
             $table->foreign('reader_account_id')->references('id')->on('news_technical_telegram_accounts')->restrictOnDelete();
             $table->foreign('publisher_account_id')->references('id')->on('news_technical_telegram_accounts')->restrictOnDelete();
         });
@@ -61,10 +61,11 @@ return new class extends Migration
             $table->dropForeign(['publisher_account_id']);
         });
 
-        Schema::table('news_sources', function (Blueprint $table): void {
-            $table->foreign('reader_account_id')->references('id')->on('technical_telegram_accounts')->restrictOnDelete();
-            $table->foreign('publisher_account_id')->references('id')->on('technical_telegram_accounts')->restrictOnDelete();
-        });
+        DB::table('news_sources')->update([
+            'reader_account_id' => null,
+            'publisher_account_id' => null,
+            'autopublish_enabled' => false,
+        ]);
 
         Schema::dropIfExists('news_technical_telegram_accounts');
         Schema::dropIfExists('news_telegram_api_credentials');
