@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Models\AlertBotSetting;
 use App\Models\NewsBotSetting;
+use App\Models\NewsTechnicalTelegramAccount;
+use App\Models\TechnicalTelegramAccount;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\ViewErrorBag;
@@ -38,6 +40,7 @@ class SkyGuardianUiMiddleware
         if ($request->routeIs('alerts.settings')) {
             $settings = AlertBotSetting::query()->first();
             $html = $this->decorateBotSettings($html, $settings?->bot_name, $settings?->bot_token);
+            $html = $this->showAccountsWithoutApi($html, TechnicalTelegramAccount::query()->orderByDesc('is_primary')->orderBy('id')->get());
             $html = $this->keepTechnicalAccountsOpen($request, $html, 'telegram_auth');
         }
 
@@ -47,6 +50,7 @@ class SkyGuardianUiMiddleware
             $html = str_replace('Параметры новостного бота', 'Telegram-бот', $html);
             $html = $this->reorderNewsAccordions($html);
             $html = $this->decorateBotSettings($html, $settings?->bot_name, $settings?->bot_token);
+            $html = $this->showAccountsWithoutApi($html, NewsTechnicalTelegramAccount::query()->orderByDesc('is_primary')->orderBy('id')->get());
             $html = $this->keepTechnicalAccountsOpen($request, $html, 'news_telegram_auth');
         }
 
@@ -146,6 +150,36 @@ class SkyGuardianUiMiddleware
         }
 
         return str_replace($gridMatch[1], implode('', $ordered), $html);
+    }
+
+    private function showAccountsWithoutApi(string $html, $accounts): string
+    {
+        if ($accounts->isEmpty() || ! str_contains($html, 'Сначала добавьте Telegram API')) {
+            return $html;
+        }
+
+        $rows = '';
+        foreach ($accounts as $account) {
+            $label = e($account->label ?: 'Технический аккаунт');
+            $phone = e($account->phone ?: 'Номер не указан');
+            $telegramId = e($account->telegram_id ?: '—');
+            $primary = $account->is_primary ? '<span class="badge">Основной</span>' : '';
+
+            $rows .= '<div class="row"><div class="row-main" style="cursor:default">'
+                .'<div><span class="row-name">'.$label.'</span>'.$primary.'</div>'
+                .'<div class="row-meta">'.$phone.' · ID '.$telegramId.'<br><strong style="color:#b97810">API не выбран</strong></div>'
+                .'<div class="row-status"><span class="status-icon warn">!</span></div>'
+                .'</div></div>';
+        }
+
+        $replacement = '<div class="notice">Telegram API удалён. Технический аккаунт сохранён. Добавьте новый API и привяжите его к аккаунту для переподключения.</div><div class="list">'.$rows.'</div>';
+
+        return preg_replace(
+            '/<div class="empty-state"><strong>Сначала добавьте Telegram API<\/strong><span>.*?<\/span><\/div>/s',
+            $replacement,
+            $html,
+            1,
+        ) ?? $html;
     }
 
     private function maskToken(?string $token): ?string
