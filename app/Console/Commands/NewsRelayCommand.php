@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\NewsBotSetting;
 use App\Models\NewsSource;
 use App\Models\NewsTechnicalTelegramAccount;
+use App\Services\Telegram\TelegramComponentPowerStore;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
 use Throwable;
@@ -59,10 +59,9 @@ class NewsRelayCommand extends Command
     private function processCycle(TelethonAccountService $telethon): void
     {
         $now = now();
-        $extra = NewsBotSetting::query()->first()?->extra_settings;
-        $extra = is_array($extra) ? $extra : [];
-        $disabledAccountIds = array_values(array_unique(array_map('intval', (array) ($extra['disabled_account_ids'] ?? []))));
-        $disabledApiIds = array_values(array_unique(array_map('intval', (array) ($extra['disabled_api_ids'] ?? []))));
+        $state = app(TelegramComponentPowerStore::class)->section('news');
+        $disabledAccountIds = $state['disabled_account_ids'];
+        $disabledApiIds = $state['disabled_api_ids'];
 
         if ($disabledApiIds !== []) {
             $disabledAccountIds = array_values(array_unique(array_merge(
