@@ -15,15 +15,41 @@ class NewsRelayCommand extends Command
 
     public function handle(TelethonAccountService $telethon): int
     {
-        do {
-            $this->processCycle($telethon);
+        $lockDirectory = storage_path('app/private/telegram');
+        if (! is_dir($lockDirectory) && ! mkdir($lockDirectory, 0770, true) && ! is_dir($lockDirectory)) {
+            $this->error('Не удалось создать каталог блокировки новостного relay.');
 
-            if ($this->option('once')) {
-                break;
-            }
+            return self::FAILURE;
+        }
 
-            sleep(1);
-        } while (true);
+        $lockHandle = fopen($lockDirectory.'/news-relay.lock', 'c+');
+        if ($lockHandle === false) {
+            $this->error('Не удалось открыть файл блокировки новостного relay.');
+
+            return self::FAILURE;
+        }
+
+        if (! flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            fclose($lockHandle);
+            $this->warn('Новостной relay уже запущен в другом процессе.');
+
+            return $this->option('once') ? self::SUCCESS : self::FAILURE;
+        }
+
+        try {
+            do {
+                $this->processCycle($telethon);
+
+                if ($this->option('once')) {
+                    break;
+                }
+
+                sleep(1);
+            } while (true);
+        } finally {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+        }
 
         return self::SUCCESS;
     }
