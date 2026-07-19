@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TechnicalTelegramAccount extends Model
 {
     protected $fillable = [
+        'telegram_api_credential_id',
         'label',
         'phone',
         'name',
@@ -25,6 +27,11 @@ class TechnicalTelegramAccount extends Model
             'is_primary' => 'boolean',
             'last_checked_at' => 'datetime',
         ];
+    }
+
+    public function telegramApiCredential(): BelongsTo
+    {
+        return $this->belongsTo(TelegramApiCredential::class);
     }
 
     public function sessionKey(): string
