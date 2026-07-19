@@ -32,7 +32,7 @@ class TelegramDependencyController extends Controller
             $this->stopAlertSources($accounts, 'Telegram API удалён. Выберите новый API и переподключите технический аккаунт.');
 
             TechnicalTelegramAccount::query()
-                ->whereIn('id', $accounts->modelKeys())
+                ->whereIn('id', $this->accountIds($accounts))
                 ->update([
                     'telegram_api_credential_id' => null,
                     'status' => 'disconnected',
@@ -68,7 +68,7 @@ class TelegramDependencyController extends Controller
             $this->stopNewsSources($accounts, 'Telegram API удалён. Выберите новый API и переподключите технический аккаунт.');
 
             NewsTechnicalTelegramAccount::query()
-                ->whereIn('id', $accounts->modelKeys())
+                ->whereIn('id', $this->accountIds($accounts))
                 ->update([
                     'news_telegram_api_credential_id' => null,
                     'status' => 'disconnected',
@@ -134,7 +134,7 @@ class TelegramDependencyController extends Controller
 
     private function stopAlertSources(Collection $accounts, string $message): void
     {
-        $ids = $accounts->modelKeys();
+        $ids = $this->accountIds($accounts);
         if ($ids === []) {
             return;
         }
@@ -154,7 +154,7 @@ class TelegramDependencyController extends Controller
 
     private function stopNewsSources(Collection $accounts, string $message): void
     {
-        $ids = $accounts->modelKeys();
+        $ids = $this->accountIds($accounts);
         if ($ids === []) {
             return;
         }
@@ -170,5 +170,15 @@ class TelegramDependencyController extends Controller
                 'destination_status' => 'not_checked',
                 'last_error' => $message,
             ]);
+    }
+
+    private function accountIds(Collection $accounts): array
+    {
+        return $accounts
+            ->pluck('id')
+            ->filter()
+            ->map(static fn ($id): int => (int) $id)
+            ->values()
+            ->all();
     }
 }
