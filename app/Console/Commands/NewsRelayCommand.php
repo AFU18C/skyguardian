@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Console\Commands;
+
 use App\Models\NewsSource;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
@@ -64,6 +65,14 @@ class NewsRelayCommand extends Command
             ->where('destination_status', 'available')
             ->orderBy('id')
             ->eachById(function (NewsSource $source) use ($telethon, $now): void {
+                $source->refresh();
+
+                if (! $source->autopublish_enabled
+                    || $source->source_status !== 'available'
+                    || $source->destination_status !== 'available') {
+                    return;
+                }
+
                 $interval = max(3, (int) ($source->poll_interval_seconds ?: 3));
 
                 if ($source->last_polled_at?->copy()->addSeconds($interval)->isFuture()) {
@@ -101,6 +110,13 @@ class NewsRelayCommand extends Command
                     return;
                 }
 
+                $source->update(['last_polled_at' => $now]);
+                $source->refresh();
+
+                if (! $source->autopublish_enabled) {
+                    return;
+                }
+
                 try {
                     $result = $telethon->relayOnce($source);
                     $published = max(0, (int) ($result['published'] ?? 0));
@@ -117,7 +133,6 @@ class NewsRelayCommand extends Command
                         'last_source_message_id' => $lastMessageId,
                         'last_received_at' => $published > 0 ? $now : $source->last_received_at,
                         'last_published_at' => $published > 0 ? $now : $source->last_published_at,
-                        'last_polled_at' => $now,
                         'last_error' => $partialMessage,
                     ]);
 
@@ -134,7 +149,6 @@ class NewsRelayCommand extends Command
                     $message = mb_substr($exception->getMessage(), 0, 2000);
 
                     $source->update([
-                        'last_polled_at' => $now,
                         'last_error' => $message,
                     ]);
 
