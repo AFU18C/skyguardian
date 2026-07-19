@@ -96,6 +96,9 @@ class NewsSourceController extends Controller
                 'destination_status' => $destinationAvailable ? 'available' : 'error',
                 'destination_type' => $destinationResult['chat_type'] ?? null,
                 'publish_as' => $publishAs,
+                'autopublish_enabled' => $sourceAvailable && $destinationAvailable
+                    ? $newsSource->autopublish_enabled
+                    : false,
                 'last_error' => $sourceAvailable && $destinationAvailable ? null : 'Проверка источника или назначения завершилась ошибкой.',
                 'last_checked_at' => now(),
             ]);
