@@ -12,7 +12,9 @@ Route::middleware('auth')->group(function (): void {
     Route::put('/alerts/settings', [AlertBotSettingsController::class, 'update'])->name('alerts.settings.update');
     Route::post('/alerts/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('alerts.telegram.send-code');
     Route::post('/alerts/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('alerts.telegram.confirm');
-    Route::delete('/alerts/settings/telegram', [AlertBotSettingsController::class, 'disconnect'])->name('alerts.telegram.disconnect');
+    Route::put('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('alerts.telegram.update');
+    Route::delete('/alerts/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('alerts.telegram.disconnect');
+    Route::delete('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'destroy'])->name('alerts.telegram.destroy');
 
     Route::view('/users', 'section', ['pageTitle' => 'Пользователи', 'pageDescription' => 'Управление доступом к панели SkyGuardian', 'activeSection' => 'users'])->name('users.index');
 });
