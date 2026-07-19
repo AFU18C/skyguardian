@@ -1,10 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\AlertBotSetting;
 use App\Models\NewsBotSetting;
-use App\Services\Telegram\TelegramComponentPowerStore;
 use App\Services\Telegram\WelcomeSettingsStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,20 +13,10 @@ use Throwable;
 
 class TelegramGroupWebhookController extends Controller
 {
-    public function __invoke(
-        Request $request,
-        string $bot,
-        WelcomeSettingsStore $store,
-        TelegramComponentPowerStore $power,
-    ): JsonResponse {
+    public function __invoke(Request $request, string $bot, WelcomeSettingsStore $store): JsonResponse
+    {
         $provided = (string) $request->header('X-Telegram-Bot-Api-Secret-Token', '');
         if (! hash_equals($store->secret(), $provided)) return response()->json(['ok' => false], 403);
-
-        $botSettings = $bot === 'news'
-            ? NewsBotSetting::query()->first()
-            : AlertBotSetting::query()->first();
-        $botEnabled = filled($botSettings?->bot_token) && $power->botEnabled($bot, true);
-        if (! $botEnabled) return response()->json(['ok' => true]);
 
         $message = $request->input('message');
         if (! is_array($message)) return response()->json(['ok' => true]);
@@ -42,7 +30,8 @@ class TelegramGroupWebhookController extends Controller
         });
         if (! is_array($settings)) return response()->json(['ok' => true]);
 
-        $token = (string) $botSettings->bot_token;
+        $token = $bot === 'news' ? NewsBotSetting::query()->first()?->bot_token : AlertBotSetting::query()->first()?->bot_token;
+        if (blank($token)) return response()->json(['ok' => true]);
 
         $messageId = (int) ($message['message_id'] ?? 0);
         $members = data_get($message, 'new_chat_members', []);
