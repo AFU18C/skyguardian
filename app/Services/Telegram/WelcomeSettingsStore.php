@@ -24,8 +24,7 @@ class WelcomeSettingsStore
 
     public function save(array $settings): array
     {
-        $current = $this->get();
-        $settings = array_replace($current, $settings);
+        $settings = array_replace($this->get(), $settings);
         $settings['secret'] = filled($settings['secret'] ?? null)
             ? (string) $settings['secret']
             : Str::random(48);
@@ -46,6 +45,21 @@ class WelcomeSettingsStore
             'bot' => 'news',
             'message' => 'Добро пожаловать, {name}! Рады видеть вас в группе {group}.',
             'secret' => '',
+            'delete_join_messages' => false,
+            'delete_leave_messages' => false,
+            'delete_pinned_messages' => false,
+            'delete_group_changes' => false,
+            'filter_enabled' => false,
+            'forbidden_words' => '',
+            'forbidden_links' => '',
+            'filter_action' => 'delete_warn',
+            'antispam_enabled' => false,
+            'new_member_minutes' => 30,
+            'block_links_for_new' => true,
+            'message_limit' => 6,
+            'message_window_seconds' => 30,
+            'antispam_action' => 'delete_warn',
+            'mute_minutes' => 10,
         ];
     }
 }
