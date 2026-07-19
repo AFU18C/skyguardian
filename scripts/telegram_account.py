@@ -12,10 +12,58 @@ from telethon.errors import (
     PhoneCodeInvalidError,
     SessionPasswordNeededError,
 )
+from telethon.tl.types import Channel, Chat
 
 
 def respond(ok: bool, **payload):
     print(json.dumps({"ok": ok, **payload}, ensure_ascii=False))
+
+
+async def check_chat(client, chat_ref: str, mode: str):
+    if not await client.is_user_authorized():
+        respond(False, message="Технический аккаунт не подключён.")
+        return
+
+    entity = await client.get_entity(chat_ref)
+    permissions = await client.get_permissions(entity, "me")
+
+    if isinstance(entity, Channel):
+        if entity.broadcast:
+            chat_type = "channel"
+            can_send = bool(
+                getattr(permissions, "is_admin", False)
+                and getattr(getattr(permissions, "admin_rights", None), "post_messages", False)
+            )
+            publish_as = "channel"
+        else:
+            chat_type = "group"
+            banned = getattr(permissions, "banned_rights", None)
+            can_send = not bool(getattr(banned, "send_messages", False))
+            anonymous = bool(getattr(getattr(permissions, "admin_rights", None), "anonymous", False))
+            publish_as = "group" if anonymous else "account"
+    elif isinstance(entity, Chat):
+        chat_type = "group"
+        banned = getattr(permissions, "banned_rights", None)
+        can_send = not bool(getattr(banned, "send_messages", False))
+        publish_as = "account"
+    else:
+        chat_type = "user"
+        can_send = True
+        publish_as = "account"
+
+    can_read = True
+    allowed = can_read if mode == "source" else can_send
+
+    respond(
+        True,
+        status="available" if allowed else "no_permission",
+        title=getattr(entity, "title", None) or getattr(entity, "username", None) or str(getattr(entity, "id", "")),
+        chat_type=chat_type,
+        can_read=can_read,
+        can_send=can_send,
+        is_admin=bool(getattr(permissions, "is_admin", False)),
+        publish_as=publish_as,
+    )
 
 
 async def main():
@@ -34,6 +82,10 @@ async def main():
     sign_in.add_argument("--code", required=True)
     sign_in.add_argument("--phone-code-hash", required=True)
     sign_in.add_argument("--password")
+
+    check = subparsers.add_parser("check-chat")
+    check.add_argument("--chat", required=True)
+    check.add_argument("--mode", required=True, choices=["source", "destination"])
 
     subparsers.add_parser("status")
     subparsers.add_parser("logout")
@@ -65,10 +117,10 @@ async def main():
                     return
                 await client.sign_in(password=args.password)
             except PhoneCodeInvalidError:
-                respond(False, message="Невірний код Telegram.")
+                respond(False, message="Неверный код Telegram.")
                 sys.exit(1)
             except PhoneCodeExpiredError:
-                respond(False, message="Код Telegram прострочений. Надішліть новий код.")
+                respond(False, message="Код Telegram просрочен. Отправьте новый код.")
                 sys.exit(1)
 
             me = await client.get_me()
@@ -82,6 +134,10 @@ async def main():
                     "phone": me.phone or args.phone,
                 },
             )
+            return
+
+        if args.command == "check-chat":
+            await check_chat(client, args.chat, args.mode)
             return
 
         if args.command == "status":
