@@ -70,15 +70,22 @@ class NewsBotSettingsController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $validated, $newsTelegramApi): void {
-            if ($request->boolean('is_primary')) {
+            $makePrimary = $request->boolean('is_primary');
+            $hasAnotherPrimary = NewsTelegramApiCredential::query()
+                ->whereKeyNot($newsTelegramApi->id)
+                ->where('is_primary', true)
+                ->exists();
+
+            if ($makePrimary) {
                 NewsTelegramApiCredential::query()->whereKeyNot($newsTelegramApi->id)->update(['is_primary' => false]);
             }
+
             $newsTelegramApi->label = $validated['label'];
             $newsTelegramApi->api_id = $validated['api_id'];
             if (! empty($validated['api_hash'])) {
                 $newsTelegramApi->api_hash = $validated['api_hash'];
             }
-            $newsTelegramApi->is_primary = $request->boolean('is_primary');
+            $newsTelegramApi->is_primary = $makePrimary || ! $hasAnotherPrimary;
             $newsTelegramApi->save();
         });
 
@@ -87,16 +94,26 @@ class NewsBotSettingsController extends Controller
 
     public function destroyApi(Request $request, NewsTelegramApiCredential $newsTelegramApi, TelethonAccountService $telethon): RedirectResponse
     {
+        $wasPrimary = $newsTelegramApi->is_primary;
         $accounts = $newsTelegramApi->technicalAccounts()->get();
-        foreach ($accounts as $account) {
-            $telethon->resetSession($account);
-            $account->delete();
-        }
-        $newsTelegramApi->delete();
+
+        DB::transaction(function () use ($accounts, $newsTelegramApi, $telethon): void {
+            foreach ($accounts as $account) {
+                $telethon->resetSession($account);
+                $account->delete();
+            }
+            $newsTelegramApi->delete();
+        });
+
         $request->session()->forget('news_telegram_auth');
 
-        NewsTelegramApiCredential::query()->orderBy('id')->first()?->update(['is_primary' => true]);
-        NewsTechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
+        if ($wasPrimary) {
+            NewsTelegramApiCredential::query()->orderBy('id')->first()?->update(['is_primary' => true]);
+        }
+        if (NewsTechnicalTelegramAccount::query()->exists()
+            && ! NewsTechnicalTelegramAccount::query()->where('is_primary', true)->exists()) {
+            NewsTechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
+        }
 
         return back()->with('status', 'Telegram API новостей удалён.');
     }
@@ -184,14 +201,25 @@ class NewsBotSettingsController extends Controller
             'news_telegram_api_credential_id' => ['required', 'integer', 'exists:news_telegram_api_credentials,id'],
         ]);
         $apiChanged = (int) $newsAccount->news_telegram_api_credential_id !== (int) $validated['news_telegram_api_credential_id'];
-        if ($request->boolean('is_primary')) {
-            NewsTechnicalTelegramAccount::query()->whereKeyNot($newsAccount->id)->update(['is_primary' => false]);
-        }
-        $newsAccount->update([
-            'label' => $validated['label'],
-            'news_telegram_api_credential_id' => $validated['news_telegram_api_credential_id'],
-            'is_primary' => $request->boolean('is_primary'),
-        ]);
+
+        DB::transaction(function () use ($request, $newsAccount, $validated): void {
+            $makePrimary = $request->boolean('is_primary');
+            $hasAnotherPrimary = NewsTechnicalTelegramAccount::query()
+                ->whereKeyNot($newsAccount->id)
+                ->where('is_primary', true)
+                ->exists();
+
+            if ($makePrimary) {
+                NewsTechnicalTelegramAccount::query()->whereKeyNot($newsAccount->id)->update(['is_primary' => false]);
+            }
+
+            $newsAccount->update([
+                'label' => $validated['label'],
+                'news_telegram_api_credential_id' => $validated['news_telegram_api_credential_id'],
+                'is_primary' => $makePrimary || ! $hasAnotherPrimary,
+            ]);
+        });
+
         if ($apiChanged) {
             $telethon->resetSession($newsAccount);
             $newsAccount->update(['status' => 'disconnected', 'last_error' => null]);
@@ -213,10 +241,15 @@ class NewsBotSettingsController extends Controller
 
     public function destroy(Request $request, NewsTechnicalTelegramAccount $newsAccount, TelethonAccountService $telethon): RedirectResponse
     {
+        $wasPrimary = $newsAccount->is_primary;
         $telethon->resetSession($newsAccount);
         $newsAccount->delete();
         $request->session()->forget('news_telegram_auth');
-        NewsTechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
+
+        if ($wasPrimary) {
+            NewsTechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
+        }
+
         return back()->with('status', 'Аккаунт новостей удалён.');
     }
 
