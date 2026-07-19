@@ -2,7 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\NewsBotSetting;
 use App\Models\NewsSource;
+use App\Models\NewsTechnicalTelegramAccount;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
 use Throwable;
@@ -57,12 +59,31 @@ class NewsRelayCommand extends Command
     private function processCycle(TelethonAccountService $telethon): void
     {
         $now = now();
+        $extra = NewsBotSetting::query()->first()?->extra_settings;
+        $extra = is_array($extra) ? $extra : [];
+        $disabledAccountIds = array_values(array_unique(array_map('intval', (array) ($extra['disabled_account_ids'] ?? []))));
+        $disabledApiIds = array_values(array_unique(array_map('intval', (array) ($extra['disabled_api_ids'] ?? []))));
+
+        if ($disabledApiIds !== []) {
+            $disabledAccountIds = array_values(array_unique(array_merge(
+                $disabledAccountIds,
+                NewsTechnicalTelegramAccount::query()
+                    ->whereIn('news_telegram_api_credential_id', $disabledApiIds)
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all(),
+            )));
+        }
 
         NewsSource::query()
             ->with(['readerAccount.telegramApiCredential', 'publisherAccount.telegramApiCredential'])
             ->where('autopublish_enabled', true)
             ->where('source_status', 'available')
             ->where('destination_status', 'available')
+            ->when($disabledAccountIds !== [], function ($query) use ($disabledAccountIds): void {
+                $query->whereNotIn('reader_account_id', $disabledAccountIds)
+                    ->whereNotIn('publisher_account_id', $disabledAccountIds);
+            })
             ->orderBy('id')
             ->eachById(function (NewsSource $source) use ($telethon, $now): void {
                 $interval = max(3, (int) ($source->poll_interval_seconds ?: 3));
