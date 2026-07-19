@@ -8,16 +8,14 @@ use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
 use App\Http\Controllers\SourcePowerController;
 use App\Http\Controllers\TechnicalAccountPowerController;
-use App\Http\Controllers\TelegramApiPowerController;
 use App\Http\Controllers\TelegramDependencyController;
 use App\Http\Controllers\TelegramWelcomeController;
 use App\Http\Middleware\SourcePowerUiMiddleware;
 use App\Http\Middleware\SkyGuardianUiMiddleware;
 use App\Http\Middleware\TechnicalAccountPowerUiMiddleware;
-use App\Http\Middleware\TelegramApiPowerUiMiddleware;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', SourcePowerUiMiddleware::class, TechnicalAccountPowerUiMiddleware::class, TelegramApiPowerUiMiddleware::class, SkyGuardianUiMiddleware::class])->group(function (): void {
+Route::middleware(['auth', SourcePowerUiMiddleware::class, TechnicalAccountPowerUiMiddleware::class, SkyGuardianUiMiddleware::class])->group(function (): void {
     Route::get('/news/sources', [NewsSourceController::class, 'index'])->name('news.sources');
     Route::post('/news/sources', [NewsSourceController::class, 'store'])->name('news.sources.store');
     Route::put('/news/sources/{newsSource}', [NewsSourceController::class, 'update'])->name('news.sources.update');
@@ -28,7 +26,6 @@ Route::middleware(['auth', SourcePowerUiMiddleware::class, TechnicalAccountPower
     Route::put('/news/settings', [BotProfileController::class, 'updateNews'])->name('news.settings.update');
     Route::post('/news/settings/apis', [NewsBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
     Route::put('/news/settings/apis/{newsTelegramApi}', [NewsBotSettingsController::class, 'updateApi'])->name('news.telegram-api.update');
-    Route::post('/news/settings/apis/{newsTelegramApi}/power', [TelegramApiPowerController::class, 'news'])->name('news.telegram-api.power');
     Route::delete('/news/settings/apis/{newsTelegramApi}', [TelegramDependencyController::class, 'destroyNewsApi'])->name('news.telegram-api.destroy');
     Route::post('/news/settings/telegram/send-code', [NewsBotSettingsController::class, 'sendCode'])->name('news.telegram.send-code');
     Route::post('/news/settings/telegram/confirm', [NewsBotSettingsController::class, 'confirmCode'])->name('news.telegram.confirm');
@@ -49,7 +46,6 @@ Route::middleware(['auth', SourcePowerUiMiddleware::class, TechnicalAccountPower
     Route::put('/alerts/settings', [BotProfileController::class, 'updateAlert'])->name('alerts.settings.update');
     Route::post('/alerts/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('alerts.telegram-api.store');
     Route::put('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'updateApi'])->name('alerts.telegram-api.update');
-    Route::post('/alerts/settings/apis/{telegramApi}/power', [TelegramApiPowerController::class, 'alert'])->name('alerts.telegram-api.power');
     Route::delete('/alerts/settings/apis/{telegramApi}', [TelegramDependencyController::class, 'destroyAlertApi'])->name('alerts.telegram-api.destroy');
     Route::post('/alerts/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('alerts.telegram.send-code');
     Route::post('/alerts/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('alerts.telegram.confirm');
