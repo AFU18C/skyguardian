@@ -1,10 +1,7 @@
 <?php
 
 namespace App\Console\Commands;
-
 use App\Models\AlertSource;
-use App\Models\TechnicalTelegramAccount;
-use App\Services\Telegram\TelegramComponentPowerStore;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -48,29 +45,10 @@ class RunAlertRelay extends Command
 
     private function processSources(TelethonAccountService $telethon): void
     {
-        $state = app(TelegramComponentPowerStore::class)->section('alerts');
-        $disabledAccountIds = $state['disabled_account_ids'];
-        $disabledApiIds = $state['disabled_api_ids'];
-
-        if ($disabledApiIds !== []) {
-            $disabledAccountIds = array_values(array_unique(array_merge(
-                $disabledAccountIds,
-                TechnicalTelegramAccount::query()
-                    ->whereIn('telegram_api_credential_id', $disabledApiIds)
-                    ->pluck('id')
-                    ->map(fn ($id): int => (int) $id)
-                    ->all(),
-            )));
-        }
-
         $sources = AlertSource::query()
             ->where('autopublish_enabled', true)
             ->where('source_status', 'available')
             ->where('destination_status', 'available')
-            ->when($disabledAccountIds !== [], function ($query) use ($disabledAccountIds): void {
-                $query->whereNotIn('reader_account_id', $disabledAccountIds)
-                    ->whereNotIn('publisher_account_id', $disabledAccountIds);
-            })
             ->with([
                 'readerAccount.telegramApiCredential',
                 'publisherAccount.telegramApiCredential',
