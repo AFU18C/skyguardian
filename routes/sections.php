@@ -15,15 +15,14 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/news/settings', [NewsBotSettingsController::class, 'edit'])->name('news.settings');
     Route::put('/news/settings', [NewsBotSettingsController::class, 'update'])->name('news.settings.update');
-
-    Route::post('/news/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
-    Route::put('/news/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'updateApi'])->name('news.telegram-api.update');
-    Route::delete('/news/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'destroyApi'])->name('news.telegram-api.destroy');
-    Route::post('/news/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('news.telegram.send-code');
-    Route::post('/news/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('news.telegram.confirm');
-    Route::put('/news/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('news.telegram.update');
-    Route::delete('/news/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('news.telegram.disconnect');
-    Route::delete('/news/settings/telegram/{account}', [AlertBotSettingsController::class, 'destroy'])->name('news.telegram.destroy');
+    Route::post('/news/settings/apis', [NewsBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
+    Route::put('/news/settings/apis/{newsTelegramApi}', [NewsBotSettingsController::class, 'updateApi'])->name('news.telegram-api.update');
+    Route::delete('/news/settings/apis/{newsTelegramApi}', [NewsBotSettingsController::class, 'destroyApi'])->name('news.telegram-api.destroy');
+    Route::post('/news/settings/telegram/send-code', [NewsBotSettingsController::class, 'sendCode'])->name('news.telegram.send-code');
+    Route::post('/news/settings/telegram/confirm', [NewsBotSettingsController::class, 'confirmCode'])->name('news.telegram.confirm');
+    Route::put('/news/settings/telegram/{newsAccount}', [NewsBotSettingsController::class, 'updateAccount'])->name('news.telegram.update');
+    Route::delete('/news/settings/telegram/{newsAccount}/disconnect', [NewsBotSettingsController::class, 'disconnect'])->name('news.telegram.disconnect');
+    Route::delete('/news/settings/telegram/{newsAccount}', [NewsBotSettingsController::class, 'destroy'])->name('news.telegram.destroy');
 
     Route::get('/alerts/sources', [AlertSourceController::class, 'index'])->name('alerts.sources');
     Route::post('/alerts/sources', [AlertSourceController::class, 'store'])->name('alerts.sources.store');
@@ -35,11 +34,9 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/alerts/settings', [AlertBotSettingsController::class, 'edit'])->name('alerts.settings');
     Route::put('/alerts/settings', [AlertBotSettingsController::class, 'update'])->name('alerts.settings.update');
-
     Route::post('/alerts/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('alerts.telegram-api.store');
     Route::put('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'updateApi'])->name('alerts.telegram-api.update');
     Route::delete('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'destroyApi'])->name('alerts.telegram-api.destroy');
-
     Route::post('/alerts/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('alerts.telegram.send-code');
     Route::post('/alerts/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('alerts.telegram.confirm');
     Route::put('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('alerts.telegram.update');
