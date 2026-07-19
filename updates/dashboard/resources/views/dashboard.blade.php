@@ -1,3 +1,34 @@
+@php
+    $cpuCores = 1;
+    $cpuInfo = @file_get_contents('/proc/cpuinfo');
+    if (is_string($cpuInfo) && $cpuInfo !== '') {
+        $detectedCores = preg_match_all('/^processor\s*:/m', $cpuInfo);
+        $cpuCores = max(1, (int) $detectedCores);
+    }
+
+    $load = sys_getloadavg();
+    $loadOneMinute = is_array($load) ? (float) ($load[0] ?? 0) : 0;
+    $cpuPercent = min(100, max(0, round(($loadOneMinute / $cpuCores) * 100)));
+
+    $memoryPercent = 0;
+    $memoryInfo = @file_get_contents('/proc/meminfo');
+    if (is_string($memoryInfo) && $memoryInfo !== '') {
+        preg_match('/^MemTotal:\s+(\d+)/m', $memoryInfo, $totalMatch);
+        preg_match('/^MemAvailable:\s+(\d+)/m', $memoryInfo, $availableMatch);
+        $memoryTotal = (int) ($totalMatch[1] ?? 0);
+        $memoryAvailable = (int) ($availableMatch[1] ?? 0);
+        if ($memoryTotal > 0) {
+            $memoryPercent = min(100, max(0, round((($memoryTotal - $memoryAvailable) / $memoryTotal) * 100)));
+        }
+    }
+
+    $diskPercent = 0;
+    $diskTotal = @disk_total_space('/');
+    $diskFree = @disk_free_space('/');
+    if (is_numeric($diskTotal) && is_numeric($diskFree) && $diskTotal > 0) {
+        $diskPercent = min(100, max(0, round((($diskTotal - $diskFree) / $diskTotal) * 100)));
+    }
+@endphp
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -17,10 +48,10 @@
         .main{min-width:0;padding:34px 30px 42px}.topbar{display:flex;align-items:center;gap:14px}.menu-btn{display:none;width:44px;height:44px;border:0;border-radius:11px;background:#fff;box-shadow:0 5px 18px rgba(25,49,80,.1);font-size:22px}.heading h1{margin:0;font-size:36px;letter-spacing:-.035em}.heading p{margin:8px 0 0;color:var(--muted);font-size:17px}
         .content{max-width:920px;margin-top:28px}.metrics{display:grid;gap:20px}.metric-card{min-height:142px;display:grid;grid-template-columns:76px 1fr 24px;gap:18px;align-items:center;padding:24px 26px;background:var(--white);border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 25px rgba(35,57,86,.045)}
         .metric-icon{width:68px;height:68px;display:grid;place-items:center;border-radius:50%;font-size:30px}.metric-icon.blue{color:#1673ec;background:#eaf3ff}.metric-icon.red{color:var(--red);background:#fff0f3}.metric-icon.purple{color:var(--purple);background:#f1edff}.metric-label{font-size:15px;font-weight:800;color:#657185;text-transform:uppercase}.metric-number{margin-top:2px;font-size:35px;font-weight:800;line-height:1}.metric-note{margin-top:9px;color:#8993a2;font-size:15px}.arrow{color:#9ba7b7;font-size:32px;font-weight:300}
-        .system-card{margin-top:22px;background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 8px 25px rgba(35,57,86,.045)}.system-head{display:flex;align-items:center;gap:13px;padding:22px 25px;border-bottom:1px solid var(--line);font-weight:800;font-size:18px}.system-head span:first-child{color:#34a37b}.system-row{display:flex;justify-content:space-between;gap:20px;padding:20px 25px;border-bottom:1px solid var(--line)}.system-row:last-child{border-bottom:0}.system-row span:last-child{color:#657185}.badge{padding:6px 12px;border-radius:8px;background:#e7f8ef!important;color:#38a86c!important;font-weight:700}
+        .system-card{margin-top:22px;background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 8px 25px rgba(35,57,86,.045)}.system-head{display:flex;align-items:center;gap:13px;padding:22px 25px;border-bottom:1px solid var(--line);font-weight:800;font-size:18px}.system-head span:first-child{color:#34a37b}.system-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(130px,1fr) 54px;gap:18px;align-items:center;padding:20px 25px;border-bottom:1px solid var(--line)}.system-row:last-child{border-bottom:0}.system-value{color:#657185;text-align:right;font-weight:700}.progress{height:8px;border-radius:999px;background:#edf1f6;overflow:hidden}.progress span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2d8cff,#52b5ff)}.progress.memory span{background:linear-gradient(90deg,#7a55e8,#a58bff)}.progress.disk span{background:linear-gradient(90deg,#36a879,#63d29c)}
         .protection{margin-top:22px;padding:23px 25px;border:1px solid #dce9ff;border-radius:18px;background:linear-gradient(110deg,#f6f9ff,#fff);box-shadow:0 8px 25px rgba(35,57,86,.035)}.protection-title{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:800}.protection-title span:first-child{color:#2274e9}.protection p{margin:12px 0 0;color:#718096;line-height:1.5}
         .overlay{display:none}
-        @media(max-width:800px){.app{display:block}.sidebar{position:fixed;left:0;top:0;width:292px;transform:translateX(-105%);transition:transform .22s ease;box-shadow:20px 0 50px rgba(0,0,0,.28)}body.menu-open .sidebar{transform:translateX(0)}.overlay{display:block;position:fixed;inset:0;background:rgba(2,10,23,.52);opacity:0;pointer-events:none;transition:opacity .22s;z-index:20}body.menu-open .overlay{opacity:1;pointer-events:auto}.main{padding:20px 16px 34px}.menu-btn{display:grid;place-items:center}.heading h1{font-size:30px}.heading p{font-size:15px}.content{margin-top:22px}.metric-card{grid-template-columns:60px 1fr 16px;gap:13px;padding:20px 17px;min-height:126px}.metric-icon{width:56px;height:56px;font-size:25px}.metric-number{font-size:31px}.system-row{padding:18px}.system-head,.protection{padding:20px}.arrow{font-size:26px}}
+        @media(max-width:800px){.app{display:block}.sidebar{position:fixed;left:0;top:0;width:292px;transform:translateX(-105%);transition:transform .22s ease;box-shadow:20px 0 50px rgba(0,0,0,.28)}body.menu-open .sidebar{transform:translateX(0)}.overlay{display:block;position:fixed;inset:0;background:rgba(2,10,23,.52);opacity:0;pointer-events:none;transition:opacity .22s;z-index:20}body.menu-open .overlay{opacity:1;pointer-events:auto}.main{padding:20px 16px 34px}.menu-btn{display:grid;place-items:center}.heading h1{font-size:30px}.heading p{font-size:15px}.content{margin-top:22px}.metric-card{grid-template-columns:60px 1fr 16px;gap:13px;padding:20px 17px;min-height:126px}.metric-icon{width:56px;height:56px;font-size:25px}.metric-number{font-size:31px}.system-row{grid-template-columns:1fr 52px;gap:10px;padding:18px}.system-row .progress{grid-column:1/-1}.system-head,.protection{padding:20px}.arrow{font-size:26px}}
     </style>
 </head>
 <body>
@@ -60,10 +91,11 @@
             </section>
 
             <section class="system-card">
-                <div class="system-head"><span>▣</span><span>Система</span></div>
-                <div class="system-row"><span>Статус системы</span><span class="badge">Работает</span></div>
-                <div class="system-row"><span>Последняя проверка</span><span>{{ now()->format('d.m.Y H:i') }}</span></div>
-                <div class="system-row"><span>Версия</span><span>v1.0.0</span></div>
+                <div class="system-head"><span>▣</span><span>Мониторинг сервера</span></div>
+                <div class="system-row"><span>Нагрузка CPU</span><div class="progress"><span style="width: {{ $cpuPercent }}%"></span></div><span class="system-value">{{ $cpuPercent }}%</span></div>
+                <div class="system-row"><span>Использование памяти</span><div class="progress memory"><span style="width: {{ $memoryPercent }}%"></span></div><span class="system-value">{{ $memoryPercent }}%</span></div>
+                <div class="system-row"><span>Использование диска</span><div class="progress disk"><span style="width: {{ $diskPercent }}%"></span></div><span class="system-value">{{ $diskPercent }}%</span></div>
+                <div class="system-row"><span>Версия</span><div></div><span class="system-value">v1.0.0</span></div>
             </section>
 
             <section class="protection"><div class="protection-title"><span>♢</span><span>Надёжная защита неба</span></div><p>Мониторинг новостей и воздушных тревог<br>24/7 в реальном времени</p></section>
