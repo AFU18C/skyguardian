@@ -4,13 +4,14 @@ namespace App\Http\Middleware;
 
 use App\Models\AlertBotSetting;
 use App\Models\NewsBotSetting;
+use App\Services\Telegram\TelegramComponentPowerStore;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class BotPowerUiMiddleware
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, TelegramComponentPowerStore $power): Response
     {
         $response = $next($request);
 
@@ -29,12 +30,9 @@ class BotPowerUiMiddleware
         $settings = $section === 'news'
             ? NewsBotSetting::query()->first()
             : AlertBotSetting::query()->first();
-
+        $state = $power->section($section);
         $tokenConfigured = filled($settings?->bot_token);
-        $extra = is_array($settings?->extra_settings) ? $settings->extra_settings : [];
-        $enabled = $tokenConfigured && (array_key_exists('bot_enabled', $extra)
-            ? (bool) $extra['bot_enabled']
-            : true);
+        $enabled = $tokenConfigured && $power->botEnabled($section, true);
 
         if (! str_contains($html, 'name="bot_enabled"')) {
             $switch = '<div class="switch-row"><div class="switch-copy"><strong>Telegram-бот</strong><span>Включено — бот работает. Выключено — полный стоп.</span></div><label class="switch"><input type="checkbox" name="bot_enabled" value="1"'
@@ -51,8 +49,8 @@ class BotPowerUiMiddleware
         $html = str_replace('Удалить токен и отключить бота?', 'Удалить токен?', $html);
         $html = str_replace('Удалить токен и отключить бота', 'Удалить токен', $html);
 
-        $disabledAccounts = array_values(array_map('intval', (array) ($extra['disabled_account_ids'] ?? [])));
-        $disabledApis = array_values(array_map('intval', (array) ($extra['disabled_api_ids'] ?? [])));
+        $disabledAccounts = $state['disabled_account_ids'];
+        $disabledApis = $state['disabled_api_ids'];
         $baseUrl = url('/settings/components');
         $csrf = csrf_token();
 
