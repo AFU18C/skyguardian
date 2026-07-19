@@ -1,6 +1,6 @@
 [Unit]
 Description=SkyGuardian Telegram Alert Relay
-After=network-online.target mariadb.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]
@@ -13,8 +13,15 @@ Restart=always
 RestartSec=3
 TimeoutStopSec=20
 KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/SkyGuardianUa/storage /var/www/SkyGuardianUa/bootstrap/cache
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=skyguardian-alert-relay
 
 [Install]
 WantedBy=multi-user.target
