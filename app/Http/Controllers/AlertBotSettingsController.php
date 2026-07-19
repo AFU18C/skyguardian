@@ -114,17 +114,46 @@ class AlertBotSettingsController extends Controller
         return back()->with('status', 'Telegram API обновлён.');
     }
 
-    public function destroyApi(TelegramApiCredential $telegramApi): RedirectResponse
-    {
-        if ($telegramApi->technicalAccounts()->exists()) {
-            return back()->withErrors(['telegram_api' => 'Сначала назначьте этим аккаунтам другой Telegram API.']);
-        }
+    public function destroyApi(
+        Request $request,
+        TelegramApiCredential $telegramApi,
+        TelethonAccountService $telethon,
+    ): RedirectResponse {
         $wasPrimary = $telegramApi->is_primary;
-        $telegramApi->delete();
+        $accounts = $telegramApi->technicalAccounts()->get();
+
+        DB::transaction(function () use ($accounts, $telegramApi, $telethon): void {
+            foreach ($accounts as $account) {
+                $telethon->resetSession($account);
+                $account->delete();
+            }
+            $telegramApi->delete();
+        });
+
+        $request->session()->forget('telegram_auth');
+
         if ($wasPrimary) {
             TelegramApiCredential::query()->orderBy('id')->first()?->update(['is_primary' => true]);
         }
-        return back()->with('status', 'Telegram API удалён.');
+        if (TechnicalTelegramAccount::query()->exists()) {
+            TechnicalTelegramAccount::query()
+                ->where('is_primary', true)
+                ->exists() || TechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
+        }
+
+        $settings = $this->settings();
+        if (! TelegramApiCredential::query()->exists()) {
+            $settings->telegram_api_id = null;
+            $settings->telegram_api_hash = null;
+        }
+        if (! TechnicalTelegramAccount::query()->exists()) {
+            $this->clearLegacyTechnicalAccount($settings);
+        }
+        $settings->save();
+
+        $suffix = $accounts->isNotEmpty() ? ' Вместе с ним удалены привязанные технические аккаунты.' : '';
+
+        return back()->with('status', 'Telegram API удалён.'.$suffix);
     }
 
     public function sendCode(Request $request, TelethonAccountService $telethon): RedirectResponse
@@ -235,13 +264,26 @@ class AlertBotSettingsController extends Controller
         }
     }
 
-    public function destroy(TechnicalTelegramAccount $account): RedirectResponse
-    {
+    public function destroy(
+        Request $request,
+        TechnicalTelegramAccount $account,
+        TelethonAccountService $telethon,
+    ): RedirectResponse {
         $wasPrimary = $account->is_primary;
+        $telethon->resetSession($account);
         $account->delete();
+        $request->session()->forget('telegram_auth');
+
         if ($wasPrimary) {
             TechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
         }
+
+        if (! TechnicalTelegramAccount::query()->exists()) {
+            $settings = $this->settings();
+            $this->clearLegacyTechnicalAccount($settings);
+            $settings->save();
+        }
+
         return back()->with('status', 'Технический аккаунт удалён.');
     }
 
@@ -284,6 +326,15 @@ class AlertBotSettingsController extends Controller
             'status' => $settings->technical_status ?: 'disconnected',
             'is_primary' => true, 'last_error' => $settings->last_error,
         ]);
+    }
+
+    private function clearLegacyTechnicalAccount(AlertBotSetting $settings): void
+    {
+        $settings->technical_phone = null;
+        $settings->technical_name = null;
+        $settings->technical_username = null;
+        $settings->technical_telegram_id = null;
+        $settings->technical_status = 'disconnected';
     }
 
     private function applyAccountResult(TechnicalTelegramAccount $technicalAccount, array $result): void
