@@ -94,9 +94,12 @@ class SkyGuardianUiMiddleware
 .source-head>div:first-child{min-width:0}
 .source-account{min-width:0;overflow-wrap:anywhere}
 @media(max-width:800px){
-.source-head{grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;padding:19px 74px 82px 21px}
+.source-head{grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;padding:19px 21px 92px}
 .source-account{grid-column:auto}
 .source-statuses{grid-column:auto;grid-row:auto;justify-self:start;flex-direction:row;flex-wrap:wrap}
+.source-check-form{position:absolute;left:21px;right:82px;bottom:18px;margin:0}
+.source-check-btn{width:100%;min-height:42px}
+.edit-source-btn{right:18px;bottom:18px}
 }
 </style>
 CSS;
