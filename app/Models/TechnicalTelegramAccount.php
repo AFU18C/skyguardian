@@ -22,6 +22,12 @@ class TechnicalTelegramAccount extends Model
 
     protected static function booted(): void
     {
+        static::saved(function (TechnicalTelegramAccount $account): void {
+            if (! TechnicalTelegramAccount::query()->where('is_primary', true)->exists()) {
+                $account->updateQuietly(['is_primary' => true]);
+            }
+        });
+
         static::deleting(function (TechnicalTelegramAccount $account): void {
             AlertSource::query()
                 ->where('reader_account_id', $account->getKey())
