@@ -14,6 +14,11 @@ def respond(ok: bool, **payload):
     print(json.dumps({"ok": ok, **payload}, ensure_ascii=False))
 
 
+def compact_error(exception: Exception, limit: int = 1500) -> str:
+    message = str(exception).strip() or exception.__class__.__name__
+    return message[:limit]
+
+
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--reader-api-id", required=True, type=int)
@@ -61,7 +66,7 @@ async def main():
         if args.after_id <= 0:
             latest = await reader.get_messages(source, limit=1)
             latest_id = latest[0].id if latest else 0
-            respond(True, initialized=True, last_message_id=latest_id, published=0)
+            respond(True, initialized=True, last_message_id=latest_id, received=0, published=0)
             return
 
         messages = await reader.get_messages(
@@ -72,43 +77,69 @@ async def main():
         )
 
         published = 0
+        processed = 0
         last_message_id = args.after_id
 
         for message in messages:
-            last_message_id = max(last_message_id, message.id)
             text = message.message or ""
 
-            if message.media:
-                media_path = await message.download_media(file=temp_dir)
-                if media_path:
-                    await publisher.send_file(
-                        destination,
-                        media_path,
-                        caption=text or None,
-                        formatting_entities=message.entities if text else None,
-                    )
+            try:
+                sent = False
+
+                if message.media:
+                    media_path = await message.download_media(file=temp_dir)
+                    if media_path:
+                        await publisher.send_file(
+                            destination,
+                            media_path,
+                            caption=text or None,
+                            formatting_entities=message.entities if text else None,
+                        )
+                        sent = True
+                    elif text:
+                        await publisher.send_message(
+                            destination,
+                            text,
+                            formatting_entities=message.entities,
+                        )
+                        sent = True
                 elif text:
                     await publisher.send_message(
                         destination,
                         text,
                         formatting_entities=message.entities,
                     )
-            elif text:
-                await publisher.send_message(
-                    destination,
-                    text,
-                    formatting_entities=message.entities,
-                )
-            else:
-                continue
+                    sent = True
 
-            published += 1
+                # Пустые или неподдерживаемые служебные сообщения считаются обработанными,
+                # иначе relay будет бесконечно получать одно и то же сообщение.
+                last_message_id = max(last_message_id, message.id)
+                processed += 1
+                if sent:
+                    published += 1
+            except Exception as exception:
+                # Уже успешно обработанные сообщения фиксируются, поэтому при следующем
+                # запуске они не будут опубликованы повторно.
+                respond(
+                    True,
+                    initialized=False,
+                    partial_failure=True,
+                    message=compact_error(exception),
+                    failed_message_id=message.id,
+                    last_message_id=last_message_id,
+                    received=len(messages),
+                    processed=processed,
+                    published=published,
+                )
+                return
 
         respond(
             True,
             initialized=False,
+            partial_failure=False,
             last_message_id=last_message_id,
             received=len(messages),
+            processed=processed,
             published=published,
         )
     finally:
@@ -122,5 +153,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except Exception as exception:
-        respond(False, message=str(exception))
+        respond(False, message=compact_error(exception))
         sys.exit(1)
