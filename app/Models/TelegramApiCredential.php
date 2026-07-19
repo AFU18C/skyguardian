@@ -11,6 +11,15 @@ class TelegramApiCredential extends Model
 
     protected $hidden = ['api_id', 'api_hash'];
 
+    protected static function booted(): void
+    {
+        static::saved(function (TelegramApiCredential $credential): void {
+            if (! TelegramApiCredential::query()->where('is_primary', true)->exists()) {
+                $credential->updateQuietly(['is_primary' => true]);
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
