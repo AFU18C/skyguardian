@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class TelegramWelcomeController extends Controller
 {
@@ -25,24 +26,37 @@ class TelegramWelcomeController extends Controller
         $token = $this->botToken($data['bot']);
 
         if ($enabled && blank($token)) {
-            return back()->withErrors(['welcome' => 'У выбранного бота не сохранён токен Telegram.']);
+            return back()->withErrors(['welcome' => 'У выбранного бота не сохранён токен Telegram.'])->withInput();
         }
 
         $settings = $store->save([
-            'enabled' => $enabled,
+            'enabled' => false,
             'chat' => trim($data['chat']),
             'bot' => $data['bot'],
             'message' => trim($data['message']),
         ]);
 
-        if (($previous['bot'] ?? null) !== $settings['bot'] && filled($this->botToken((string) ($previous['bot'] ?? '')))) {
-            $this->deleteWebhook((string) $this->botToken((string) $previous['bot']));
-        }
+        try {
+            if (($previous['bot'] ?? null) !== $settings['bot']) {
+                $previousToken = $this->botToken((string) ($previous['bot'] ?? ''));
+                if (filled($previousToken)) {
+                    $this->deleteWebhook((string) $previousToken);
+                }
+            }
 
-        if ($enabled) {
-            $this->setWebhook((string) $token, $settings['bot'], (string) $settings['secret']);
-        } elseif (filled($token)) {
-            $this->deleteWebhook((string) $token);
+            if ($enabled) {
+                $this->setWebhook((string) $token, $settings['bot'], (string) $settings['secret']);
+                $store->save(['enabled' => true]);
+            } elseif (filled($token)) {
+                $this->deleteWebhook((string) $token);
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+            $store->save(['enabled' => false]);
+
+            return back()->withErrors([
+                'welcome' => $exception->getMessage() ?: 'Не удалось настроить Telegram webhook приветствия.',
+            ])->withInput();
         }
 
         return back()->with('status', $enabled
@@ -75,8 +89,12 @@ class TelegramWelcomeController extends Controller
 
     private function deleteWebhook(string $token): void
     {
-        Http::asForm()->timeout(15)->post("https://api.telegram.org/bot{$token}/deleteWebhook", [
+        $response = Http::asForm()->timeout(15)->post("https://api.telegram.org/bot{$token}/deleteWebhook", [
             'drop_pending_updates' => false,
-        ])->throw();
+        ]);
+
+        if (! $response->successful() || ! $response->json('ok')) {
+            throw new RuntimeException((string) ($response->json('description') ?: 'Telegram не отключил предыдущий webhook.'));
+        }
     }
 }
