@@ -12,6 +12,8 @@ class AlertBotSetting extends Model
         'technical_username',
         'technical_telegram_id',
         'technical_status',
+        'telegram_api_id',
+        'telegram_api_hash',
         'bot_token',
         'administrator_telegram_id',
         'bot_status',
@@ -32,6 +34,8 @@ class AlertBotSetting extends Model
     {
         return [
             'technical_phone' => 'encrypted',
+            'telegram_api_id' => 'encrypted',
+            'telegram_api_hash' => 'encrypted',
             'bot_token' => 'encrypted',
             'autopublish_enabled' => 'boolean',
             'text_processing_enabled' => 'boolean',
