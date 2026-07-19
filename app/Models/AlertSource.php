@@ -19,6 +19,9 @@ class AlertSource extends Model
         'destination_status',
         'destination_type',
         'publish_as',
+        'last_source_message_id',
+        'last_received_at',
+        'last_published_at',
         'last_error',
         'last_checked_at',
     ];
@@ -28,6 +31,9 @@ class AlertSource extends Model
         return [
             'autopublish_enabled' => 'boolean',
             'text_processing_enabled' => 'boolean',
+            'last_source_message_id' => 'integer',
+            'last_received_at' => 'datetime',
+            'last_published_at' => 'datetime',
             'last_checked_at' => 'datetime',
         ];
     }
