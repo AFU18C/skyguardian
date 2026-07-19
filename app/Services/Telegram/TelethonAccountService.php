@@ -2,6 +2,7 @@
 
 namespace App\Services\Telegram;
 
+use App\Models\AlertBotSetting;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -9,8 +10,9 @@ class TelethonAccountService
 {
     public function isConfigured(): bool
     {
-        return filled(config('services.telegram.api_id'))
-            && filled(config('services.telegram.api_hash'));
+        [$apiId, $apiHash] = $this->credentials();
+
+        return filled($apiId) && filled($apiHash);
     }
 
     public function sendCode(string $phone): array
@@ -45,17 +47,29 @@ class TelethonAccountService
         return $this->run(['logout']);
     }
 
+    private function credentials(): array
+    {
+        $settings = AlertBotSetting::query()->first();
+
+        return [
+            $settings?->telegram_api_id ?: config('services.telegram.api_id'),
+            $settings?->telegram_api_hash ?: config('services.telegram.api_hash'),
+        ];
+    }
+
     private function run(array $arguments): array
     {
-        if (! $this->isConfigured()) {
-            throw new RuntimeException('Telegram API ID та API Hash не налаштовані на сервері.');
+        [$apiId, $apiHash] = $this->credentials();
+
+        if (! filled($apiId) || ! filled($apiHash)) {
+            throw new RuntimeException('Вкажіть API ID та App api_hash у налаштуваннях бота.');
         }
 
         $command = array_merge([
             config('services.telegram.python', 'python3'),
             base_path('scripts/telegram_account.py'),
-            '--api-id', (string) config('services.telegram.api_id'),
-            '--api-hash', (string) config('services.telegram.api_hash'),
+            '--api-id', (string) $apiId,
+            '--api-hash', (string) $apiHash,
             '--session', storage_path('app/private/telegram/technical'),
         ], $arguments);
 
