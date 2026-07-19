@@ -1,14 +1,19 @@
 <?php
 
 use App\Http\Controllers\AlertBotSettingsController;
+use App\Http\Controllers\AlertSourceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function (): void {
     Route::view('/news/sources', 'section', ['pageTitle' => 'Источники новостей', 'pageDescription' => 'Подключение и управление источниками новостного бота', 'activeSection' => 'news-sources'])->name('news.sources');
     Route::view('/news/settings', 'section', ['pageTitle' => 'Настройки новостного бота', 'pageDescription' => 'Параметры обработки и публикации новостей', 'activeSection' => 'news-settings'])->name('news.settings');
 
-    Route::get('/alerts/sources', [AlertBotSettingsController::class, 'sources'])->name('alerts.sources');
-    Route::put('/alerts/sources', [AlertBotSettingsController::class, 'updateSources'])->name('alerts.sources.update');
+    Route::get('/alerts/sources', [AlertSourceController::class, 'index'])->name('alerts.sources');
+    Route::post('/alerts/sources', [AlertSourceController::class, 'store'])->name('alerts.sources.store');
+    Route::put('/alerts/sources/{alertSource}', [AlertSourceController::class, 'update'])->name('alerts.sources.update');
+    Route::delete('/alerts/sources/{alertSource}', [AlertSourceController::class, 'destroy'])->name('alerts.sources.destroy');
+    Route::post('/alerts/sources/{alertSource}/check-source', [AlertSourceController::class, 'checkSource'])->name('alerts.sources.check-source');
+    Route::post('/alerts/sources/{alertSource}/check-destination', [AlertSourceController::class, 'checkDestination'])->name('alerts.sources.check-destination');
 
     Route::get('/alerts/settings', [AlertBotSettingsController::class, 'edit'])->name('alerts.settings');
     Route::put('/alerts/settings', [AlertBotSettingsController::class, 'update'])->name('alerts.settings.update');
