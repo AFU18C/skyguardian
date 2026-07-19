@@ -98,6 +98,9 @@ class AlertSourceController extends Controller
                 'destination_status' => $destinationAvailable ? 'available' : 'error',
                 'destination_type' => $destinationResult['chat_type'] ?? null,
                 'publish_as' => $publishAs,
+                'autopublish_enabled' => $sourceAvailable && $destinationAvailable
+                    ? $alertSource->autopublish_enabled
+                    : false,
                 'last_error' => $sourceAvailable && $destinationAvailable
                     ? null
                     : 'Проверка источника или группы назначения завершилась ошибкой.',
@@ -132,15 +135,20 @@ class AlertSourceController extends Controller
                 'message' => ucfirst(implode(', ', $problems)).'. Проверьте адреса, доступ аккаунтов и права администратора.',
             ]);
         } catch (Throwable $exception) {
+            $message = mb_substr($exception->getMessage(), 0, 2000);
+
             $alertSource->update([
-                'last_error' => $exception->getMessage(),
+                'source_status' => 'error',
+                'destination_status' => 'error',
+                'autopublish_enabled' => false,
+                'last_error' => $message,
                 'last_checked_at' => now(),
             ]);
 
             return back()->with('check_modal', [
                 'type' => 'error',
                 'title' => 'Ошибка проверки',
-                'message' => $exception->getMessage(),
+                'message' => $message,
             ]);
         }
     }
@@ -152,6 +160,7 @@ class AlertSourceController extends Controller
             $available = ($result['status'] ?? null) === 'available';
             $alertSource->update([
                 'source_status' => $available ? 'available' : 'error',
+                'autopublish_enabled' => $available ? $alertSource->autopublish_enabled : false,
                 'last_error' => $available ? null : 'Технический аккаунт не может читать источник.',
                 'last_checked_at' => now(),
             ]);
@@ -164,16 +173,19 @@ class AlertSourceController extends Controller
                     : 'Проверьте адрес канала и доступ технического аккаунта.',
             ]);
         } catch (Throwable $exception) {
+            $message = mb_substr($exception->getMessage(), 0, 2000);
+
             $alertSource->update([
                 'source_status' => 'error',
-                'last_error' => $exception->getMessage(),
+                'autopublish_enabled' => false,
+                'last_error' => $message,
                 'last_checked_at' => now(),
             ]);
 
             return back()->with('check_modal', [
                 'type' => 'error',
                 'title' => 'Источник недоступен',
-                'message' => $exception->getMessage(),
+                'message' => $message,
             ]);
         }
     }
@@ -188,6 +200,7 @@ class AlertSourceController extends Controller
                 'destination_status' => $available ? 'available' : 'error',
                 'destination_type' => $result['chat_type'] ?? null,
                 'publish_as' => $publishAs,
+                'autopublish_enabled' => $available ? $alertSource->autopublish_enabled : false,
                 'last_error' => $available ? null : 'Нет права отправлять сообщения в группу назначения.',
                 'last_checked_at' => now(),
             ]);
@@ -206,16 +219,19 @@ class AlertSourceController extends Controller
                     : 'Добавьте технический аккаунт в группу или канал и выдайте ему право отправлять сообщения.',
             ]);
         } catch (Throwable $exception) {
+            $message = mb_substr($exception->getMessage(), 0, 2000);
+
             $alertSource->update([
                 'destination_status' => 'error',
-                'last_error' => $exception->getMessage(),
+                'autopublish_enabled' => false,
+                'last_error' => $message,
                 'last_checked_at' => now(),
             ]);
 
             return back()->with('check_modal', [
                 'type' => 'error',
                 'title' => 'Группа назначения недоступна',
-                'message' => $exception->getMessage(),
+                'message' => $message,
             ]);
         }
     }
