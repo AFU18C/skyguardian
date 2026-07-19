@@ -8,6 +8,7 @@ use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use RuntimeException;
 use Throwable;
 
 class NewsSourceController extends Controller
@@ -71,14 +72,17 @@ class NewsSourceController extends Controller
     public function destroy(NewsSource $newsSource): RedirectResponse
     {
         $newsSource->delete();
+
         return back()->with('status', 'Источник новостей удалён.');
     }
 
     public function check(NewsSource $newsSource, TelethonAccountService $telethon): RedirectResponse
     {
         try {
+            $newsSource->loadMissing(['readerAccount.telegramApiCredential', 'publisherAccount.telegramApiCredential']);
+
             if (! $newsSource->readerAccount || ! $newsSource->publisherAccount) {
-                throw new \RuntimeException('Выберите отдельные технические аккаунты новостного раздела.');
+                throw new RuntimeException('Выберите отдельные технические аккаунты новостного раздела.');
             }
 
             $sourceResult = $telethon->checkChat($newsSource->readerAccount, $newsSource->source_chat, 'source');
@@ -104,8 +108,19 @@ class NewsSourceController extends Controller
                     : 'Проверьте адреса, доступ аккаунтов и права публикации.',
             ]);
         } catch (Throwable $exception) {
-            $newsSource->update(['last_error' => $exception->getMessage(), 'last_checked_at' => now()]);
-            return back()->with('check_modal', ['type' => 'error', 'title' => 'Ошибка проверки', 'message' => $exception->getMessage()]);
+            $newsSource->update([
+                'source_status' => 'error',
+                'destination_status' => 'error',
+                'autopublish_enabled' => false,
+                'last_error' => mb_substr($exception->getMessage(), 0, 2000),
+                'last_checked_at' => now(),
+            ]);
+
+            return back()->with('check_modal', [
+                'type' => 'error',
+                'title' => 'Ошибка проверки',
+                'message' => $exception->getMessage(),
+            ]);
         }
     }
 
