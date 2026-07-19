@@ -43,6 +43,8 @@ class AlertBotSettingsController extends Controller
     {
         $validated = $request->validate([
             'technical_phone' => ['nullable', 'string', 'max:32'],
+            'telegram_api_id' => ['nullable', 'digits_between:4,20'],
+            'telegram_api_hash' => ['nullable', 'string', 'size:32'],
             'bot_token' => ['nullable', 'string', 'max:255'],
             'administrator_telegram_id' => ['nullable', 'string', 'max:32'],
             'source_chat' => ['nullable', 'string', 'max:255'],
@@ -51,13 +53,21 @@ class AlertBotSettingsController extends Controller
 
         $settings = AlertBotSetting::query()->firstOrCreate();
         $settings->fill([
-            'technical_phone' => $validated['technical_phone'] ?? null,
+            'technical_phone' => $validated['technical_phone'] ?? $settings->technical_phone,
             'administrator_telegram_id' => $validated['administrator_telegram_id'] ?? null,
             'source_chat' => $validated['source_chat'] ?? null,
             'destination_chat' => $validated['destination_chat'] ?? null,
             'autopublish_enabled' => $request->boolean('autopublish_enabled'),
             'text_processing_enabled' => $request->boolean('text_processing_enabled'),
         ]);
+
+        if ($request->filled('telegram_api_id')) {
+            $settings->telegram_api_id = $validated['telegram_api_id'];
+        }
+
+        if ($request->filled('telegram_api_hash')) {
+            $settings->telegram_api_hash = $validated['telegram_api_hash'];
+        }
 
         if ($request->filled('bot_token')) {
             $settings->bot_token = $validated['bot_token'];
