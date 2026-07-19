@@ -45,6 +45,37 @@ class NewsRelayCommand extends Command
                     return;
                 }
 
+                $readerReady = $source->readerAccount
+                    && $source->readerAccount->status === 'connected'
+                    && $source->readerAccount->telegramApiCredential;
+                $publisherReady = $source->publisherAccount
+                    && $source->publisherAccount->status === 'connected'
+                    && $source->publisherAccount->telegramApiCredential;
+
+                if (! $readerReady || ! $publisherReady) {
+                    $problems = [];
+                    if (! $readerReady) {
+                        $problems[] = 'аккаунт чтения не подключён или не имеет Telegram API';
+                    }
+                    if (! $publisherReady) {
+                        $problems[] = 'аккаунт публикации не подключён или не имеет Telegram API';
+                    }
+
+                    $message = ucfirst(implode('; ', $problems)).'. Автопубликация отключена.';
+
+                    $source->update([
+                        'autopublish_enabled' => false,
+                        'source_status' => $readerReady ? $source->source_status : 'not_checked',
+                        'destination_status' => $publisherReady ? $source->destination_status : 'not_checked',
+                        'last_polled_at' => $now,
+                        'last_error' => $message,
+                    ]);
+
+                    $this->warn(($source->label ?: 'Источник #'.$source->id).': '.$message);
+
+                    return;
+                }
+
                 try {
                     $result = $telethon->relayOnce($source);
                     $published = max(0, (int) ($result['published'] ?? 0));
