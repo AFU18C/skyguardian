@@ -7,13 +7,15 @@ use App\Http\Controllers\GroupManagementController;
 use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
 use App\Http\Controllers\SourcePowerController;
+use App\Http\Controllers\TechnicalAccountPowerController;
 use App\Http\Controllers\TelegramDependencyController;
 use App\Http\Controllers\TelegramWelcomeController;
 use App\Http\Middleware\SourcePowerUiMiddleware;
 use App\Http\Middleware\SkyGuardianUiMiddleware;
+use App\Http\Middleware\TechnicalAccountPowerUiMiddleware;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', SourcePowerUiMiddleware::class, SkyGuardianUiMiddleware::class])->group(function (): void {
+Route::middleware(['auth', SourcePowerUiMiddleware::class, TechnicalAccountPowerUiMiddleware::class, SkyGuardianUiMiddleware::class])->group(function (): void {
     Route::get('/news/sources', [NewsSourceController::class, 'index'])->name('news.sources');
     Route::post('/news/sources', [NewsSourceController::class, 'store'])->name('news.sources.store');
     Route::put('/news/sources/{newsSource}', [NewsSourceController::class, 'update'])->name('news.sources.update');
@@ -28,6 +30,7 @@ Route::middleware(['auth', SourcePowerUiMiddleware::class, SkyGuardianUiMiddlewa
     Route::post('/news/settings/telegram/send-code', [NewsBotSettingsController::class, 'sendCode'])->name('news.telegram.send-code');
     Route::post('/news/settings/telegram/confirm', [NewsBotSettingsController::class, 'confirmCode'])->name('news.telegram.confirm');
     Route::put('/news/settings/telegram/{newsAccount}', [NewsBotSettingsController::class, 'updateAccount'])->name('news.telegram.update');
+    Route::post('/news/settings/telegram/{account}/power', [TechnicalAccountPowerController::class, 'news'])->name('news.telegram.power');
     Route::delete('/news/settings/telegram/{newsAccount}/disconnect', [NewsBotSettingsController::class, 'disconnect'])->name('news.telegram.disconnect');
     Route::delete('/news/settings/telegram/{newsAccount}', [TelegramDependencyController::class, 'destroyNewsAccount'])->name('news.telegram.destroy');
 
@@ -47,6 +50,7 @@ Route::middleware(['auth', SourcePowerUiMiddleware::class, SkyGuardianUiMiddlewa
     Route::post('/alerts/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('alerts.telegram.send-code');
     Route::post('/alerts/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('alerts.telegram.confirm');
     Route::put('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('alerts.telegram.update');
+    Route::post('/alerts/settings/telegram/{account}/power', [TechnicalAccountPowerController::class, 'alert'])->name('alerts.telegram.power');
     Route::delete('/alerts/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('alerts.telegram.disconnect');
     Route::delete('/alerts/settings/telegram/{account}', [TelegramDependencyController::class, 'destroyAlertAccount'])->name('alerts.telegram.destroy');
 
