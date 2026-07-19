@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\AlertBotSetting;
 use App\Models\AlertSource;
 use App\Models\TechnicalTelegramAccount;
+use App\Services\Telegram\TelegramComponentPowerStore;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -48,10 +48,9 @@ class RunAlertRelay extends Command
 
     private function processSources(TelethonAccountService $telethon): void
     {
-        $extra = AlertBotSetting::query()->first()?->extra_settings;
-        $extra = is_array($extra) ? $extra : [];
-        $disabledAccountIds = array_values(array_unique(array_map('intval', (array) ($extra['disabled_account_ids'] ?? []))));
-        $disabledApiIds = array_values(array_unique(array_map('intval', (array) ($extra['disabled_api_ids'] ?? []))));
+        $state = app(TelegramComponentPowerStore::class)->section('alerts');
+        $disabledAccountIds = $state['disabled_account_ids'];
+        $disabledApiIds = $state['disabled_api_ids'];
 
         if ($disabledApiIds !== []) {
             $disabledAccountIds = array_values(array_unique(array_merge(
