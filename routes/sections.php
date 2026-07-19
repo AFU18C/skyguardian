@@ -2,11 +2,13 @@
 
 use App\Http\Controllers\AlertBotSettingsController;
 use App\Http\Controllers\AlertSourceController;
+use App\Http\Controllers\BotProfileController;
 use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
+use App\Http\Middleware\SkyGuardianUiMiddleware;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): void {
     Route::get('/news/sources', [NewsSourceController::class, 'index'])->name('news.sources');
     Route::post('/news/sources', [NewsSourceController::class, 'store'])->name('news.sources.store');
     Route::put('/news/sources/{newsSource}', [NewsSourceController::class, 'update'])->name('news.sources.update');
@@ -14,7 +16,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/news/sources/{newsSource}/check', [NewsSourceController::class, 'check'])->name('news.sources.check');
 
     Route::get('/news/settings', [NewsBotSettingsController::class, 'edit'])->name('news.settings');
-    Route::put('/news/settings', [NewsBotSettingsController::class, 'update'])->name('news.settings.update');
+    Route::put('/news/settings', [BotProfileController::class, 'updateNews'])->name('news.settings.update');
     Route::post('/news/settings/apis', [NewsBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
     Route::put('/news/settings/apis/{newsTelegramApi}', [NewsBotSettingsController::class, 'updateApi'])->name('news.telegram-api.update');
     Route::delete('/news/settings/apis/{newsTelegramApi}', [NewsBotSettingsController::class, 'destroyApi'])->name('news.telegram-api.destroy');
@@ -33,7 +35,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/alerts/sources/{alertSource}/check-destination', [AlertSourceController::class, 'checkDestination'])->name('alerts.sources.check-destination');
 
     Route::get('/alerts/settings', [AlertBotSettingsController::class, 'edit'])->name('alerts.settings');
-    Route::put('/alerts/settings', [AlertBotSettingsController::class, 'update'])->name('alerts.settings.update');
+    Route::put('/alerts/settings', [BotProfileController::class, 'updateAlert'])->name('alerts.settings.update');
     Route::post('/alerts/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('alerts.telegram-api.store');
     Route::put('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'updateApi'])->name('alerts.telegram-api.update');
     Route::delete('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'destroyApi'])->name('alerts.telegram-api.destroy');
@@ -43,5 +45,5 @@ Route::middleware('auth')->group(function (): void {
     Route::delete('/alerts/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('alerts.telegram.disconnect');
     Route::delete('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'destroy'])->name('alerts.telegram.destroy');
 
-    Route::view('/users', 'section', ['pageTitle' => 'Пользователи', 'pageDescription' => 'Управление доступом к панели SkyGuardian', 'activeSection' => 'users'])->name('users.index');
+    Route::view('/users', 'group-management')->name('users.index');
 });
