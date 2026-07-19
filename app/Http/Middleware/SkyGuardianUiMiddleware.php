@@ -16,7 +16,8 @@ class SkyGuardianUiMiddleware
 
         $this->applySecurityHeaders($response);
 
-        if (! str_contains((string) $response->headers->get('Content-Type'), 'text/html')) {
+        if (! $response->isSuccessful()
+            || ! str_contains((string) $response->headers->get('Content-Type'), 'text/html')) {
             return $response;
         }
 
@@ -63,14 +64,34 @@ class SkyGuardianUiMiddleware
 
     private function decorateBotSettings(string $html, ?string $botName, ?string $token): string
     {
-        $nameField = '<div class="field"><label>Название бота</label><input class="input" name="bot_name" value="'.e($botName ?? '').'" placeholder="Например: SkyGuardian"></div>';
-
-        $html = preg_replace('/(<div class="field"><label>(?:Токен Telegram-бота|Токен бота)<\/label>)/u', $nameField.'$1', $html, 1) ?? $html;
+        if (! str_contains($html, 'name="bot_name"')) {
+            $nameField = '<div class="field"><label>Название бота</label><input class="input" name="bot_name" value="'.e($botName ?? '').'" placeholder="Например: SkyGuardian"></div>';
+            $html = preg_replace(
+                '/(<div class="field"><label>(?:Токен Telegram-бота|Токен бота)<\/label>)/u',
+                $nameField.'$1',
+                $html,
+                1,
+            ) ?? $html;
+        }
 
         $masked = $this->maskToken($token);
-        if ($masked !== null) {
-            $html = preg_replace('/(<input class="input" type="password" name="bot_token")([^>]*)(>)/u', '$1 placeholder="'.$masked.' — введите новый токен для замены"$3', $html, 1) ?? $html;
+        if ($masked === null) {
+            return $html;
+        }
 
+        $html = preg_replace_callback(
+            '/<input class="input" type="password" name="bot_token"([^>]*)>/u',
+            function (array $matches) use ($masked): string {
+                $attributes = preg_replace('/\s+placeholder="[^"]*"/u', '', $matches[1]) ?? $matches[1];
+
+                return '<input class="input" type="password" name="bot_token"'.$attributes
+                    .' placeholder="'.e($masked).' — введите новый токен для замены">';
+            },
+            $html,
+            1,
+        ) ?? $html;
+
+        if (! str_contains($html, 'name="remove_bot_token"')) {
             $removeAction = '<div class="actions"><button class="btn danger" type="submit" name="remove_bot_token" value="1" formnovalidate onclick="return confirm(\'Удалить токен и отключить бота?\')">Удалить токен и отключить бота</button></div>';
             $html = preg_replace(
                 '/(<div class="field"><label>(?:Токен Telegram-бота|Токен бота)<\/label><input class="input" type="password" name="bot_token"[^>]*><\/div>)/u',
