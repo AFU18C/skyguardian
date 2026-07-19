@@ -8,7 +8,7 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/SkyGuardianUa
-ExecStart=/usr/bin/php artisan alerts:relay --sleep=2
+ExecStart=/usr/bin/php artisan alerts:relay --sleep=1
 Restart=always
 RestartSec=3
 TimeoutStopSec=20
