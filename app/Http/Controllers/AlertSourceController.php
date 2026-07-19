@@ -50,8 +50,10 @@ class AlertSourceController extends Controller
             || (int) $alertSource->publisher_account_id !== (int) $validated['publisher_account_id'];
 
         if ($request->boolean('autopublish_enabled')
-            && ($alertSource->source_status !== 'available' || $alertSource->destination_status !== 'available')) {
-            return back()->withErrors(['source' => 'Сначала успешно проверьте источник и группу назначения.']);
+            && ($connectionChanged
+                || $alertSource->source_status !== 'available'
+                || $alertSource->destination_status !== 'available')) {
+            return back()->withErrors(['source' => 'Сначала сохраните изменения и успешно проверьте источник и группу назначения.']);
         }
 
         $alertSource->fill($validated + [
@@ -65,6 +67,7 @@ class AlertSourceController extends Controller
             $alertSource->destination_type = null;
             $alertSource->publish_as = null;
             $alertSource->last_error = null;
+            $alertSource->autopublish_enabled = false;
         }
 
         $alertSource->save();
@@ -184,7 +187,7 @@ class AlertSourceController extends Controller
             'destination_chat' => $settings->destination_chat,
             'reader_account_id' => $account->id,
             'publisher_account_id' => $account->id,
-            'autopublish_enabled' => (bool) $settings->autopublish_enabled,
+            'autopublish_enabled' => false,
             'text_processing_enabled' => (bool) $settings->text_processing_enabled,
             'source_status' => 'not_checked',
             'destination_status' => 'not_checked',
