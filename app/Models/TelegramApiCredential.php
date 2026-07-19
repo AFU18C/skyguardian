@@ -9,6 +9,8 @@ class TelegramApiCredential extends Model
 {
     protected $fillable = ['label', 'api_id', 'api_hash', 'is_primary'];
 
+    protected $hidden = ['api_id', 'api_hash'];
+
     protected function casts(): array
     {
         return [
