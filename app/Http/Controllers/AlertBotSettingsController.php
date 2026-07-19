@@ -15,15 +15,7 @@ class AlertBotSettingsController extends Controller
 {
     public function edit(Request $request, TelethonAccountService $telethon): View
     {
-        $settings = AlertBotSetting::query()->firstOrCreate([], [
-            'technical_status' => 'disconnected',
-            'bot_status' => 'not_configured',
-            'source_status' => 'not_checked',
-            'destination_status' => 'not_checked',
-            'service_status' => 'stopped',
-            'text_processing_enabled' => true,
-        ]);
-
+        $settings = $this->settings();
         $this->importLegacyAccount($settings);
 
         return view('alerts.settings', [
@@ -36,6 +28,11 @@ class AlertBotSettingsController extends Controller
         ]);
     }
 
+    public function sources(): View
+    {
+        return view('alerts.sources', ['settings' => $this->settings()]);
+    }
+
     public function update(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -43,18 +40,13 @@ class AlertBotSettingsController extends Controller
             'telegram_api_hash' => ['nullable', 'string', 'size:32'],
             'bot_token' => ['nullable', 'string', 'max:255'],
             'administrator_telegram_id' => ['nullable', 'string', 'max:32'],
-            'source_chat' => ['nullable', 'string', 'max:255'],
-            'destination_chat' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $settings = AlertBotSetting::query()->firstOrCreate();
-        $settings->fill([
-            'administrator_telegram_id' => $validated['administrator_telegram_id'] ?? null,
-            'source_chat' => $validated['source_chat'] ?? null,
-            'destination_chat' => $validated['destination_chat'] ?? null,
-            'autopublish_enabled' => $request->boolean('autopublish_enabled'),
-            'text_processing_enabled' => $request->boolean('text_processing_enabled'),
-        ]);
+        $settings = $this->settings();
+
+        if ($request->has('administrator_telegram_id')) {
+            $settings->administrator_telegram_id = $validated['administrator_telegram_id'] ?? null;
+        }
 
         foreach (['telegram_api_id', 'telegram_api_hash', 'bot_token'] as $field) {
             if ($request->filled($field)) {
@@ -64,7 +56,24 @@ class AlertBotSettingsController extends Controller
 
         $settings->save();
 
-        return back()->with('status', 'Налаштування збережено.');
+        return back()->with('status', 'Настройки сохранены.');
+    }
+
+    public function updateSources(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'source_chat' => ['nullable', 'string', 'max:255'],
+            'destination_chat' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $this->settings()->update([
+            'source_chat' => $validated['source_chat'] ?? null,
+            'destination_chat' => $validated['destination_chat'] ?? null,
+            'autopublish_enabled' => $request->boolean('autopublish_enabled'),
+            'text_processing_enabled' => $request->boolean('text_processing_enabled'),
+        ]);
+
+        return back()->with('status', 'Настройки источника сохранены.');
     }
 
     public function sendCode(Request $request, TelethonAccountService $telethon): RedirectResponse
@@ -78,7 +87,7 @@ class AlertBotSettingsController extends Controller
         $account = isset($validated['account_id'])
             ? TechnicalTelegramAccount::query()->findOrFail($validated['account_id'])
             : TechnicalTelegramAccount::query()->create([
-                'label' => $validated['label'] ?: 'Технічний акаунт',
+                'label' => $validated['label'] ?: 'Технический аккаунт',
                 'phone' => $validated['technical_phone'],
                 'status' => 'disconnected',
                 'is_primary' => ! TechnicalTelegramAccount::query()->exists(),
@@ -100,7 +109,7 @@ class AlertBotSettingsController extends Controller
                 'password_required' => false,
             ]);
 
-            return back()->with('status', 'Код надіслано в Telegram.');
+            return back()->with('status', 'Код отправлен в Telegram.');
         } catch (Throwable $exception) {
             $account->update(['status' => 'error', 'last_error' => $exception->getMessage()]);
             return back()->withErrors(['telegram' => $exception->getMessage()]);
@@ -116,7 +125,7 @@ class AlertBotSettingsController extends Controller
 
         $auth = $request->session()->get('telegram_auth');
         if (! is_array($auth) || empty($auth['account_id']) || empty($auth['phone']) || empty($auth['phone_code_hash'])) {
-            return back()->withErrors(['telegram' => 'Спочатку надішліть код на номер телефону.']);
+            return back()->withErrors(['telegram' => 'Сначала отправьте код на номер телефона.']);
         }
 
         $account = TechnicalTelegramAccount::query()->findOrFail($auth['account_id']);
@@ -132,13 +141,13 @@ class AlertBotSettingsController extends Controller
 
             if (($result['status'] ?? null) === 'password_required') {
                 $request->session()->put('telegram_auth.password_required', true);
-                return back()->withErrors(['telegram' => 'Введіть пароль двоетапної перевірки Telegram.']);
+                return back()->withErrors(['telegram' => 'Введите пароль двухэтапной проверки Telegram.']);
             }
 
             $this->applyAccountResult($account, $result);
             $request->session()->forget('telegram_auth');
 
-            return back()->with('status', 'Технічний Telegram-акаунт підключено.');
+            return back()->with('status', 'Технический Telegram-аккаунт подключён.');
         } catch (Throwable $exception) {
             $account->update(['status' => 'error', 'last_error' => $exception->getMessage()]);
             return back()->withErrors(['telegram' => $exception->getMessage()]);
@@ -156,7 +165,7 @@ class AlertBotSettingsController extends Controller
             $account->update(['label' => $validated['label'], 'is_primary' => $request->boolean('is_primary')]);
         });
 
-        return back()->with('status', 'Акаунт оновлено.');
+        return back()->with('status', 'Аккаунт обновлён.');
     }
 
     public function disconnect(Request $request, TechnicalTelegramAccount $account, TelethonAccountService $telethon): RedirectResponse
@@ -165,7 +174,7 @@ class AlertBotSettingsController extends Controller
             $telethon->logout($account);
             $account->update(['status' => 'disconnected', 'last_error' => null]);
             $request->session()->forget('telegram_auth');
-            return back()->with('status', 'Технічний акаунт відключено.');
+            return back()->with('status', 'Технический аккаунт отключён.');
         } catch (Throwable $exception) {
             $account->update(['status' => 'error', 'last_error' => $exception->getMessage()]);
             return back()->withErrors(['telegram' => $exception->getMessage()]);
@@ -181,7 +190,19 @@ class AlertBotSettingsController extends Controller
             TechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
         }
 
-        return back()->with('status', 'Технічний акаунт видалено.');
+        return back()->with('status', 'Технический аккаунт удалён.');
+    }
+
+    private function settings(): AlertBotSetting
+    {
+        return AlertBotSetting::query()->firstOrCreate([], [
+            'technical_status' => 'disconnected',
+            'bot_status' => 'not_configured',
+            'source_status' => 'not_checked',
+            'destination_status' => 'not_checked',
+            'service_status' => 'stopped',
+            'text_processing_enabled' => true,
+        ]);
     }
 
     private function importLegacyAccount(AlertBotSetting $settings): void
@@ -191,7 +212,7 @@ class AlertBotSettingsController extends Controller
         }
 
         TechnicalTelegramAccount::query()->create([
-            'label' => 'Основний акаунт',
+            'label' => 'Основной аккаунт',
             'phone' => $settings->technical_phone,
             'name' => $settings->technical_name,
             'username' => $settings->technical_username,
