@@ -54,6 +54,10 @@ class SkyGuardianUiMiddleware
             $html = $this->keepTechnicalAccountsOpen($request, $html, 'news_telegram_auth');
         }
 
+        if ($request->routeIs('alerts.sources') || $request->routeIs('news.sources')) {
+            $html = $this->stabilizeSourceCards($html);
+        }
+
         $response->setContent($html);
 
         return $response;
@@ -80,6 +84,24 @@ class SkyGuardianUiMiddleware
         }
 
         return preg_replace('/<details class="card">/', '<details class="card" open>', $html, 1) ?? $html;
+    }
+
+    private function stabilizeSourceCards(string $html): string
+    {
+        $css = <<<'CSS'
+<style id="source-card-long-title-fix">
+.source-title{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal;line-height:1.25}
+.source-head>div:first-child{min-width:0}
+.source-account{min-width:0;overflow-wrap:anywhere}
+@media(max-width:800px){
+.source-head{grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;padding:19px 74px 82px 21px}
+.source-account{grid-column:auto}
+.source-statuses{grid-column:auto;grid-row:auto;justify-self:start;flex-direction:row;flex-wrap:wrap}
+}
+</style>
+CSS;
+
+        return str_replace('</head>', $css.'</head>', $html);
     }
 
     private function decorateBotSettings(string $html, ?string $botName, ?string $token): string
