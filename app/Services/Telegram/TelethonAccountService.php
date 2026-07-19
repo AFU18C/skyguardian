@@ -2,18 +2,21 @@
 
 namespace App\Services\Telegram;
 
-use App\Models\AlertBotSetting;
 use App\Models\TechnicalTelegramAccount;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class TelethonAccountService
 {
-    public function isConfigured(): bool
+    public function isConfigured(?TechnicalTelegramAccount $account = null): bool
     {
-        [$apiId, $apiHash] = $this->credentials();
+        if ($account) {
+            $account->loadMissing('telegramApiCredential');
+            return filled($account->telegramApiCredential?->api_id)
+                && filled($account->telegramApiCredential?->api_hash);
+        }
 
-        return filled($apiId) && filled($apiHash);
+        return \App\Models\TelegramApiCredential::query()->exists();
     }
 
     public function sendCode(string $phone, TechnicalTelegramAccount $account): array
@@ -23,18 +26,11 @@ class TelethonAccountService
 
     public function signIn(string $phone, string $code, string $phoneCodeHash, TechnicalTelegramAccount $account, ?string $password = null): array
     {
-        $arguments = [
-            'sign-in',
-            '--phone', $phone,
-            '--code', $code,
-            '--phone-code-hash', $phoneCodeHash,
-        ];
-
+        $arguments = ['sign-in', '--phone', $phone, '--code', $code, '--phone-code-hash', $phoneCodeHash];
         if (filled($password)) {
             $arguments[] = '--password';
             $arguments[] = $password;
         }
-
         return $this->run($arguments, $account);
     }
 
@@ -48,38 +44,32 @@ class TelethonAccountService
         return $this->run(['logout'], $account);
     }
 
-    private function credentials(): array
+    private function credentials(TechnicalTelegramAccount $account): array
     {
-        $settings = AlertBotSetting::query()->first();
-
-        return [
-            $settings?->telegram_api_id ?: config('services.telegram.api_id'),
-            $settings?->telegram_api_hash ?: config('services.telegram.api_hash'),
-        ];
+        $account->loadMissing('telegramApiCredential');
+        $api = $account->telegramApiCredential;
+        return [$api?->api_id, $api?->api_hash];
     }
 
     private function sessionPath(TechnicalTelegramAccount $account): string
     {
         $legacyPath = storage_path('app/private/telegram/technical');
-
         if ($account->is_primary && (is_file($legacyPath.'.session') || is_file($legacyPath))) {
             return $legacyPath;
         }
 
         $sessionDirectory = storage_path('app/private/telegram/accounts');
         if (! is_dir($sessionDirectory) && ! mkdir($sessionDirectory, 0770, true) && ! is_dir($sessionDirectory)) {
-            throw new RuntimeException('Не вдалося створити каталог Telegram-сесій.');
+            throw new RuntimeException('Не удалось создать каталог Telegram-сессий.');
         }
-
         return $sessionDirectory.'/'.$account->sessionKey();
     }
 
     private function run(array $arguments, TechnicalTelegramAccount $account): array
     {
-        [$apiId, $apiHash] = $this->credentials();
-
+        [$apiId, $apiHash] = $this->credentials($account);
         if (! filled($apiId) || ! filled($apiHash)) {
-            throw new RuntimeException('Вкажіть API ID та App api_hash у налаштуваннях бота.');
+            throw new RuntimeException('Выберите Telegram API для технического аккаунта.');
         }
 
         $command = array_merge([
@@ -93,18 +83,14 @@ class TelethonAccountService
         $process = new Process($command, base_path());
         $process->setTimeout(45);
         $process->run();
-
         $output = trim($process->getOutput() ?: $process->getErrorOutput());
         $result = json_decode($output, true);
-
         if (! is_array($result)) {
-            throw new RuntimeException($output ?: 'Telethon не повернув відповідь.');
+            throw new RuntimeException($output ?: 'Telethon не вернул ответ.');
         }
-
         if (! $process->isSuccessful() || ($result['ok'] ?? false) !== true) {
-            throw new RuntimeException($result['message'] ?? 'Помилка підключення до Telegram.');
+            throw new RuntimeException($result['message'] ?? 'Ошибка подключения к Telegram.');
         }
-
         return $result;
     }
 }
