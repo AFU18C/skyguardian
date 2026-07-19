@@ -1,0 +1,20 @@
+[Unit]
+Description=SkyGuardian Telegram Alert Relay
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/SkyGuardianUa
+ExecStart=/usr/bin/php artisan alerts:relay --sleep=2
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
