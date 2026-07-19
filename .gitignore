@@ -1,0 +1,7 @@
+# SkyGuardian Telegram technical account secrets
+telegram_listener/.env
+telegram_listener/.venv/
+telegram_listener/storage/
+telegram_listener/*.session
+telegram_listener/*.session-journal
+telegram_listener/__pycache__/
