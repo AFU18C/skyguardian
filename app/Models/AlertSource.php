@@ -15,6 +15,7 @@ class AlertSource extends Model
         'publisher_account_id',
         'autopublish_enabled',
         'text_processing_enabled',
+        'poll_interval_seconds',
         'source_status',
         'destination_status',
         'destination_type',
@@ -22,6 +23,7 @@ class AlertSource extends Model
         'last_source_message_id',
         'last_received_at',
         'last_published_at',
+        'last_polled_at',
         'last_error',
         'last_checked_at',
     ];
@@ -31,9 +33,11 @@ class AlertSource extends Model
         return [
             'autopublish_enabled' => 'boolean',
             'text_processing_enabled' => 'boolean',
+            'poll_interval_seconds' => 'integer',
             'last_source_message_id' => 'integer',
             'last_received_at' => 'datetime',
             'last_published_at' => 'datetime',
+            'last_polled_at' => 'datetime',
             'last_checked_at' => 'datetime',
         ];
     }
