@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AlertBotSetting;
+use App\Models\NewsBotSetting;
 use App\Models\NewsTechnicalTelegramAccount;
 use App\Models\TechnicalTelegramAccount;
 use App\Services\Telegram\TelethonAccountService;
+use App\Services\Telegram\WelcomeSettingsStore;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +16,7 @@ use Throwable;
 
 class GroupManagementController extends Controller
 {
-    public function index(): View
+    public function index(WelcomeSettingsStore $welcomeStore): View
     {
         $alertAccounts = TechnicalTelegramAccount::query()
             ->where('status', 'connected')
@@ -27,7 +30,17 @@ class GroupManagementController extends Controller
             ->orderBy('label')
             ->get();
 
-        return view('group-management', compact('alertAccounts', 'newsAccounts'));
+        $welcomeSettings = $welcomeStore->get();
+        $newsBotConfigured = filled(NewsBotSetting::query()->first()?->bot_token);
+        $alertBotConfigured = filled(AlertBotSetting::query()->first()?->bot_token);
+
+        return view('group-management', compact(
+            'alertAccounts',
+            'newsAccounts',
+            'welcomeSettings',
+            'newsBotConfigured',
+            'alertBotConfigured',
+        ));
     }
 
     public function deleteMessages(Request $request, TelethonAccountService $telegram): JsonResponse
