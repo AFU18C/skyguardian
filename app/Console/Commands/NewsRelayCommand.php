@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\NewsSource;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
-use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
@@ -17,7 +16,7 @@ class NewsRelayCommand extends Command
 
     public function handle(TelethonAccountService $telethon): int
     {
-        $lock = Cache::lock('skyguardian:news-relay', 300);
+        $lock = Cache::lock('skyguardian:news-relay', 86400);
 
         if (! $lock->get()) {
             $this->warn('Новостной relay уже запущен в другом процессе.');
@@ -27,7 +26,7 @@ class NewsRelayCommand extends Command
 
         try {
             do {
-                $this->processCycle($telethon, $lock);
+                $this->processCycle($telethon);
 
                 if ($this->option('once')) {
                     break;
@@ -42,11 +41,9 @@ class NewsRelayCommand extends Command
         return self::SUCCESS;
     }
 
-    private function processCycle(TelethonAccountService $telethon, Lock $lock): void
+    private function processCycle(TelethonAccountService $telethon): void
     {
         $now = now();
-        $lock->forceRelease();
-        $lock->get();
 
         NewsSource::query()
             ->with(['readerAccount.telegramApiCredential', 'publisherAccount.telegramApiCredential'])
