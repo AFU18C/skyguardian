@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\NewsSource;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class NewsRelayCommand extends Command
@@ -16,27 +15,15 @@ class NewsRelayCommand extends Command
 
     public function handle(TelethonAccountService $telethon): int
     {
-        $lock = Cache::lock('skyguardian:news-relay', 86400);
+        do {
+            $this->processCycle($telethon);
 
-        if (! $lock->get()) {
-            $this->warn('Новостной relay уже запущен в другом процессе.');
+            if ($this->option('once')) {
+                break;
+            }
 
-            return self::FAILURE;
-        }
-
-        try {
-            do {
-                $this->processCycle($telethon);
-
-                if ($this->option('once')) {
-                    break;
-                }
-
-                sleep(1);
-            } while (true);
-        } finally {
-            $lock->release();
-        }
+            sleep(1);
+        } while (true);
 
         return self::SUCCESS;
     }
