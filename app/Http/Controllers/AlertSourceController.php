@@ -38,7 +38,7 @@ class AlertSourceController extends Controller
             'text_processing_enabled' => $request->boolean('text_processing_enabled'),
         ]);
 
-        return back()->with('status', 'Источник добавлен. Проверьте канал и группу назначения.');
+        return back()->with('status', 'Источник добавлен. Запустите проверку.');
     }
 
     public function update(Request $request, AlertSource $alertSource): RedirectResponse
@@ -53,7 +53,7 @@ class AlertSourceController extends Controller
             && ($connectionChanged
                 || $alertSource->source_status !== 'available'
                 || $alertSource->destination_status !== 'available')) {
-            return back()->withErrors(['source' => 'Сначала сохраните изменения и успешно проверьте источник и группу назначения.']);
+            return back()->withErrors(['source' => 'Сначала сохраните изменения и успешно запустите проверку.']);
         }
 
         $alertSource->fill($validated + [
@@ -81,6 +81,68 @@ class AlertSourceController extends Controller
         $alertSource->delete();
 
         return back()->with('status', 'Источник удалён.');
+    }
+
+    public function check(AlertSource $alertSource, TelethonAccountService $telethon): RedirectResponse
+    {
+        try {
+            $sourceResult = $telethon->checkChat($alertSource->readerAccount, $alertSource->source_chat, 'source');
+            $destinationResult = $telethon->checkChat($alertSource->publisherAccount, $alertSource->destination_chat, 'destination');
+
+            $sourceAvailable = ($sourceResult['status'] ?? null) === 'available';
+            $destinationAvailable = ($destinationResult['status'] ?? null) === 'available';
+            $publishAs = $destinationResult['publish_as'] ?? 'account';
+
+            $alertSource->update([
+                'source_status' => $sourceAvailable ? 'available' : 'error',
+                'destination_status' => $destinationAvailable ? 'available' : 'error',
+                'destination_type' => $destinationResult['chat_type'] ?? null,
+                'publish_as' => $publishAs,
+                'last_error' => $sourceAvailable && $destinationAvailable
+                    ? null
+                    : 'Проверка источника или группы назначения завершилась ошибкой.',
+                'last_checked_at' => now(),
+            ]);
+
+            if ($sourceAvailable && $destinationAvailable) {
+                $publishLabel = match ($publishAs) {
+                    'channel' => 'канала',
+                    'group' => 'группы',
+                    default => 'технического аккаунта',
+                };
+
+                return back()->with('check_modal', [
+                    'type' => 'success',
+                    'title' => 'Проверка успешно пройдена',
+                    'message' => 'Источник доступен, публикация разрешена. Сообщения будут выходить от имени '.$publishLabel.'.',
+                ]);
+            }
+
+            $problems = [];
+            if (! $sourceAvailable) {
+                $problems[] = 'нет доступа к источнику';
+            }
+            if (! $destinationAvailable) {
+                $problems[] = 'нет прав на публикацию';
+            }
+
+            return back()->with('check_modal', [
+                'type' => 'error',
+                'title' => 'Проверка не пройдена',
+                'message' => ucfirst(implode(', ', $problems)).'. Проверьте адреса, доступ аккаунтов и права администратора.',
+            ]);
+        } catch (Throwable $exception) {
+            $alertSource->update([
+                'last_error' => $exception->getMessage(),
+                'last_checked_at' => now(),
+            ]);
+
+            return back()->with('check_modal', [
+                'type' => 'error',
+                'title' => 'Ошибка проверки',
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     public function checkSource(AlertSource $alertSource, TelethonAccountService $telethon): RedirectResponse
