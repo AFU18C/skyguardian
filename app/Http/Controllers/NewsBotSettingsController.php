@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\NewsBotSetting;
+use App\Models\NewsSource;
 use App\Models\NewsTechnicalTelegramAccount;
 use App\Models\NewsTelegramApiCredential;
 use App\Services\Telegram\TelethonAccountService;
@@ -97,9 +98,13 @@ class NewsBotSettingsController extends Controller
         $wasPrimary = $newsTelegramApi->is_primary;
         $accounts = $newsTelegramApi->technicalAccounts()->get();
 
-        DB::transaction(function () use ($accounts, $newsTelegramApi, $telethon): void {
+        foreach ($accounts as $account) {
+            $telethon->resetSession($account);
+        }
+
+        DB::transaction(function () use ($accounts, $newsTelegramApi): void {
             foreach ($accounts as $account) {
-                $telethon->resetSession($account);
+                $this->detachAccountFromSources($account->id);
                 $account->delete();
             }
             $newsTelegramApi->delete();
@@ -115,7 +120,7 @@ class NewsBotSettingsController extends Controller
             NewsTechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
         }
 
-        return back()->with('status', 'Telegram API новостей удалён.');
+        return back()->with('status', 'Telegram API новостей удалён. Связанные источники сохранены, но автопубликация для них отключена.');
     }
 
     public function sendCode(Request $request, TelethonAccountService $telethon): RedirectResponse
@@ -243,14 +248,40 @@ class NewsBotSettingsController extends Controller
     {
         $wasPrimary = $newsAccount->is_primary;
         $telethon->resetSession($newsAccount);
-        $newsAccount->delete();
+
+        DB::transaction(function () use ($newsAccount): void {
+            $this->detachAccountFromSources($newsAccount->id);
+            $newsAccount->delete();
+        });
+
         $request->session()->forget('news_telegram_auth');
 
         if ($wasPrimary) {
             NewsTechnicalTelegramAccount::query()->orderBy('id')->first()?->update(['is_primary' => true]);
         }
 
-        return back()->with('status', 'Аккаунт новостей удалён.');
+        return back()->with('status', 'Аккаунт новостей удалён. Связанные источники сохранены, но автопубликация для них отключена.');
+    }
+
+    private function detachAccountFromSources(int $accountId): void
+    {
+        NewsSource::query()
+            ->where('reader_account_id', $accountId)
+            ->update([
+                'reader_account_id' => null,
+                'autopublish_enabled' => false,
+                'source_status' => 'not_checked',
+                'last_error' => 'Аккаунт чтения удалён. Выберите новый технический аккаунт.',
+            ]);
+
+        NewsSource::query()
+            ->where('publisher_account_id', $accountId)
+            ->update([
+                'publisher_account_id' => null,
+                'autopublish_enabled' => false,
+                'destination_status' => 'not_checked',
+                'last_error' => 'Аккаунт публикации удалён. Выберите новый технический аккаунт.',
+            ]);
     }
 
     private function settings(): NewsBotSetting
