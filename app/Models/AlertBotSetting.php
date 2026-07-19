@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class AlertBotSetting extends Model
 {
     protected $fillable = [
+        'bot_name',
         'technical_phone',
         'technical_name',
         'technical_username',
@@ -28,6 +29,13 @@ class AlertBotSetting extends Model
         'last_published_at',
         'last_error',
         'extra_settings',
+    ];
+
+    protected $hidden = [
+        'technical_phone',
+        'telegram_api_id',
+        'telegram_api_hash',
+        'bot_token',
     ];
 
     protected function casts(): array
