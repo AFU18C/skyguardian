@@ -6,17 +6,20 @@ use App\Http\Controllers\BotProfileController;
 use App\Http\Controllers\GroupManagementController;
 use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
+use App\Http\Controllers\SourcePowerController;
 use App\Http\Controllers\TelegramDependencyController;
 use App\Http\Controllers\TelegramWelcomeController;
+use App\Http\Middleware\SourcePowerUiMiddleware;
 use App\Http\Middleware\SkyGuardianUiMiddleware;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): void {
+Route::middleware(['auth', SourcePowerUiMiddleware::class, SkyGuardianUiMiddleware::class])->group(function (): void {
     Route::get('/news/sources', [NewsSourceController::class, 'index'])->name('news.sources');
     Route::post('/news/sources', [NewsSourceController::class, 'store'])->name('news.sources.store');
     Route::put('/news/sources/{newsSource}', [NewsSourceController::class, 'update'])->name('news.sources.update');
     Route::delete('/news/sources/{newsSource}', [NewsSourceController::class, 'destroy'])->name('news.sources.destroy');
     Route::post('/news/sources/{newsSource}/check', [NewsSourceController::class, 'check'])->name('news.sources.check');
+    Route::post('/news/sources/{newsSource}/power', [SourcePowerController::class, 'news'])->name('news.sources.power');
     Route::get('/news/settings', [NewsBotSettingsController::class, 'edit'])->name('news.settings');
     Route::put('/news/settings', [BotProfileController::class, 'updateNews'])->name('news.settings.update');
     Route::post('/news/settings/apis', [NewsBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
@@ -33,6 +36,7 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
     Route::put('/alerts/sources/{alertSource}', [AlertSourceController::class, 'update'])->name('alerts.sources.update');
     Route::delete('/alerts/sources/{alertSource}', [AlertSourceController::class, 'destroy'])->name('alerts.sources.destroy');
     Route::post('/alerts/sources/{alertSource}/check', [AlertSourceController::class, 'check'])->name('alerts.sources.check');
+    Route::post('/alerts/sources/{alertSource}/power', [SourcePowerController::class, 'alert'])->name('alerts.sources.power');
     Route::post('/alerts/sources/{alertSource}/check-source', [AlertSourceController::class, 'checkSource'])->name('alerts.sources.check-source');
     Route::post('/alerts/sources/{alertSource}/check-destination', [AlertSourceController::class, 'checkDestination'])->name('alerts.sources.check-destination');
     Route::get('/alerts/settings', [AlertBotSettingsController::class, 'edit'])->name('alerts.settings');
