@@ -7,6 +7,7 @@ use App\Http\Controllers\GroupManagementController;
 use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
 use App\Http\Controllers\TelegramDependencyController;
+use App\Http\Controllers\TelegramWelcomeController;
 use App\Http\Middleware\SkyGuardianUiMiddleware;
 use Illuminate\Support\Facades\Route;
 
@@ -49,4 +50,5 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
 
     Route::get('/users', [GroupManagementController::class, 'index'])->name('users.index');
     Route::post('/users/delete-messages', [GroupManagementController::class, 'deleteMessages'])->name('users.messages.delete');
+    Route::put('/users/welcome', [TelegramWelcomeController::class, 'update'])->name('users.welcome.update');
 });
