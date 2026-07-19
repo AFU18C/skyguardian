@@ -17,7 +17,6 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
     Route::put('/news/sources/{newsSource}', [NewsSourceController::class, 'update'])->name('news.sources.update');
     Route::delete('/news/sources/{newsSource}', [NewsSourceController::class, 'destroy'])->name('news.sources.destroy');
     Route::post('/news/sources/{newsSource}/check', [NewsSourceController::class, 'check'])->name('news.sources.check');
-
     Route::get('/news/settings', [NewsBotSettingsController::class, 'edit'])->name('news.settings');
     Route::put('/news/settings', [BotProfileController::class, 'updateNews'])->name('news.settings.update');
     Route::post('/news/settings/apis', [NewsBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
@@ -36,7 +35,6 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
     Route::post('/alerts/sources/{alertSource}/check', [AlertSourceController::class, 'check'])->name('alerts.sources.check');
     Route::post('/alerts/sources/{alertSource}/check-source', [AlertSourceController::class, 'checkSource'])->name('alerts.sources.check-source');
     Route::post('/alerts/sources/{alertSource}/check-destination', [AlertSourceController::class, 'checkDestination'])->name('alerts.sources.check-destination');
-
     Route::get('/alerts/settings', [AlertBotSettingsController::class, 'edit'])->name('alerts.settings');
     Route::put('/alerts/settings', [BotProfileController::class, 'updateAlert'])->name('alerts.settings.update');
     Route::post('/alerts/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('alerts.telegram-api.store');
@@ -50,5 +48,7 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
 
     Route::get('/users', [GroupManagementController::class, 'index'])->name('users.index');
     Route::post('/users/delete-messages', [GroupManagementController::class, 'deleteMessages'])->name('users.messages.delete');
-    Route::put('/users/welcome', [TelegramWelcomeController::class, 'update'])->name('users.welcome.update');
+    Route::post('/users/groups', [TelegramWelcomeController::class, 'store'])->name('users.groups.store');
+    Route::put('/users/groups/{group}', [TelegramWelcomeController::class, 'update'])->name('users.groups.update');
+    Route::delete('/users/groups/{group}', [TelegramWelcomeController::class, 'destroy'])->name('users.groups.destroy');
 });
