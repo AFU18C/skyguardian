@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Console\Commands;
+
 use App\Models\AlertSource;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
@@ -56,6 +57,14 @@ class RunAlertRelay extends Command
             ->get();
 
         foreach ($sources as $source) {
+            $source->refresh();
+
+            if (! $source->autopublish_enabled
+                || $source->source_status !== 'available'
+                || $source->destination_status !== 'available') {
+                continue;
+            }
+
             $interval = min(43200, max(3, (int) ($source->poll_interval_seconds ?: 3)));
 
             if ($source->last_polled_at
@@ -64,6 +73,11 @@ class RunAlertRelay extends Command
             }
 
             $source->update(['last_polled_at' => now()]);
+            $source->refresh();
+
+            if (! $source->autopublish_enabled) {
+                continue;
+            }
 
             try {
                 $result = $telethon->relayOnce($source);
