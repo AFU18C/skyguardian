@@ -65,17 +65,27 @@ class NewsRelayCommand extends Command
                         (int) ($source->last_source_message_id ?? 0),
                         (int) ($result['last_message_id'] ?? 0),
                     );
+                    $partialFailure = (bool) ($result['partial_failure'] ?? false);
+                    $partialMessage = $partialFailure
+                        ? mb_substr((string) ($result['message'] ?? 'Часть сообщений не удалось опубликовать.'), 0, 2000)
+                        : null;
 
                     $source->update([
                         'last_source_message_id' => $lastMessageId,
                         'last_received_at' => $published > 0 ? $now : $source->last_received_at,
                         'last_published_at' => $published > 0 ? $now : $source->last_published_at,
                         'last_polled_at' => $now,
-                        'last_error' => null,
+                        'last_error' => $partialMessage,
                     ]);
 
+                    $label = $source->label ?: 'Источник #'.$source->id;
                     if ($published > 0) {
-                        $this->info(($source->label ?: 'Источник #'.$source->id).': опубликовано '.$published.'.');
+                        $this->info($label.': опубликовано '.$published.'.');
+                    }
+                    if ($partialFailure) {
+                        $failedId = (int) ($result['failed_message_id'] ?? 0);
+                        $suffix = $failedId > 0 ? ' Сообщение #'.$failedId.' будет повторено.' : '';
+                        $this->warn($label.': частичная ошибка — '.$partialMessage.'.'.$suffix);
                     }
                 } catch (Throwable $exception) {
                     $message = mb_substr($exception->getMessage(), 0, 2000);
