@@ -3,6 +3,7 @@
 use App\Http\Controllers\AlertBotSettingsController;
 use App\Http\Controllers\AlertSourceController;
 use App\Http\Controllers\BotProfileController;
+use App\Http\Controllers\GroupManagementController;
 use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
 use App\Http\Controllers\TelegramDependencyController;
@@ -46,5 +47,6 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
     Route::delete('/alerts/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('alerts.telegram.disconnect');
     Route::delete('/alerts/settings/telegram/{account}', [TelegramDependencyController::class, 'destroyAlertAccount'])->name('alerts.telegram.destroy');
 
-    Route::view('/users', 'group-management')->name('users.index');
+    Route::get('/users', [GroupManagementController::class, 'index'])->name('users.index');
+    Route::post('/users/delete-messages', [GroupManagementController::class, 'deleteMessages'])->name('users.messages.delete');
 });
