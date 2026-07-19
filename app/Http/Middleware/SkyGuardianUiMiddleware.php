@@ -39,7 +39,12 @@ class SkyGuardianUiMiddleware
 
         if ($request->routeIs('alerts.settings')) {
             $settings = AlertBotSetting::query()->first();
-            $html = $this->decorateBotSettings($html, $settings?->bot_name, $settings?->bot_token);
+            $html = $this->decorateBotSettings(
+                $html,
+                $settings?->bot_name,
+                $settings?->bot_token,
+                $settings?->bot_status !== 'disabled',
+            );
             $html = $this->showAccountsWithoutApi($html, TechnicalTelegramAccount::query()->orderByDesc('is_primary')->orderBy('id')->get());
             $html = $this->keepTechnicalAccountsOpen($request, $html, 'telegram_auth');
         }
@@ -49,7 +54,12 @@ class SkyGuardianUiMiddleware
             $html = preg_replace('/<div class="notice">Этот раздел полностью изолирован от воздушной тревоги\..*?<\/div>/s', '', $html) ?? $html;
             $html = str_replace('Параметры новостного бота', 'Telegram-бот', $html);
             $html = $this->reorderNewsAccordions($html);
-            $html = $this->decorateBotSettings($html, $settings?->bot_name, $settings?->bot_token);
+            $html = $this->decorateBotSettings(
+                $html,
+                $settings?->bot_name,
+                $settings?->bot_token,
+                $settings?->service_status !== 'disabled',
+            );
             $html = $this->showAccountsWithoutApi($html, NewsTechnicalTelegramAccount::query()->orderByDesc('is_primary')->orderBy('id')->get());
             $html = $this->keepTechnicalAccountsOpen($request, $html, 'news_telegram_auth');
         }
@@ -147,13 +157,28 @@ CSS;
         return str_replace('</head>', $css.'</head>', $html);
     }
 
-    private function decorateBotSettings(string $html, ?string $botName, ?string $token): string
+    private function decorateBotSettings(string $html, ?string $botName, ?string $token, bool $enabled): string
     {
         if (! str_contains($html, 'name="bot_name"')) {
             $nameField = '<div class="field"><label>Название бота</label><input class="input" name="bot_name" value="'.e($botName ?? '').'" placeholder="Например: SkyGuardian"></div>';
             $html = preg_replace(
                 '/(<div class="field"><label>(?:Токен Telegram-бота|Токен бота)<\/label>)/u',
                 $nameField.'$1',
+                $html,
+                1,
+            ) ?? $html;
+        }
+
+        if (! str_contains($html, 'name="bot_enabled"')) {
+            $configured = filled($token);
+            $powerSwitch = '<div class="switch-row"><strong>Telegram-бот</strong><label class="switch">'
+                .'<input type="checkbox" name="bot_enabled" value="1"'
+                .($configured && $enabled ? ' checked' : '')
+                .(! $configured ? ' disabled' : '')
+                .'><span class="slider"></span></label></div>';
+            $html = preg_replace(
+                '/(<div class="field"><label>Название бота<\/label>)/u',
+                $powerSwitch.'$1',
                 $html,
                 1,
             ) ?? $html;
@@ -177,7 +202,7 @@ CSS;
         ) ?? $html;
 
         if (! str_contains($html, 'name="remove_bot_token"')) {
-            $removeAction = '<div class="actions"><button class="btn danger" type="submit" name="remove_bot_token" value="1" formnovalidate onclick="return confirm(\'Удалить токен и отключить бота?\')">Удалить токен и отключить бота</button></div>';
+            $removeAction = '<div class="actions"><button class="btn danger" type="submit" name="remove_bot_token" value="1" formnovalidate onclick="return confirm(\'Удалить токен?\')">Удалить токен</button></div>';
             $html = preg_replace(
                 '/(<div class="field"><label>(?:Токен Telegram-бота|Токен бота)<\/label><input class="input" type="password" name="bot_token"[^>]*><\/div>)/u',
                 '$1'.$removeAction,
