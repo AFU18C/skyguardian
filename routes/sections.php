@@ -6,6 +6,7 @@ use App\Http\Controllers\BotProfileController;
 use App\Http\Controllers\GroupManagementController;
 use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
+use App\Http\Controllers\TelegramComponentPowerController;
 use App\Http\Controllers\TelegramDependencyController;
 use App\Http\Controllers\TelegramWelcomeController;
 use App\Http\Middleware\BotPowerUiMiddleware;
@@ -13,6 +14,12 @@ use App\Http\Middleware\SkyGuardianUiMiddleware;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', BotPowerUiMiddleware::class, SkyGuardianUiMiddleware::class])->group(function (): void {
+    Route::post('/settings/components/{section}/{type}/{id}/power', TelegramComponentPowerController::class)
+        ->whereIn('section', ['alerts', 'news'])
+        ->whereIn('type', ['account', 'api'])
+        ->whereNumber('id')
+        ->name('telegram.components.power');
+
     Route::get('/news/sources', [NewsSourceController::class, 'index'])->name('news.sources');
     Route::post('/news/sources', [NewsSourceController::class, 'store'])->name('news.sources.store');
     Route::put('/news/sources/{newsSource}', [NewsSourceController::class, 'update'])->name('news.sources.update');
