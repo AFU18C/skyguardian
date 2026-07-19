@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\NewsTechnicalTelegramAccount;
 use App\Models\TechnicalTelegramAccount;
 use App\Services\Telegram\TelethonAccountService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use RuntimeException;
+use Throwable;
 
 class GroupManagementController extends Controller
 {
@@ -37,22 +38,39 @@ class GroupManagementController extends Controller
             'period' => ['required', 'in:1,10,all'],
         ]);
 
-        [$section, $accountId] = explode(':', $data['account'], 2);
+        try {
+            [$section, $accountId] = explode(':', $data['account'], 2);
 
-        $account = $section === 'news'
-            ? NewsTechnicalTelegramAccount::query()->findOrFail((int) $accountId)
-            : TechnicalTelegramAccount::query()->findOrFail((int) $accountId);
+            $account = $section === 'news'
+                ? NewsTechnicalTelegramAccount::query()->findOrFail((int) $accountId)
+                : TechnicalTelegramAccount::query()->findOrFail((int) $accountId);
 
-        if ($account->status !== 'connected') {
-            throw new RuntimeException('Выбранный технический аккаунт не подключён к Telegram.');
+            if ($account->status !== 'connected') {
+                return response()->json([
+                    'ok' => false,
+                    'message' => 'Выбранный технический аккаунт не подключён к Telegram.',
+                ], 422);
+            }
+
+            $result = $telegram->deleteMessages($account, trim($data['chat']), $data['period']);
+
+            return response()->json([
+                'ok' => true,
+                'deleted' => (int) ($result['deleted'] ?? 0),
+                'message' => (string) ($result['message'] ?? 'Удаление завершено.'),
+            ]);
+        } catch (ModelNotFoundException) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Выбранный технический аккаунт не найден. Обновите страницу и выберите его заново.',
+            ], 404);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'ok' => false,
+                'message' => $exception->getMessage() ?: 'Не удалось удалить сообщения Telegram.',
+            ], 422);
         }
-
-        $result = $telegram->deleteMessages($account, trim($data['chat']), $data['period']);
-
-        return response()->json([
-            'ok' => true,
-            'deleted' => (int) ($result['deleted'] ?? 0),
-            'message' => (string) ($result['message'] ?? 'Удаление завершено.'),
-        ]);
     }
 }
