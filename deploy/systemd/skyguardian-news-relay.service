@@ -1,0 +1,18 @@
+[Unit]
+Description=SkyGuardian News Telegram Relay
+After=network-online.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/SkyGuardianUa
+ExecStart=/usr/bin/php /var/www/SkyGuardianUa/artisan news:relay
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
