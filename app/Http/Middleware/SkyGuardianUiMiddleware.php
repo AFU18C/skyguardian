@@ -14,6 +14,8 @@ class SkyGuardianUiMiddleware
     {
         $response = $next($request);
 
+        $this->applySecurityHeaders($response);
+
         if (! str_contains((string) $response->headers->get('Content-Type'), 'text/html')) {
             return $response;
         }
@@ -47,6 +49,16 @@ class SkyGuardianUiMiddleware
         $response->setContent($html);
 
         return $response;
+    }
+
+    private function applySecurityHeaders(Response $response): void
+    {
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
+        $response->headers->set('Referrer-Policy', 'same-origin');
+        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('Pragma', 'no-cache');
     }
 
     private function decorateBotSettings(string $html, ?string $botName, ?string $token): string
