@@ -70,6 +70,14 @@ class SkyGuardianUiMiddleware
         $masked = $this->maskToken($token);
         if ($masked !== null) {
             $html = preg_replace('/(<input class="input" type="password" name="bot_token")([^>]*)(>)/u', '$1 placeholder="'.$masked.' — введите новый токен для замены"$3', $html, 1) ?? $html;
+
+            $removeAction = '<div class="actions"><button class="btn danger" type="submit" name="remove_bot_token" value="1" formnovalidate onclick="return confirm(\'Удалить токен и отключить бота?\')">Удалить токен и отключить бота</button></div>';
+            $html = preg_replace(
+                '/(<div class="field"><label>(?:Токен Telegram-бота|Токен бота)<\/label><input class="input" type="password" name="bot_token"[^>]*><\/div>)/u',
+                '$1'.$removeAction,
+                $html,
+                1,
+            ) ?? $html;
         }
 
         return $html;
