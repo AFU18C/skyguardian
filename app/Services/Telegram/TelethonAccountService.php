@@ -84,6 +84,24 @@ class TelethonAccountService
         return $this->execute($process, 120, 'Ошибка автопубликации Telegram.');
     }
 
+    public function deleteMessages(TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account, string $chat, string $period): array
+    {
+        [$apiId, $apiHash] = $this->credentials($account);
+
+        $process = new Process([
+            config('services.telegram.python', 'python3'),
+            base_path('scripts/telegram_account.py'),
+            '--api-id', (string) $apiId,
+            '--api-hash', (string) $apiHash,
+            '--session', $this->sessionPath($account),
+            'delete-messages',
+            '--chat', $chat,
+            '--period', $period,
+        ], base_path());
+
+        return $this->execute($process, 300, 'Не удалось удалить сообщения Telegram.');
+    }
+
     public function logout(TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account): array
     {
         return $this->run(['logout'], $account);
