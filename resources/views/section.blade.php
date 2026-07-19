@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#081a31">
+<title>{{ $pageTitle }} — SkyGuardian</title>
+<style>
+:root{--nav:#081a31;--nav2:#0a2742;--blue:#246fdb;--text:#1d2a3c;--muted:#7c8798;--line:#e8edf3;--bg:#f7f9fc;--white:#fff}*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);background:var(--bg)}a{text-decoration:none;color:inherit}.app{min-height:100vh;display:grid;grid-template-columns:302px minmax(0,1fr)}.sidebar{position:sticky;top:0;height:100vh;padding:28px 20px;background:linear-gradient(180deg,var(--nav),var(--nav2));color:#edf4ff;overflow:auto;z-index:30}.brand{display:flex;align-items:center;gap:12px;margin:0 4px 28px;font-size:21px;font-weight:800}.brand-mark{width:38px;height:44px;display:grid;place-items:center;background:linear-gradient(145deg,#31a5ff,#1359df);clip-path:polygon(50% 0,95% 18%,90% 67%,50% 100%,10% 67%,5% 18%)}.nav-home,.nav-title,.nav-sub{display:flex;align-items:center;gap:13px}.nav-home{padding:17px 16px;border-radius:10px}.nav-home:hover,.nav-sub:hover{background:rgba(255,255,255,.07)}.nav-group{padding:25px 8px 20px;border-bottom:1px solid rgba(255,255,255,.09)}.nav-title{font-size:15px;font-weight:800;text-transform:uppercase}.nav-sub{margin-top:6px;padding:12px 10px 12px 21px;color:#d5dfeb;font-size:16px;border-radius:9px}.nav-sub.active{background:linear-gradient(90deg,#2266cb,#2c74dd);color:#fff}.dot{width:8px;height:8px;border-radius:50%;background:#879ab5}.logout{width:100%;margin-top:24px;padding:13px 16px;border:1px solid rgba(255,255,255,.13);border-radius:10px;background:rgba(255,255,255,.05);color:#e8f0fa;text-align:left}.main{min-width:0;padding:34px 30px}.topbar{display:flex;align-items:center;gap:14px}.menu-btn{display:none;width:44px;height:44px;border:0;border-radius:11px;background:#fff;box-shadow:0 5px 18px rgba(25,49,80,.1);font-size:22px}.heading h1{margin:0;font-size:36px}.heading p{margin:8px 0 0;color:var(--muted);font-size:17px}.content{max-width:920px;margin-top:28px}.panel{min-height:280px;padding:28px;background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 25px rgba(35,57,86,.045)}.empty{min-height:220px;display:grid;place-items:center;text-align:center;color:var(--muted)}.empty strong{display:block;margin-bottom:8px;color:var(--text);font-size:22px}.overlay{display:none}@media(max-width:800px){.app{display:block}.sidebar{position:fixed;left:0;top:0;width:292px;transform:translateX(-105%);transition:.22s;box-shadow:20px 0 50px rgba(0,0,0,.28)}body.menu-open .sidebar{transform:translateX(0)}.overlay{display:block;position:fixed;inset:0;background:rgba(2,10,23,.52);opacity:0;pointer-events:none;transition:.22s;z-index:20}body.menu-open .overlay{opacity:1;pointer-events:auto}.main{padding:20px 16px}.menu-btn{display:grid;place-items:center}.heading h1{font-size:30px}}
+</style>
+</head>
+<body>
+<div class="overlay" onclick="document.body.classList.remove('menu-open')"></div>
+<div class="app">
+<aside class="sidebar">
+<div class="brand"><span class="brand-mark">✈</span><span>SkyGuardian</span></div>
+<a class="nav-home" href="{{ route('dashboard') }}">⌂ <span>Главная</span></a>
+<div class="nav-group"><div class="nav-title">▦ <span>Новости</span></div>
+<a class="nav-sub {{ $activeSection==='news-sources'?'active':'' }}" href="{{ route('news.sources') }}"><span class="dot"></span>Источники Бота</a>
+<a class="nav-sub {{ $activeSection==='news-settings'?'active':'' }}" href="{{ route('news.settings') }}"><span class="dot"></span>Настройки Бота</a></div>
+<div class="nav-group"><div class="nav-title">♟ <span>Воздушная тревога</span></div>
+<a class="nav-sub {{ $activeSection==='alert-sources'?'active':'' }}" href="{{ route('alerts.sources') }}"><span class="dot"></span>Источники Бота</a>
+<a class="nav-sub {{ $activeSection==='alert-settings'?'active':'' }}" href="{{ route('alerts.settings') }}"><span class="dot"></span>Настройки Бота</a></div>
+<div class="nav-group"><div class="nav-title">✹ <span>Общие настройки</span></div>
+<a class="nav-sub {{ $activeSection==='users'?'active':'' }}" href="{{ route('users.index') }}"><span class="dot"></span>Пользователи</a></div>
+<form method="POST" action="{{ route('logout') }}">@csrf<button class="logout" type="submit">Выйти</button></form>
+</aside>
+<main class="main"><div class="topbar"><button class="menu-btn" type="button" onclick="document.body.classList.add('menu-open')">☰</button><div class="heading"><h1>{{ $pageTitle }}</h1><p>{{ $pageDescription }}</p></div></div><div class="content"><section class="panel"><div class="empty"><div><strong>Раздел готов</strong><span>Функционал будет добавляться поэтапно без изменения общей структуры панели.</span></div></div></section></div></main>
+</div>
+</body></html>
