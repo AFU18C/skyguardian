@@ -3,6 +3,7 @@
 namespace App\Services\Telegram;
 
 use App\Models\TechnicalTelegramAccount;
+use App\Models\TelegramApiCredential;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
@@ -16,7 +17,7 @@ class TelethonAccountService
                 && filled($account->telegramApiCredential?->api_hash);
         }
 
-        return \App\Models\TelegramApiCredential::query()->exists();
+        return TelegramApiCredential::query()->exists();
     }
 
     public function sendCode(string $phone, TechnicalTelegramAccount $account): array
@@ -42,6 +43,15 @@ class TelethonAccountService
     public function logout(TechnicalTelegramAccount $account): array
     {
         return $this->run(['logout'], $account);
+    }
+
+    public function resetSession(TechnicalTelegramAccount $account): void
+    {
+        foreach ([$this->sessionPath($account), $this->sessionPath($account).'.session'] as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
     }
 
     private function credentials(TechnicalTelegramAccount $account): array
