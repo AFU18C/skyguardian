@@ -23,7 +23,8 @@ class SkyGuardianUiMiddleware
             return $response;
         }
 
-        $html = str_replace('>Пользователи<', '>Управление группой<', $html);
+        $html = str_replace('>Пользователи<', '>Группа / канал<', $html);
+        $html = str_replace('>Управление группой<', '>Группа / канал<', $html);
 
         if ($request->routeIs('dashboard')) {
             $html = preg_replace('/<section class="metrics">.*?<\/section>/s', '', $html) ?? $html;
