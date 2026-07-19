@@ -8,14 +8,18 @@ use App\Models\NewsTechnicalTelegramAccount;
 use App\Models\TechnicalTelegramAccount;
 use App\Models\TelegramApiCredential;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 use Symfony\Component\Process\Process;
 
 class TelethonAccountService
 {
+    private const MAX_ERROR_LENGTH = 2000;
+
     public function isConfigured(TechnicalTelegramAccount|NewsTechnicalTelegramAccount|null $account = null): bool
     {
         if ($account) {
             $account->loadMissing('telegramApiCredential');
+
             return filled($account->telegramApiCredential?->api_id)
                 && filled($account->telegramApiCredential?->api_hash);
         }
@@ -35,6 +39,7 @@ class TelethonAccountService
             $arguments[] = '--password';
             $arguments[] = $password;
         }
+
         return $this->run($arguments, $account);
     }
 
@@ -76,16 +81,7 @@ class TelethonAccountService
             '--limit', '20',
         ], base_path());
 
-        $process->setTimeout(120);
-        $process->run();
-        $output = trim($process->getOutput() ?: $process->getErrorOutput());
-        $result = json_decode($output, true);
-
-        if (! is_array($result) || ! $process->isSuccessful() || ($result['ok'] ?? false) !== true) {
-            throw new RuntimeException(is_array($result) ? ($result['message'] ?? 'Ошибка автопубликации Telegram.') : ($output ?: 'Telethon не вернул ответ.'));
-        }
-
-        return $result;
+        return $this->execute($process, 120, 'Ошибка автопубликации Telegram.');
     }
 
     public function logout(TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account): array
@@ -95,9 +91,20 @@ class TelethonAccountService
 
     public function resetSession(TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account): void
     {
-        foreach ([$this->sessionPath($account), $this->sessionPath($account).'.session'] as $path) {
-            if (is_file($path)) {
-                @unlink($path);
+        $basePath = $this->sessionPath($account);
+
+        foreach ([
+            $basePath,
+            $basePath.'.session',
+            $basePath.'.session-journal',
+            $basePath.'.session-shm',
+            $basePath.'.session-wal',
+            $basePath.'-journal',
+            $basePath.'-shm',
+            $basePath.'-wal',
+        ] as $path) {
+            if (is_file($path) && ! @unlink($path)) {
+                throw new RuntimeException('Не удалось удалить файл Telegram-сессии.');
             }
         }
     }
@@ -109,6 +116,7 @@ class TelethonAccountService
         if (! filled($api?->api_id) || ! filled($api?->api_hash)) {
             throw new RuntimeException('Выберите Telegram API для технического аккаунта.');
         }
+
         return [$api->api_id, $api->api_hash];
     }
 
@@ -134,22 +142,36 @@ class TelethonAccountService
     private function run(array $arguments, TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account): array
     {
         [$apiId, $apiHash] = $this->credentials($account);
-        $command = array_merge([
+        $process = new Process(array_merge([
             config('services.telegram.python', 'python3'),
             base_path('scripts/telegram_account.py'),
             '--api-id', (string) $apiId,
             '--api-hash', (string) $apiHash,
             '--session', $this->sessionPath($account),
-        ], $arguments);
+        ], $arguments), base_path());
 
-        $process = new Process($command, base_path());
-        $process->setTimeout(45);
-        $process->run();
+        return $this->execute($process, 45, 'Ошибка подключения к Telegram.');
+    }
+
+    private function execute(Process $process, int $timeout, string $fallbackMessage): array
+    {
+        $process->setTimeout($timeout);
+
+        try {
+            $process->mustRun();
+        } catch (ProcessTimedOutException) {
+            $process->stop(1);
+            throw new RuntimeException('Telegram не ответил за отведённое время.');
+        } catch (\Throwable) {
+            // Ответ скрипта разбирается ниже, чтобы сохранить понятное сообщение Telegram.
+        }
+
         $output = trim($process->getOutput() ?: $process->getErrorOutput());
         $result = json_decode($output, true);
 
         if (! is_array($result) || ! $process->isSuccessful() || ($result['ok'] ?? false) !== true) {
-            throw new RuntimeException(is_array($result) ? ($result['message'] ?? 'Ошибка подключения к Telegram.') : ($output ?: 'Telethon не вернул ответ.'));
+            $message = is_array($result) ? ($result['message'] ?? $fallbackMessage) : ($output ?: $fallbackMessage);
+            throw new RuntimeException(mb_substr((string) $message, 0, self::MAX_ERROR_LENGTH));
         }
 
         return $result;
