@@ -19,6 +19,13 @@ class TelegramGroupWebhookController extends Controller
         $provided = (string) $request->header('X-Telegram-Bot-Api-Secret-Token', '');
         if (! hash_equals($store->secret(), $provided)) return response()->json(['ok' => false], 403);
 
+        $botSettings = $bot === 'news'
+            ? NewsBotSetting::query()->first()
+            : AlertBotSetting::query()->first();
+        $extra = is_array($botSettings?->extra_settings) ? $botSettings->extra_settings : [];
+        $botEnabled = filled($botSettings?->bot_token) && (bool) ($extra['bot_enabled'] ?? true);
+        if (! $botEnabled) return response()->json(['ok' => true]);
+
         $message = $request->input('message');
         if (! is_array($message)) return response()->json(['ok' => true]);
 
@@ -31,8 +38,7 @@ class TelegramGroupWebhookController extends Controller
         });
         if (! is_array($settings)) return response()->json(['ok' => true]);
 
-        $token = $bot === 'news' ? NewsBotSetting::query()->first()?->bot_token : AlertBotSetting::query()->first()?->bot_token;
-        if (blank($token)) return response()->json(['ok' => true]);
+        $token = (string) $botSettings->bot_token;
 
         $messageId = (int) ($message['message_id'] ?? 0);
         $members = data_get($message, 'new_chat_members', []);
