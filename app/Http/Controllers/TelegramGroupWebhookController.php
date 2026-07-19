@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AlertBotSetting;
 use App\Models\NewsBotSetting;
+use App\Services\Telegram\TelegramComponentPowerStore;
 use App\Services\Telegram\WelcomeSettingsStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,16 +15,19 @@ use Throwable;
 
 class TelegramGroupWebhookController extends Controller
 {
-    public function __invoke(Request $request, string $bot, WelcomeSettingsStore $store): JsonResponse
-    {
+    public function __invoke(
+        Request $request,
+        string $bot,
+        WelcomeSettingsStore $store,
+        TelegramComponentPowerStore $power,
+    ): JsonResponse {
         $provided = (string) $request->header('X-Telegram-Bot-Api-Secret-Token', '');
         if (! hash_equals($store->secret(), $provided)) return response()->json(['ok' => false], 403);
 
         $botSettings = $bot === 'news'
             ? NewsBotSetting::query()->first()
             : AlertBotSetting::query()->first();
-        $extra = is_array($botSettings?->extra_settings) ? $botSettings->extra_settings : [];
-        $botEnabled = filled($botSettings?->bot_token) && (bool) ($extra['bot_enabled'] ?? true);
+        $botEnabled = filled($botSettings?->bot_token) && $power->botEnabled($bot, true);
         if (! $botEnabled) return response()->json(['ok' => true]);
 
         $message = $request->input('message');
