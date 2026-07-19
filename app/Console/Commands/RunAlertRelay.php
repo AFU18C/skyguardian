@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\AlertSource;
-use App\Services\Telegram\TelegramApiPowerStore;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -47,7 +46,6 @@ class RunAlertRelay extends Command
 
     private function processSources(TelethonAccountService $telethon): void
     {
-        $power = app(TelegramApiPowerStore::class);
         $sources = AlertSource::query()
             ->where('autopublish_enabled', true)
             ->where('source_status', 'available')
@@ -60,23 +58,16 @@ class RunAlertRelay extends Command
 
         foreach ($sources as $source) {
             $source->refresh();
-            $source->loadMissing(['readerAccount.telegramApiCredential', 'publisherAccount.telegramApiCredential']);
+            $source->loadMissing([
+                'readerAccount.telegramApiCredential',
+                'publisherAccount.telegramApiCredential',
+            ]);
 
             if (! $source->autopublish_enabled
                 || $source->source_status !== 'available'
-                || $source->destination_status !== 'available') {
-                continue;
-            }
-
-            $reader = $source->readerAccount;
-            $publisher = $source->publisherAccount;
-            if (! $reader || ! $publisher
-                || $reader->status !== 'connected'
-                || $publisher->status !== 'connected'
-                || ! $reader->telegramApiCredential
-                || ! $publisher->telegramApiCredential
-                || ! $power->enabled('alerts', (int) $reader->telegramApiCredential->getKey())
-                || ! $power->enabled('alerts', (int) $publisher->telegramApiCredential->getKey())) {
+                || $source->destination_status !== 'available'
+                || $source->readerAccount?->status === 'disabled'
+                || $source->publisherAccount?->status === 'disabled') {
                 continue;
             }
 
@@ -89,8 +80,11 @@ class RunAlertRelay extends Command
 
             $source->update(['last_polled_at' => now()]);
             $source->refresh();
+            $source->loadMissing(['readerAccount', 'publisherAccount']);
 
-            if (! $source->autopublish_enabled) {
+            if (! $source->autopublish_enabled
+                || $source->readerAccount?->status === 'disabled'
+                || $source->publisherAccount?->status === 'disabled') {
                 continue;
             }
 
