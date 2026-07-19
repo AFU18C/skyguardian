@@ -2,10 +2,16 @@
 
 use App\Http\Controllers\AlertBotSettingsController;
 use App\Http\Controllers\AlertSourceController;
+use App\Http\Controllers\NewsSourceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function (): void {
-    Route::view('/news/sources', 'section', ['pageTitle' => 'Источники новостей', 'pageDescription' => 'Подключение и управление источниками новостного бота', 'activeSection' => 'news-sources'])->name('news.sources');
+    Route::get('/news/sources', [NewsSourceController::class, 'index'])->name('news.sources');
+    Route::post('/news/sources', [NewsSourceController::class, 'store'])->name('news.sources.store');
+    Route::put('/news/sources/{newsSource}', [NewsSourceController::class, 'update'])->name('news.sources.update');
+    Route::delete('/news/sources/{newsSource}', [NewsSourceController::class, 'destroy'])->name('news.sources.destroy');
+    Route::post('/news/sources/{newsSource}/check', [NewsSourceController::class, 'check'])->name('news.sources.check');
+
     Route::view('/news/settings', 'section', ['pageTitle' => 'Настройки новостного бота', 'pageDescription' => 'Параметры обработки и публикации новостей', 'activeSection' => 'news-settings'])->name('news.settings');
 
     Route::get('/alerts/sources', [AlertSourceController::class, 'index'])->name('alerts.sources');
