@@ -26,7 +26,7 @@
 <div class="grid">
 <section class="card">
 <div class="card-head"><div><h2 class="card-title">Технічний акаунт</h2><p class="card-note">Підключення через Telethon</p></div><span class="status {{ $settings->technical_status === 'connected' ? 'ok' : 'warn' }}">{{ $settings->technical_status === 'connected' ? 'Підключений' : 'Не підключений' }}</span></div>
-@if(!$telegramApiConfigured)<div class="notice">На сервері потрібно вказати TELEGRAM_API_ID і TELEGRAM_API_HASH.</div>@endif
+@if(!$telegramApiConfigured)<div class="notice">Вкажіть API ID та App api_hash у блоці Telegram API.</div>@endif
 @if($settings->technical_status === 'connected')
 <div class="summary"><div class="summary-item"><span>Ім’я</span><strong>{{ $settings->technical_name ?: '—' }}</strong></div><div class="summary-item"><span>Username</span><strong>{{ $settings->technical_username ? '@'.$settings->technical_username : '—' }}</strong></div><div class="summary-item"><span>Telegram ID</span><strong>{{ $settings->technical_telegram_id ?: '—' }}</strong></div><div class="summary-item"><span>Номер</span><strong>{{ $settings->technical_phone ?: '—' }}</strong></div></div>
 <form method="POST" action="{{ route('alerts.telegram.disconnect') }}" class="actions">@csrf @method('DELETE')<button class="btn danger" type="submit">Відключити акаунт</button></form>
@@ -35,6 +35,14 @@
 @else
 <form method="POST" action="{{ route('alerts.telegram.send-code') }}">@csrf<div class="field"><label for="technical_phone_connect">Номер телефону</label><input class="input" id="technical_phone_connect" name="technical_phone" value="{{ old('technical_phone', $settings->technical_phone) }}" placeholder="+380 XX XXX XX XX" required></div><div class="actions"><button class="btn" type="submit" @disabled(!$telegramApiConfigured)>Надіслати код</button></div></form>
 @endif
+</section>
+<section class="card">
+<div class="card-head"><div><h2 class="card-title">Telegram API</h2><p class="card-note">Дані з my.telegram.org для підключення Telethon</p></div><span class="status {{ $telegramApiConfigured ? 'ok' : 'warn' }}">{{ $telegramApiConfigured ? 'Налаштовано' : 'Не налаштовано' }}</span></div>
+<form method="POST" action="{{ route('alerts.settings.update') }}">@csrf @method('PUT')
+<div class="field"><label for="telegram_api_id">API-ідентифікатор</label><input class="input" id="telegram_api_id" name="telegram_api_id" inputmode="numeric" placeholder="{{ $settings->telegram_api_id ? 'Збережено — введіть новий лише для заміни' : 'Наприклад: 12345678' }}"></div>
+<div class="field"><label for="telegram_api_hash">App api_hash</label><input class="input" id="telegram_api_hash" type="password" name="telegram_api_hash" placeholder="{{ $settings->telegram_api_hash ? 'Збережено — введіть новий лише для заміни' : '32 символи з my.telegram.org' }}"></div>
+<div class="savebar"><button class="btn" type="submit">Зберегти Telegram API</button></div>
+</form>
 </section>
 <section class="card">
 <div class="card-head"><div><h2 class="card-title">Telegram-бот</h2><p class="card-note">Простий пульт керування</p></div><span class="status {{ $settings->bot_status === 'running' ? 'ok' : 'warn' }}">{{ $settings->bot_status === 'running' ? 'Працює' : 'Не налаштований' }}</span></div>
