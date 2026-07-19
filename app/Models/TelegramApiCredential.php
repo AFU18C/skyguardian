@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TelegramApiCredential extends Model
 {
-    protected $fillable = ['label', 'api_id', 'api_hash', 'is_primary'];
+    protected $fillable = ['label', 'api_id', 'api_hash', 'is_primary', 'is_enabled'];
 
     protected $hidden = ['api_id', 'api_hash'];
 
@@ -26,6 +26,7 @@ class TelegramApiCredential extends Model
             'api_id' => 'encrypted',
             'api_hash' => 'encrypted',
             'is_primary' => 'boolean',
+            'is_enabled' => 'boolean',
         ];
     }
 
