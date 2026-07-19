@@ -6,6 +6,7 @@ use App\Models\AlertBotSetting;
 use App\Models\NewsBotSetting;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\ViewErrorBag;
 use Symfony\Component\HttpFoundation\Response;
 
 class SkyGuardianUiMiddleware
@@ -37,6 +38,7 @@ class SkyGuardianUiMiddleware
         if ($request->routeIs('alerts.settings')) {
             $settings = AlertBotSetting::query()->first();
             $html = $this->decorateBotSettings($html, $settings?->bot_name, $settings?->bot_token);
+            $html = $this->keepTechnicalAccountsOpen($request, $html, 'telegram_auth');
         }
 
         if ($request->routeIs('news.settings')) {
@@ -45,6 +47,7 @@ class SkyGuardianUiMiddleware
             $html = str_replace('Параметры новостного бота', 'Telegram-бот', $html);
             $html = $this->reorderNewsAccordions($html);
             $html = $this->decorateBotSettings($html, $settings?->bot_name, $settings?->bot_token);
+            $html = $this->keepTechnicalAccountsOpen($request, $html, 'news_telegram_auth');
         }
 
         $response->setContent($html);
@@ -60,6 +63,19 @@ class SkyGuardianUiMiddleware
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
         $response->headers->set('Cache-Control', 'no-store, private');
         $response->headers->set('Pragma', 'no-cache');
+    }
+
+    private function keepTechnicalAccountsOpen(Request $request, string $html, string $authKey): string
+    {
+        $errors = $request->session()->get('errors');
+        $hasErrors = $errors instanceof ViewErrorBag && $errors->any();
+        $hasStatus = filled($request->session()->get('status'));
+
+        if (! $request->session()->has($authKey) && ! $hasErrors && ! $hasStatus) {
+            return $html;
+        }
+
+        return preg_replace('/<details class="card">/', '<details class="card" open>', $html, 1) ?? $html;
     }
 
     private function decorateBotSettings(string $html, ?string $botName, ?string $token): string
