@@ -1,10 +1,9 @@
 <?php
 
-use App\Http\Controllers\TelegramAuthController;
+use App\Http\Controllers\EmailAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function (): void {
-    Route::get('/login', [TelegramAuthController::class, 'show'])->name('login');
-    Route::get('/auth/telegram/callback', [TelegramAuthController::class, 'callback'])
-        ->name('telegram.auth.callback');
+    Route::get('/login', [EmailAuthController::class, 'show'])->name('login');
+    Route::post('/login', [EmailAuthController::class, 'store'])->name('login.store');
 });
