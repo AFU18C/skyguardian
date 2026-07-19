@@ -88,20 +88,60 @@ class SkyGuardianUiMiddleware
 
     private function stabilizeSourceCards(string $html): string
     {
+        $html = preg_replace_callback(
+            '/(<button class="edit-source-btn"[^>]*>.*?<\/button>\s*<div class="source-body">\s*<form id="source-update-(\d+)".*?<input type="checkbox" name="autopublish_enabled" value="1"([^>]*)>)/s',
+            function (array $matches): string {
+                $checked = str_contains($matches[3], 'checked');
+                $disabled = str_contains($matches[3], 'disabled');
+                $switch = '<label class="source-power-switch" title="Включить или выключить источник">'
+                    .'<input type="checkbox" data-source-power data-form="source-update-'.$matches[2].'"'
+                    .($checked ? ' checked' : '')
+                    .($disabled ? ' disabled' : '')
+                    .' aria-label="Включить или выключить источник">'
+                    .'<span></span></label>';
+
+                return $switch.$matches[1];
+            },
+            $html,
+        ) ?? $html;
+
         $css = <<<'CSS'
 <style id="source-card-long-title-fix">
 .source-title{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal;line-height:1.25}
 .source-head>div:first-child{min-width:0}
 .source-account{min-width:0;overflow-wrap:anywhere}
+.source-card>.status-dot,.source-card>.source-indicator{display:none!important}
+.source-power-switch{position:absolute;right:20px;top:20px;width:48px;height:28px;z-index:4;display:block;cursor:pointer}
+.source-power-switch input{position:absolute;opacity:0;pointer-events:none}
+.source-power-switch span{position:absolute;inset:0;border-radius:999px;background:#cbd5e1;box-shadow:inset 0 0 0 1px rgba(15,23,42,.08);transition:.2s}
+.source-power-switch span:before{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(15,23,42,.24);transition:.2s}
+.source-power-switch input:checked+span{background:#18a765}
+.source-power-switch input:checked+span:before{transform:translateX(20px)}
+.source-power-switch input:disabled+span{opacity:.48;cursor:not-allowed}
+.source-power-switch:has(input:disabled){cursor:not-allowed}
+.source-head{padding-right:88px!important}
 @media(max-width:800px){
-.source-head{grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;padding:19px 21px 92px}
+.source-head{grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;padding:19px 21px 92px!important;padding-right:78px!important}
 .source-account{grid-column:auto}
 .source-statuses{grid-column:auto;grid-row:auto;justify-self:start;flex-direction:row;flex-wrap:wrap}
 .source-check-form{position:absolute;left:21px;right:82px;bottom:18px;margin:0}
 .source-check-btn{width:100%;min-height:42px}
 .edit-source-btn{right:18px;bottom:18px}
+.source-power-switch{right:20px;top:20px}
 }
 </style>
+<script id="source-power-switch-script">
+document.addEventListener('change',function(event){
+    const toggle=event.target.closest('[data-source-power]');
+    if(!toggle)return;
+    const form=document.getElementById(toggle.dataset.form);
+    const original=form?.querySelector('input[name="autopublish_enabled"]');
+    if(!form||!original){toggle.checked=!toggle.checked;return;}
+    original.checked=toggle.checked;
+    toggle.disabled=true;
+    if(typeof form.requestSubmit==='function'){form.requestSubmit();}else{form.submit();}
+});
+</script>
 CSS;
 
         return str_replace('</head>', $css.'</head>', $html);
