@@ -3,6 +3,7 @@
 namespace App\Services\Telegram;
 
 use App\Models\AlertSource;
+use App\Models\NewsSource;
 use App\Models\TechnicalTelegramAccount;
 use App\Models\TelegramApiCredential;
 use RuntimeException;
@@ -46,7 +47,7 @@ class TelethonAccountService
         return $this->run(['check-chat', '--chat', $chat, '--mode', $mode], $account);
     }
 
-    public function relayOnce(AlertSource $source): array
+    public function relayOnce(AlertSource|NewsSource $source): array
     {
         $source->loadMissing([
             'readerAccount.telegramApiCredential',
