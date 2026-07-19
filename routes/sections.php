@@ -5,6 +5,7 @@ use App\Http\Controllers\AlertSourceController;
 use App\Http\Controllers\BotProfileController;
 use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
+use App\Http\Controllers\TelegramDependencyController;
 use App\Http\Middleware\SkyGuardianUiMiddleware;
 use Illuminate\Support\Facades\Route;
 
@@ -19,12 +20,12 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
     Route::put('/news/settings', [BotProfileController::class, 'updateNews'])->name('news.settings.update');
     Route::post('/news/settings/apis', [NewsBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
     Route::put('/news/settings/apis/{newsTelegramApi}', [NewsBotSettingsController::class, 'updateApi'])->name('news.telegram-api.update');
-    Route::delete('/news/settings/apis/{newsTelegramApi}', [NewsBotSettingsController::class, 'destroyApi'])->name('news.telegram-api.destroy');
+    Route::delete('/news/settings/apis/{newsTelegramApi}', [TelegramDependencyController::class, 'destroyNewsApi'])->name('news.telegram-api.destroy');
     Route::post('/news/settings/telegram/send-code', [NewsBotSettingsController::class, 'sendCode'])->name('news.telegram.send-code');
     Route::post('/news/settings/telegram/confirm', [NewsBotSettingsController::class, 'confirmCode'])->name('news.telegram.confirm');
     Route::put('/news/settings/telegram/{newsAccount}', [NewsBotSettingsController::class, 'updateAccount'])->name('news.telegram.update');
     Route::delete('/news/settings/telegram/{newsAccount}/disconnect', [NewsBotSettingsController::class, 'disconnect'])->name('news.telegram.disconnect');
-    Route::delete('/news/settings/telegram/{newsAccount}', [NewsBotSettingsController::class, 'destroy'])->name('news.telegram.destroy');
+    Route::delete('/news/settings/telegram/{newsAccount}', [TelegramDependencyController::class, 'destroyNewsAccount'])->name('news.telegram.destroy');
 
     Route::get('/alerts/sources', [AlertSourceController::class, 'index'])->name('alerts.sources');
     Route::post('/alerts/sources', [AlertSourceController::class, 'store'])->name('alerts.sources.store');
@@ -38,12 +39,12 @@ Route::middleware(['auth', SkyGuardianUiMiddleware::class])->group(function (): 
     Route::put('/alerts/settings', [BotProfileController::class, 'updateAlert'])->name('alerts.settings.update');
     Route::post('/alerts/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('alerts.telegram-api.store');
     Route::put('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'updateApi'])->name('alerts.telegram-api.update');
-    Route::delete('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'destroyApi'])->name('alerts.telegram-api.destroy');
+    Route::delete('/alerts/settings/apis/{telegramApi}', [TelegramDependencyController::class, 'destroyAlertApi'])->name('alerts.telegram-api.destroy');
     Route::post('/alerts/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('alerts.telegram.send-code');
     Route::post('/alerts/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('alerts.telegram.confirm');
     Route::put('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('alerts.telegram.update');
     Route::delete('/alerts/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('alerts.telegram.disconnect');
-    Route::delete('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'destroy'])->name('alerts.telegram.destroy');
+    Route::delete('/alerts/settings/telegram/{account}', [TelegramDependencyController::class, 'destroyAlertAccount'])->name('alerts.telegram.destroy');
 
     Route::view('/users', 'group-management')->name('users.index');
 });
