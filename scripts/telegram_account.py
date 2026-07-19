@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 from telethon import TelegramClient
 from telethon.errors import (
@@ -83,6 +84,45 @@ async def check_chat(client, chat_ref: str, mode: str):
     )
 
 
+async def delete_messages(client, chat_ref: str, period: str):
+    if not await client.is_user_authorized():
+        respond(False, message="Технический аккаунт не подключён.")
+        return
+
+    entity = await client.get_entity(chat_ref)
+    me = await client.get_me()
+    permissions = await client.get_permissions(entity, me)
+    is_creator = bool(getattr(permissions, "is_creator", False))
+    is_admin = bool(getattr(permissions, "is_admin", False) or is_creator)
+    admin_rights = getattr(permissions, "admin_rights", None)
+
+    if isinstance(entity, (Channel, Chat)):
+        can_delete = bool(is_creator or (is_admin and getattr(admin_rights, "delete_messages", False)))
+        if not can_delete:
+            respond(False, message="У технического аккаунта нет права удаления сообщений в этом чате.")
+            return
+
+    cutoff = None
+    if period in {"1", "10"}:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=int(period))
+
+    ids = []
+    async for message in client.iter_messages(entity):
+        if cutoff and message.date < cutoff:
+            break
+        ids.append(message.id)
+
+    deleted = 0
+    for offset in range(0, len(ids), 100):
+        batch = ids[offset:offset + 100]
+        if not batch:
+            continue
+        await client.delete_messages(entity, batch, revoke=True)
+        deleted += len(batch)
+
+    respond(True, deleted=deleted, message=f"Удалено сообщений: {deleted}.")
+
+
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--api-id", required=True, type=int)
@@ -103,6 +143,10 @@ async def main():
     check = subparsers.add_parser("check-chat")
     check.add_argument("--chat", required=True)
     check.add_argument("--mode", required=True, choices=["source", "destination"])
+
+    cleanup = subparsers.add_parser("delete-messages")
+    cleanup.add_argument("--chat", required=True)
+    cleanup.add_argument("--period", required=True, choices=["1", "10", "all"])
 
     subparsers.add_parser("status")
     subparsers.add_parser("logout")
@@ -155,6 +199,10 @@ async def main():
 
         if args.command == "check-chat":
             await check_chat(client, args.chat, args.mode)
+            return
+
+        if args.command == "delete-messages":
+            await delete_messages(client, args.chat, args.period)
             return
 
         if args.command == "status":
