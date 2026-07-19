@@ -13,11 +13,11 @@ class BotProfileController extends Controller
     {
         $validated = $this->validateProfile($request);
         $settings = AlertBotSetting::query()->firstOrCreate([]);
-        $settings->bot_name = $validated['bot_name'] ?? null;
-        $settings->administrator_telegram_id = $validated['administrator_telegram_id'] ?? null;
+        $settings->bot_name = $this->nullableTrimmed($validated['bot_name'] ?? null);
+        $settings->administrator_telegram_id = $this->nullableTrimmed($validated['administrator_telegram_id'] ?? null);
 
         if ($request->filled('bot_token')) {
-            $settings->bot_token = $validated['bot_token'];
+            $settings->bot_token = trim($validated['bot_token']);
         }
 
         $settings->save();
@@ -29,11 +29,11 @@ class BotProfileController extends Controller
     {
         $validated = $this->validateProfile($request);
         $settings = NewsBotSetting::query()->firstOrCreate([], ['service_status' => 'stopped']);
-        $settings->bot_name = $validated['bot_name'] ?? null;
-        $settings->administrator_telegram_id = $validated['administrator_telegram_id'] ?? null;
+        $settings->bot_name = $this->nullableTrimmed($validated['bot_name'] ?? null);
+        $settings->administrator_telegram_id = $this->nullableTrimmed($validated['administrator_telegram_id'] ?? null);
 
         if ($request->filled('bot_token')) {
-            $settings->bot_token = $validated['bot_token'];
+            $settings->bot_token = trim($validated['bot_token']);
         }
 
         $settings->save();
@@ -45,8 +45,18 @@ class BotProfileController extends Controller
     {
         return $request->validate([
             'bot_name' => ['nullable', 'string', 'max:100'],
-            'bot_token' => ['nullable', 'string', 'max:255'],
-            'administrator_telegram_id' => ['nullable', 'string', 'max:32'],
+            'bot_token' => ['nullable', 'string', 'max:255', 'regex:/^\d{5,15}:[A-Za-z0-9_-]{20,}$/'],
+            'administrator_telegram_id' => ['nullable', 'regex:/^-?\d{5,20}$/'],
+        ], [
+            'bot_token.regex' => 'Токен Telegram-бота имеет неверный формат.',
+            'administrator_telegram_id.regex' => 'Telegram ID должен содержать только цифры и при необходимости начинаться с минуса.',
         ]);
+    }
+
+    private function nullableTrimmed(?string $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 }
