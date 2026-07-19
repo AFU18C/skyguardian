@@ -19,21 +19,44 @@ class TelegramWelcomeController extends Controller
             'chat' => ['required', 'string', 'max:255'],
             'bot' => ['required', 'in:news,alerts'],
             'message' => ['required', 'string', 'max:2000'],
+            'forbidden_words' => ['nullable', 'string', 'max:10000'],
+            'forbidden_links' => ['nullable', 'string', 'max:10000'],
+            'filter_action' => ['required', 'in:delete,delete_warn,mute'],
+            'new_member_minutes' => ['required', 'integer', 'min:1', 'max:1440'],
+            'message_limit' => ['required', 'integer', 'min:2', 'max:100'],
+            'message_window_seconds' => ['required', 'integer', 'min:5', 'max:3600'],
+            'antispam_action' => ['required', 'in:delete,delete_warn,mute'],
+            'mute_minutes' => ['required', 'integer', 'min:1', 'max:10080'],
         ]);
 
         $previous = $store->get();
-        $enabled = $request->boolean('enabled');
         $token = $this->botToken($data['bot']);
+        $webhookRequired = $this->webhookRequired($request);
 
-        if ($enabled && blank($token)) {
+        if ($webhookRequired && blank($token)) {
             return back()->withErrors(['welcome' => 'У выбранного бота не сохранён токен Telegram.'])->withInput();
         }
 
         $settings = $store->save([
-            'enabled' => false,
+            'enabled' => $request->boolean('enabled'),
             'chat' => trim($data['chat']),
             'bot' => $data['bot'],
             'message' => trim($data['message']),
+            'delete_join_messages' => $request->boolean('delete_join_messages'),
+            'delete_leave_messages' => $request->boolean('delete_leave_messages'),
+            'delete_pinned_messages' => $request->boolean('delete_pinned_messages'),
+            'delete_group_changes' => $request->boolean('delete_group_changes'),
+            'filter_enabled' => $request->boolean('filter_enabled'),
+            'forbidden_words' => trim((string) ($data['forbidden_words'] ?? '')),
+            'forbidden_links' => trim((string) ($data['forbidden_links'] ?? '')),
+            'filter_action' => $data['filter_action'],
+            'antispam_enabled' => $request->boolean('antispam_enabled'),
+            'new_member_minutes' => (int) $data['new_member_minutes'],
+            'block_links_for_new' => $request->boolean('block_links_for_new'),
+            'message_limit' => (int) $data['message_limit'],
+            'message_window_seconds' => (int) $data['message_window_seconds'],
+            'antispam_action' => $data['antispam_action'],
+            'mute_minutes' => (int) $data['mute_minutes'],
         ]);
 
         try {
@@ -44,24 +67,31 @@ class TelegramWelcomeController extends Controller
                 }
             }
 
-            if ($enabled) {
+            if ($webhookRequired) {
                 $this->setWebhook((string) $token, $settings['bot'], (string) $settings['secret']);
-                $store->save(['enabled' => true]);
             } elseif (filled($token)) {
                 $this->deleteWebhook((string) $token);
             }
         } catch (Throwable $exception) {
             report($exception);
-            $store->save(['enabled' => false]);
 
             return back()->withErrors([
-                'welcome' => $exception->getMessage() ?: 'Не удалось настроить Telegram webhook приветствия.',
+                'welcome' => $exception->getMessage() ?: 'Не удалось настроить Telegram webhook управления группой.',
             ])->withInput();
         }
 
-        return back()->with('status', $enabled
-            ? 'Приветствие новых пользователей включено.'
-            : 'Приветствие новых пользователей выключено.');
+        return back()->with('status', 'Настройки управления группой сохранены.');
+    }
+
+    private function webhookRequired(Request $request): bool
+    {
+        return $request->boolean('enabled')
+            || $request->boolean('delete_join_messages')
+            || $request->boolean('delete_leave_messages')
+            || $request->boolean('delete_pinned_messages')
+            || $request->boolean('delete_group_changes')
+            || $request->boolean('filter_enabled')
+            || $request->boolean('antispam_enabled');
     }
 
     private function botToken(string $bot): ?string
@@ -83,7 +113,7 @@ class TelegramWelcomeController extends Controller
         ]);
 
         if (! $response->successful() || ! $response->json('ok')) {
-            throw new RuntimeException((string) ($response->json('description') ?: 'Telegram не принял webhook приветствия.'));
+            throw new RuntimeException((string) ($response->json('description') ?: 'Telegram не принял webhook управления группой.'));
         }
     }
 
