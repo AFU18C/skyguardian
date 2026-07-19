@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\NewsSource;
-use App\Services\Telegram\TelegramApiPowerStore;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
 use Throwable;
@@ -58,7 +57,6 @@ class NewsRelayCommand extends Command
     private function processCycle(TelethonAccountService $telethon): void
     {
         $now = now();
-        $power = app(TelegramApiPowerStore::class);
 
         NewsSource::query()
             ->with(['readerAccount.telegramApiCredential', 'publisherAccount.telegramApiCredential'])
@@ -66,13 +64,21 @@ class NewsRelayCommand extends Command
             ->where('source_status', 'available')
             ->where('destination_status', 'available')
             ->orderBy('id')
-            ->eachById(function (NewsSource $source) use ($telethon, $now, $power): void {
+            ->eachById(function (NewsSource $source) use ($telethon, $now): void {
                 $source->refresh();
-                $source->loadMissing(['readerAccount.telegramApiCredential', 'publisherAccount.telegramApiCredential']);
+                $source->loadMissing([
+                    'readerAccount.telegramApiCredential',
+                    'publisherAccount.telegramApiCredential',
+                ]);
 
                 if (! $source->autopublish_enabled
                     || $source->source_status !== 'available'
                     || $source->destination_status !== 'available') {
+                    return;
+                }
+
+                if ($source->readerAccount?->status === 'disabled'
+                    || $source->publisherAccount?->status === 'disabled') {
                     return;
                 }
 
@@ -88,13 +94,6 @@ class NewsRelayCommand extends Command
                 $publisherReady = $source->publisherAccount
                     && $source->publisherAccount->status === 'connected'
                     && $source->publisherAccount->telegramApiCredential;
-
-                if ($readerReady && ! $power->enabled('news', (int) $source->readerAccount->telegramApiCredential->getKey())) {
-                    return;
-                }
-                if ($publisherReady && ! $power->enabled('news', (int) $source->publisherAccount->telegramApiCredential->getKey())) {
-                    return;
-                }
 
                 if (! $readerReady || ! $publisherReady) {
                     $problems = [];
@@ -122,8 +121,11 @@ class NewsRelayCommand extends Command
 
                 $source->update(['last_polled_at' => $now]);
                 $source->refresh();
+                $source->loadMissing(['readerAccount', 'publisherAccount']);
 
-                if (! $source->autopublish_enabled) {
+                if (! $source->autopublish_enabled
+                    || $source->readerAccount?->status === 'disabled'
+                    || $source->publisherAccount?->status === 'disabled') {
                     return;
                 }
 
