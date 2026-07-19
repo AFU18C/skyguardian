@@ -84,6 +84,17 @@ async def check_chat(client, chat_ref: str, mode: str):
     )
 
 
+async def latest_message(client, chat_ref: str):
+    if not await client.is_user_authorized():
+        respond(False, message="Технический аккаунт не подключён.")
+        return
+
+    entity = await client.get_entity(chat_ref)
+    messages = await client.get_messages(entity, limit=1)
+    latest_id = messages[0].id if messages else 0
+    respond(True, latest_message_id=latest_id)
+
+
 async def delete_messages(client, chat_ref: str, period: str):
     if not await client.is_user_authorized():
         respond(False, message="Технический аккаунт не подключён.")
@@ -151,6 +162,9 @@ async def main():
     check.add_argument("--chat", required=True)
     check.add_argument("--mode", required=True, choices=["source", "destination"])
 
+    latest = subparsers.add_parser("latest-message")
+    latest.add_argument("--chat", required=True)
+
     cleanup = subparsers.add_parser("delete-messages")
     cleanup.add_argument("--chat", required=True)
     cleanup.add_argument("--period", required=True, choices=["1", "10", "all"])
@@ -206,6 +220,10 @@ async def main():
 
         if args.command == "check-chat":
             await check_chat(client, args.chat, args.mode)
+            return
+
+        if args.command == "latest-message":
+            await latest_message(client, args.chat)
             return
 
         if args.command == "delete-messages":
