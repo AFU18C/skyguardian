@@ -73,12 +73,11 @@ class NewsRelayCommand extends Command
 
                 if (! $source->autopublish_enabled
                     || $source->source_status !== 'available'
-                    || $source->destination_status !== 'available') {
-                    return;
-                }
-
-                if ($source->readerAccount?->status === 'disabled'
-                    || $source->publisherAccount?->status === 'disabled') {
+                    || $source->destination_status !== 'available'
+                    || $source->readerAccount?->status === 'disabled'
+                    || $source->publisherAccount?->status === 'disabled'
+                    || ! $source->readerAccount?->telegramApiCredential?->is_enabled
+                    || ! $source->publisherAccount?->telegramApiCredential?->is_enabled) {
                     return;
                 }
 
@@ -121,11 +120,16 @@ class NewsRelayCommand extends Command
 
                 $source->update(['last_polled_at' => $now]);
                 $source->refresh();
-                $source->loadMissing(['readerAccount', 'publisherAccount']);
+                $source->loadMissing([
+                    'readerAccount.telegramApiCredential',
+                    'publisherAccount.telegramApiCredential',
+                ]);
 
                 if (! $source->autopublish_enabled
                     || $source->readerAccount?->status === 'disabled'
-                    || $source->publisherAccount?->status === 'disabled') {
+                    || $source->publisherAccount?->status === 'disabled'
+                    || ! $source->readerAccount?->telegramApiCredential?->is_enabled
+                    || ! $source->publisherAccount?->telegramApiCredential?->is_enabled) {
                     return;
                 }
 
