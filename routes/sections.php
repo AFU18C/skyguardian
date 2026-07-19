@@ -12,6 +12,11 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/alerts/settings', [AlertBotSettingsController::class, 'edit'])->name('alerts.settings');
     Route::put('/alerts/settings', [AlertBotSettingsController::class, 'update'])->name('alerts.settings.update');
+
+    Route::post('/alerts/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('alerts.telegram-api.store');
+    Route::put('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'updateApi'])->name('alerts.telegram-api.update');
+    Route::delete('/alerts/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'destroyApi'])->name('alerts.telegram-api.destroy');
+
     Route::post('/alerts/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('alerts.telegram.send-code');
     Route::post('/alerts/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('alerts.telegram.confirm');
     Route::put('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('alerts.telegram.update');
