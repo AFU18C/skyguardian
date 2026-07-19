@@ -68,6 +68,7 @@ class AlertSourceController extends Controller
             $alertSource->publish_as = null;
             $alertSource->last_error = null;
             $alertSource->autopublish_enabled = false;
+            $alertSource->last_polled_at = null;
         }
 
         $alertSource->save();
@@ -165,6 +166,7 @@ class AlertSourceController extends Controller
             'destination_chat' => ['required', 'string', 'max:255'],
             'reader_account_id' => ['required', 'integer', 'exists:technical_telegram_accounts,id'],
             'publisher_account_id' => ['required', 'integer', 'exists:technical_telegram_accounts,id'],
+            'poll_interval_seconds' => ['required', 'integer', 'min:3', 'max:43200'],
         ]);
     }
 
@@ -189,6 +191,7 @@ class AlertSourceController extends Controller
             'publisher_account_id' => $account->id,
             'autopublish_enabled' => false,
             'text_processing_enabled' => (bool) $settings->text_processing_enabled,
+            'poll_interval_seconds' => 3,
             'source_status' => 'not_checked',
             'destination_status' => 'not_checked',
         ]);
