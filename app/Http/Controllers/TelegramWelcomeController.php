@@ -13,11 +13,47 @@ use Throwable;
 
 class TelegramWelcomeController extends Controller
 {
-    public function update(Request $request, WelcomeSettingsStore $store): RedirectResponse
+    public function store(Request $request, WelcomeSettingsStore $store): RedirectResponse
     {
         $data = $request->validate([
             'chat' => ['required', 'string', 'max:255'],
             'bot' => ['required', 'in:news,alerts'],
+        ]);
+
+        $token = $this->botToken($data['bot']);
+        if (blank($token)) {
+            return back()->withErrors(['group' => 'У выбранного бота не сохранён токен Telegram.'])->withInput();
+        }
+
+        try {
+            $chat = $this->getChat((string) $token, trim($data['chat']));
+            foreach ($store->groups() as $existing) {
+                if ((string) ($existing['chat_id'] ?? '') === (string) ($chat['id'] ?? '')) {
+                    return back()->withErrors(['group' => 'Эта группа или канал уже добавлены.'])->withInput();
+                }
+            }
+
+            $store->add([
+                'chat' => trim($data['chat']),
+                'chat_id' => (string) ($chat['id'] ?? ''),
+                'title' => (string) ($chat['title'] ?? $chat['username'] ?? $data['chat']),
+                'type' => (string) ($chat['type'] ?? 'group'),
+                'bot' => $data['bot'],
+            ]);
+            $this->syncWebhooks($store);
+        } catch (Throwable $exception) {
+            report($exception);
+            return back()->withErrors(['group' => $exception->getMessage() ?: 'Не удалось добавить группу или канал.'])->withInput();
+        }
+
+        return back()->with('status', 'Группа или канал добавлены.');
+    }
+
+    public function update(Request $request, string $group, WelcomeSettingsStore $store): RedirectResponse
+    {
+        abort_unless($store->find($group), 404);
+
+        $data = $request->validate([
             'message' => ['required', 'string', 'max:2000'],
             'forbidden_words' => ['nullable', 'string', 'max:10000'],
             'forbidden_links' => ['nullable', 'string', 'max:10000'],
@@ -29,18 +65,8 @@ class TelegramWelcomeController extends Controller
             'mute_minutes' => ['required', 'integer', 'min:1', 'max:10080'],
         ]);
 
-        $previous = $store->get();
-        $token = $this->botToken($data['bot']);
-        $webhookRequired = $this->webhookRequired($request);
-
-        if ($webhookRequired && blank($token)) {
-            return back()->withErrors(['welcome' => 'У выбранного бота не сохранён токен Telegram.'])->withInput();
-        }
-
-        $settings = $store->save([
+        $store->update($group, [
             'enabled' => $request->boolean('enabled'),
-            'chat' => trim($data['chat']),
-            'bot' => $data['bot'],
             'message' => trim($data['message']),
             'delete_join_messages' => $request->boolean('delete_join_messages'),
             'delete_leave_messages' => $request->boolean('delete_leave_messages'),
@@ -60,71 +86,66 @@ class TelegramWelcomeController extends Controller
         ]);
 
         try {
-            if (($previous['bot'] ?? null) !== $settings['bot']) {
-                $previousToken = $this->botToken((string) ($previous['bot'] ?? ''));
-                if (filled($previousToken)) {
-                    $this->deleteWebhook((string) $previousToken);
-                }
-            }
-
-            if ($webhookRequired) {
-                $this->setWebhook((string) $token, $settings['bot'], (string) $settings['secret']);
-            } elseif (filled($token)) {
-                $this->deleteWebhook((string) $token);
-            }
+            $this->syncWebhooks($store);
         } catch (Throwable $exception) {
             report($exception);
-
-            return back()->withErrors([
-                'welcome' => $exception->getMessage() ?: 'Не удалось настроить Telegram webhook управления группой.',
-            ])->withInput();
+            return back()->withErrors(['group' => $exception->getMessage()])->withInput();
         }
 
-        return back()->with('status', 'Настройки управления группой сохранены.');
+        return back()->with('status', 'Настройки группы сохранены.');
     }
 
-    private function webhookRequired(Request $request): bool
+    public function destroy(string $group, WelcomeSettingsStore $store): RedirectResponse
     {
-        return $request->boolean('enabled')
-            || $request->boolean('delete_join_messages')
-            || $request->boolean('delete_leave_messages')
-            || $request->boolean('delete_pinned_messages')
-            || $request->boolean('delete_group_changes')
-            || $request->boolean('filter_enabled')
-            || $request->boolean('antispam_enabled');
+        abort_unless($store->delete($group), 404);
+        try {
+            $this->syncWebhooks($store);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
+        return back()->with('status', 'Группа или канал удалены из SkyGuardian.');
+    }
+
+    private function getChat(string $token, string $chat): array
+    {
+        $response = Http::asForm()->timeout(15)->post("https://api.telegram.org/bot{$token}/getChat", ['chat_id' => $chat]);
+        if (! $response->successful() || ! $response->json('ok')) {
+            throw new RuntimeException((string) ($response->json('description') ?: 'Telegram не нашёл группу. Добавьте бота в группу и проверьте @username/chat_id.'));
+        }
+
+        return (array) $response->json('result', []);
+    }
+
+    private function syncWebhooks(WelcomeSettingsStore $store): void
+    {
+        $groups = $store->groups();
+        foreach (['news', 'alerts'] as $bot) {
+            $token = $this->botToken($bot);
+            if (blank($token)) {
+                continue;
+            }
+
+            $needed = collect($groups)->contains(fn (array $group): bool => ($group['bot'] ?? null) === $bot);
+            $method = $needed ? 'setWebhook' : 'deleteWebhook';
+            $payload = $needed ? [
+                'url' => route('telegram.welcome.webhook', ['bot' => $bot]),
+                'secret_token' => $store->secret(),
+                'allowed_updates' => json_encode(['message']),
+                'drop_pending_updates' => false,
+            ] : ['drop_pending_updates' => false];
+
+            $response = Http::asForm()->timeout(15)->post("https://api.telegram.org/bot{$token}/{$method}", $payload);
+            if (! $response->successful() || ! $response->json('ok')) {
+                throw new RuntimeException((string) ($response->json('description') ?: 'Telegram не принял webhook управления группой.'));
+            }
+        }
     }
 
     private function botToken(string $bot): ?string
     {
-        return match ($bot) {
-            'news' => NewsBotSetting::query()->first()?->bot_token,
-            'alerts' => AlertBotSetting::query()->first()?->bot_token,
-            default => null,
-        };
-    }
-
-    private function setWebhook(string $token, string $bot, string $secret): void
-    {
-        $response = Http::asForm()->timeout(15)->post("https://api.telegram.org/bot{$token}/setWebhook", [
-            'url' => route('telegram.welcome.webhook', ['bot' => $bot]),
-            'secret_token' => $secret,
-            'allowed_updates' => json_encode(['message']),
-            'drop_pending_updates' => false,
-        ]);
-
-        if (! $response->successful() || ! $response->json('ok')) {
-            throw new RuntimeException((string) ($response->json('description') ?: 'Telegram не принял webhook управления группой.'));
-        }
-    }
-
-    private function deleteWebhook(string $token): void
-    {
-        $response = Http::asForm()->timeout(15)->post("https://api.telegram.org/bot{$token}/deleteWebhook", [
-            'drop_pending_updates' => false,
-        ]);
-
-        if (! $response->successful() || ! $response->json('ok')) {
-            throw new RuntimeException((string) ($response->json('description') ?: 'Telegram не отключил предыдущий webhook.'));
-        }
+        return $bot === 'news'
+            ? NewsBotSetting::query()->first()?->bot_token
+            : AlertBotSetting::query()->first()?->bot_token;
     }
 }
