@@ -1,16 +1,14 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use App\Models\AlertBotSetting;
 use App\Models\NewsBotSetting;
-use App\Services\Telegram\TelegramComponentPowerStore;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class BotProfileController extends Controller
 {
-    public function updateAlert(Request $request, TelegramComponentPowerStore $power): RedirectResponse
+    public function updateAlert(Request $request): RedirectResponse
     {
         $validated = $this->validateProfile($request);
         $settings = AlertBotSetting::query()->firstOrCreate([]);
@@ -20,26 +18,18 @@ class BotProfileController extends Controller
         if ($request->boolean('remove_bot_token')) {
             $settings->bot_token = null;
             $settings->bot_status = 'not_configured';
-            $power->setBotEnabled('alerts', false);
-        } else {
-            if ($request->filled('bot_token')) {
-                $settings->bot_token = trim($validated['bot_token']);
-            }
-
-            $enabled = filled($settings->bot_token) && $request->boolean('bot_enabled');
-            $settings->bot_status = $enabled ? 'active' : 'stopped';
-            $power->setBotEnabled('alerts', $enabled);
+        } elseif ($request->filled('bot_token')) {
+            $settings->bot_token = trim($validated['bot_token']);
         }
 
         $settings->save();
-        $enabled = $power->botEnabled('alerts', filled($settings->bot_token));
 
         return back()->with('status', $request->boolean('remove_bot_token')
-            ? 'Токен Telegram-бота удалён.'
-            : ($enabled ? 'Telegram-бот включён.' : 'Telegram-бот полностью остановлен.'));
+            ? 'Токен Telegram-бота удалён. Бот отключён.'
+            : 'Настройки Telegram-бота сохранены.');
     }
 
-    public function updateNews(Request $request, TelegramComponentPowerStore $power): RedirectResponse
+    public function updateNews(Request $request): RedirectResponse
     {
         $validated = $this->validateProfile($request);
         $settings = NewsBotSetting::query()->firstOrCreate([], ['service_status' => 'stopped']);
@@ -49,23 +39,15 @@ class BotProfileController extends Controller
         if ($request->boolean('remove_bot_token')) {
             $settings->bot_token = null;
             $settings->service_status = 'stopped';
-            $power->setBotEnabled('news', false);
-        } else {
-            if ($request->filled('bot_token')) {
-                $settings->bot_token = trim($validated['bot_token']);
-            }
-
-            $enabled = filled($settings->bot_token) && $request->boolean('bot_enabled');
-            $settings->service_status = $enabled ? 'running' : 'stopped';
-            $power->setBotEnabled('news', $enabled);
+        } elseif ($request->filled('bot_token')) {
+            $settings->bot_token = trim($validated['bot_token']);
         }
 
         $settings->save();
-        $enabled = $power->botEnabled('news', filled($settings->bot_token));
 
         return back()->with('status', $request->boolean('remove_bot_token')
-            ? 'Токен Telegram-бота удалён.'
-            : ($enabled ? 'Telegram-бот включён.' : 'Telegram-бот полностью остановлен.'));
+            ? 'Токен Telegram-бота удалён. Бот отключён.'
+            : 'Настройки Telegram-бота сохранены.');
     }
 
     private function validateProfile(Request $request): array
@@ -74,7 +56,6 @@ class BotProfileController extends Controller
             'bot_name' => ['nullable', 'string', 'max:100'],
             'bot_token' => ['nullable', 'string', 'max:255', 'regex:/^\d{5,15}:[A-Za-z0-9_-]{20,}$/'],
             'administrator_telegram_id' => ['nullable', 'regex:/^-?\d{5,20}$/'],
-            'bot_enabled' => ['nullable', 'boolean'],
             'remove_bot_token' => ['nullable', 'boolean'],
         ], [
             'bot_token.regex' => 'Токен Telegram-бота имеет неверный формат.',
