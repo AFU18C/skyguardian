@@ -1,6 +1,6 @@
 [Unit]
 Description=SkyGuardian News Telegram Relay
-After=network-online.target mariadb.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]
@@ -13,6 +13,15 @@ Restart=always
 RestartSec=3
 KillSignal=SIGTERM
 TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/SkyGuardianUa/storage /var/www/SkyGuardianUa/bootstrap/cache
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=skyguardian-news-relay
 
 [Install]
 WantedBy=multi-user.target
