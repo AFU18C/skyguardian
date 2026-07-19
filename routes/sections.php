@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AlertBotSettingsController;
 use App\Http\Controllers\AlertSourceController;
+use App\Http\Controllers\NewsBotSettingsController;
 use App\Http\Controllers\NewsSourceController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,7 +13,17 @@ Route::middleware('auth')->group(function (): void {
     Route::delete('/news/sources/{newsSource}', [NewsSourceController::class, 'destroy'])->name('news.sources.destroy');
     Route::post('/news/sources/{newsSource}/check', [NewsSourceController::class, 'check'])->name('news.sources.check');
 
-    Route::view('/news/settings', 'section', ['pageTitle' => 'Настройки новостного бота', 'pageDescription' => 'Параметры обработки и публикации новостей', 'activeSection' => 'news-settings'])->name('news.settings');
+    Route::get('/news/settings', [NewsBotSettingsController::class, 'edit'])->name('news.settings');
+    Route::put('/news/settings', [NewsBotSettingsController::class, 'update'])->name('news.settings.update');
+
+    Route::post('/news/settings/apis', [AlertBotSettingsController::class, 'storeApi'])->name('news.telegram-api.store');
+    Route::put('/news/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'updateApi'])->name('news.telegram-api.update');
+    Route::delete('/news/settings/apis/{telegramApi}', [AlertBotSettingsController::class, 'destroyApi'])->name('news.telegram-api.destroy');
+    Route::post('/news/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('news.telegram.send-code');
+    Route::post('/news/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('news.telegram.confirm');
+    Route::put('/news/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('news.telegram.update');
+    Route::delete('/news/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('news.telegram.disconnect');
+    Route::delete('/news/settings/telegram/{account}', [AlertBotSettingsController::class, 'destroy'])->name('news.telegram.destroy');
 
     Route::get('/alerts/sources', [AlertSourceController::class, 'index'])->name('alerts.sources');
     Route::post('/alerts/sources', [AlertSourceController::class, 'store'])->name('alerts.sources.store');
