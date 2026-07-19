@@ -58,6 +58,22 @@ class TelethonAccountService
         ];
     }
 
+    private function sessionPath(TechnicalTelegramAccount $account): string
+    {
+        $legacyPath = storage_path('app/private/telegram/technical');
+
+        if ($account->is_primary && (is_file($legacyPath.'.session') || is_file($legacyPath))) {
+            return $legacyPath;
+        }
+
+        $sessionDirectory = storage_path('app/private/telegram/accounts');
+        if (! is_dir($sessionDirectory) && ! mkdir($sessionDirectory, 0770, true) && ! is_dir($sessionDirectory)) {
+            throw new RuntimeException('Не вдалося створити каталог Telegram-сесій.');
+        }
+
+        return $sessionDirectory.'/'.$account->sessionKey();
+    }
+
     private function run(array $arguments, TechnicalTelegramAccount $account): array
     {
         [$apiId, $apiHash] = $this->credentials();
@@ -66,17 +82,12 @@ class TelethonAccountService
             throw new RuntimeException('Вкажіть API ID та App api_hash у налаштуваннях бота.');
         }
 
-        $sessionDirectory = storage_path('app/private/telegram/accounts');
-        if (! is_dir($sessionDirectory) && ! mkdir($sessionDirectory, 0770, true) && ! is_dir($sessionDirectory)) {
-            throw new RuntimeException('Не вдалося створити каталог Telegram-сесій.');
-        }
-
         $command = array_merge([
             config('services.telegram.python', 'python3'),
             base_path('scripts/telegram_account.py'),
             '--api-id', (string) $apiId,
             '--api-hash', (string) $apiHash,
-            '--session', $sessionDirectory.'/'.$account->sessionKey(),
+            '--session', $this->sessionPath($account),
         ], $arguments);
 
         $process = new Process($command, base_path());
