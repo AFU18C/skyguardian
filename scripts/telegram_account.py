@@ -25,26 +25,42 @@ async def check_chat(client, chat_ref: str, mode: str):
         return
 
     entity = await client.get_entity(chat_ref)
-    permissions = await client.get_permissions(entity, "me")
+    me = await client.get_me()
+    permissions = await client.get_permissions(entity, me)
+
+    is_creator = bool(getattr(permissions, "is_creator", False))
+    is_admin = bool(getattr(permissions, "is_admin", False) or is_creator)
+    admin_rights = getattr(permissions, "admin_rights", None)
+    banned_rights = getattr(permissions, "banned_rights", None)
 
     if isinstance(entity, Channel):
         if entity.broadcast:
             chat_type = "channel"
             can_send = bool(
-                getattr(permissions, "is_admin", False)
-                and getattr(getattr(permissions, "admin_rights", None), "post_messages", False)
+                is_creator
+                or (
+                    is_admin
+                    and (
+                        getattr(admin_rights, "post_messages", False)
+                        or getattr(admin_rights, "edit_messages", False)
+                    )
+                )
             )
             publish_as = "channel"
         else:
             chat_type = "group"
-            banned = getattr(permissions, "banned_rights", None)
-            can_send = not bool(getattr(banned, "send_messages", False))
-            anonymous = bool(getattr(getattr(permissions, "admin_rights", None), "anonymous", False))
+            can_send = bool(
+                is_creator
+                or not getattr(banned_rights, "send_messages", False)
+            )
+            anonymous = bool(is_admin and getattr(admin_rights, "anonymous", False))
             publish_as = "group" if anonymous else "account"
     elif isinstance(entity, Chat):
         chat_type = "group"
-        banned = getattr(permissions, "banned_rights", None)
-        can_send = not bool(getattr(banned, "send_messages", False))
+        can_send = bool(
+            is_creator
+            or not getattr(banned_rights, "send_messages", False)
+        )
         publish_as = "account"
     else:
         chat_type = "user"
@@ -61,7 +77,8 @@ async def check_chat(client, chat_ref: str, mode: str):
         chat_type=chat_type,
         can_read=can_read,
         can_send=can_send,
-        is_admin=bool(getattr(permissions, "is_admin", False)),
+        is_admin=is_admin,
+        is_creator=is_creator,
         publish_as=publish_as,
     )
 
