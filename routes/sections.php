@@ -12,6 +12,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/alerts/sources', [AlertSourceController::class, 'store'])->name('alerts.sources.store');
     Route::put('/alerts/sources/{alertSource}', [AlertSourceController::class, 'update'])->name('alerts.sources.update');
     Route::delete('/alerts/sources/{alertSource}', [AlertSourceController::class, 'destroy'])->name('alerts.sources.destroy');
+    Route::post('/alerts/sources/{alertSource}/check', [AlertSourceController::class, 'check'])->name('alerts.sources.check');
     Route::post('/alerts/sources/{alertSource}/check-source', [AlertSourceController::class, 'checkSource'])->name('alerts.sources.check-source');
     Route::post('/alerts/sources/{alertSource}/check-destination', [AlertSourceController::class, 'checkDestination'])->name('alerts.sources.check-destination');
 
