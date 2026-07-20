@@ -59,7 +59,9 @@ Route::middleware(['auth', SourcePowerUiMiddleware::class, TechnicalAccountPower
     Route::delete('/alerts/settings/telegram/{account}', [TelegramDependencyController::class, 'destroyAlertAccount'])->name('alerts.telegram.destroy');
 
     Route::get('/users', [GroupManagementController::class, 'index'])->name('users.index');
-    Route::post('/users/delete-messages', [GroupManagementController::class, 'deleteMessages'])->name('users.messages.delete');
+    Route::post('/users/delete-messages', [GroupManagementController::class, 'deleteMessages'])
+        ->middleware('throttle:3,1')
+        ->name('users.messages.delete');
     Route::post('/users/groups', [TelegramWelcomeController::class, 'store'])->name('users.groups.store');
     Route::put('/users/groups/{group}', [TelegramWelcomeController::class, 'update'])->name('users.groups.update');
     Route::delete('/users/groups/{group}', [TelegramWelcomeController::class, 'destroy'])->name('users.groups.destroy');
