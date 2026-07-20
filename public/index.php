@@ -362,28 +362,7 @@ function renderAccountForm(array $account, bool $isNew = false): void
 
 function renderGroupPage(array $data): void
 {
-    $accounts = $data['accounts'];
     renderLayoutStart('Управление группой', '/group');
-    echo '<div class="section-header"><div><h2>Технические аккаунты</h2><p>Технические аккаунты: ' . count($accounts) . ' из ' . MAX_ACCOUNTS . '</p></div>';
-    if (count($accounts) < MAX_ACCOUNTS) {
-        echo '<button class="button primary" type="button" id="showNewAccount">Добавить аккаунт</button>';
-    } else {
-        echo '<button class="button primary" disabled type="button">Добавить аккаунт</button>';
-    }
-    echo '</div>';
-    if (count($accounts) < MAX_ACCOUNTS) {
-        echo '<div id="newAccountWrap" class="hidden">';
-        renderAccountForm(['active' => true], true);
-        echo '</div>';
-    }
-    echo '<div class="accordion-list">';
-    foreach ($accounts as $account) {
-        renderAccountForm($account);
-    }
-    if (!$accounts) {
-        echo '<div class="empty-state"><div>＋</div><h3>Аккаунтов пока нет</h3><p>Добавьте первый технический аккаунт.</p></div>';
-    }
-    echo '</div>';
     renderLayoutEnd();
 }
 
