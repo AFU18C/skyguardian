@@ -20,12 +20,48 @@ def respond(ok: bool, **payload):
     print(json.dumps({"ok": ok, **payload}, ensure_ascii=False))
 
 
+def raw_entity_id(chat_id: int) -> int:
+    if chat_id <= -1000000000000:
+        return int(str(abs(chat_id))[3:])
+
+    return abs(chat_id)
+
+
+async def resolve_chat_entity(client, chat_ref: str):
+    normalized = str(chat_ref).strip()
+
+    try:
+        return await client.get_entity(normalized)
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        requested_id = int(normalized)
+    except ValueError as exception:
+        raise RuntimeError(
+            "Telegram не нашёл эту группу или канал. Проверьте ссылку, @username и доступ технического аккаунта."
+        ) from exception
+
+    requested_raw_id = raw_entity_id(requested_id)
+
+    async for dialog in client.iter_dialogs():
+        dialog_id = int(getattr(dialog, "id", 0) or 0)
+        entity_id = int(getattr(dialog.entity, "id", 0) or 0)
+
+        if dialog_id == requested_id or entity_id == requested_raw_id:
+            return dialog.entity
+
+    raise RuntimeError(
+        "Технический аккаунт не видит эту группу или канал. Добавьте аккаунт в чат и повторите попытку."
+    )
+
+
 async def check_chat(client, chat_ref: str, mode: str):
     if not await client.is_user_authorized():
         respond(False, message="Технический аккаунт не подключён.")
         return
 
-    entity = await client.get_entity(chat_ref)
+    entity = await resolve_chat_entity(client, chat_ref)
     me = await client.get_me()
     permissions = await client.get_permissions(entity, me)
 
@@ -89,7 +125,7 @@ async def latest_message(client, chat_ref: str):
         respond(False, message="Технический аккаунт не подключён.")
         return
 
-    entity = await client.get_entity(chat_ref)
+    entity = await resolve_chat_entity(client, chat_ref)
     messages = await client.get_messages(entity, limit=1)
     latest_id = messages[0].id if messages else 0
     respond(True, latest_message_id=latest_id)
@@ -100,7 +136,7 @@ async def delete_messages(client, chat_ref: str, period: str):
         respond(False, message="Технический аккаунт не подключён.")
         return
 
-    entity = await client.get_entity(chat_ref)
+    entity = await resolve_chat_entity(client, chat_ref)
     me = await client.get_me()
     permissions = await client.get_permissions(entity, me)
     is_creator = bool(getattr(permissions, "is_creator", False))
