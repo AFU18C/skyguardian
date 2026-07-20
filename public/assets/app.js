@@ -116,7 +116,7 @@
 
     if (/^\/(news|alerts)\/settings\/?$/.test(window.location.pathname)) {
         const script = document.createElement('script');
-        script.src = '/assets/settings-accounts.js?v=2';
+        script.src = '/assets/settings-accounts.js?v=3';
         script.defer = true;
         document.body.appendChild(script);
     }
