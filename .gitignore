@@ -1,5 +1,7 @@
 /storage/skyguardian.json
 /storage/*.tmp
+/storage/*.lock
+/storage/sessions/
 .env
 .DS_Store
 /vendor/
