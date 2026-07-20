@@ -11,6 +11,14 @@
                 trigger.style.pointerEvents = 'none';
             }
         });
+
+        const sectionHeader = root.querySelector('main.content .section-header');
+        if (sectionHeader) {
+            const title = sectionHeader.querySelector('h2');
+            const subtitle = sectionHeader.querySelector('p');
+            if (title) title.textContent = 'Технические аккаунты';
+            if (subtitle) subtitle.remove();
+        }
     };
 
     refine();
