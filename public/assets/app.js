@@ -115,9 +115,14 @@
     document.querySelectorAll('[data-autohide]').forEach((notice) => window.setTimeout(() => notice.remove(), 4500));
 
     if (/^\/(news|alerts)\/settings\/?$/.test(window.location.pathname)) {
-        const script = document.createElement('script');
-        script.src = '/assets/settings-accounts-v2.js?v=2';
-        script.defer = true;
-        document.body.appendChild(script);
+        const settingsScript = document.createElement('script');
+        settingsScript.src = '/assets/settings-accounts-v2.js?v=2';
+        settingsScript.defer = true;
+        document.body.appendChild(settingsScript);
+
+        const spoilerScript = document.createElement('script');
+        spoilerScript.src = '/assets/account-spoiler.js?v=1';
+        spoilerScript.defer = true;
+        document.body.appendChild(spoilerScript);
     }
 })();
