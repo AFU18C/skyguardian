@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AlertBotSettingsController;
 use App\Http\Controllers\AlertSourceController;
+use App\Http\Controllers\AlertTelegramQrController;
 use App\Http\Controllers\BotProfileController;
 use App\Http\Controllers\GroupManagementController;
 use App\Http\Controllers\NewsBotSettingsController;
@@ -53,6 +54,9 @@ Route::middleware(['auth', SourcePowerUiMiddleware::class, TechnicalAccountPower
     Route::delete('/alerts/settings/apis/{telegramApi}', [TelegramDependencyController::class, 'destroyAlertApi'])->name('alerts.telegram-api.destroy');
     Route::post('/alerts/settings/telegram/send-code', [AlertBotSettingsController::class, 'sendCode'])->name('alerts.telegram.send-code');
     Route::post('/alerts/settings/telegram/confirm', [AlertBotSettingsController::class, 'confirmCode'])->name('alerts.telegram.confirm');
+    Route::get('/alerts/settings/telegram/qr', [AlertTelegramQrController::class, 'index'])->name('alerts.telegram.qr');
+    Route::post('/alerts/settings/telegram/qr', [AlertTelegramQrController::class, 'start'])->name('alerts.telegram.qr.start');
+    Route::delete('/alerts/settings/telegram/qr', [AlertTelegramQrController::class, 'cancel'])->name('alerts.telegram.qr.cancel');
     Route::put('/alerts/settings/telegram/{account}', [AlertBotSettingsController::class, 'updateAccount'])->name('alerts.telegram.update');
     Route::post('/alerts/settings/telegram/{account}/power', [TechnicalAccountPowerController::class, 'alert'])->name('alerts.telegram.power');
     Route::delete('/alerts/settings/telegram/{account}/disconnect', [AlertBotSettingsController::class, 'disconnect'])->name('alerts.telegram.disconnect');
