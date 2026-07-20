@@ -118,16 +118,7 @@ class TelethonAccountService
     {
         $basePath = $this->sessionPath($account);
 
-        foreach ([
-            $basePath,
-            $basePath.'.session',
-            $basePath.'.session-journal',
-            $basePath.'.session-shm',
-            $basePath.'.session-wal',
-            $basePath.'-journal',
-            $basePath.'-shm',
-            $basePath.'-wal',
-        ] as $path) {
+        foreach ($this->sessionFiles($basePath) as $path) {
             if (is_file($path) && ! @unlink($path)) {
                 throw new RuntimeException('Не удалось удалить файл Telegram-сессии.');
             }
@@ -147,21 +138,71 @@ class TelethonAccountService
 
     private function sessionPath(TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account): string
     {
-        if ($account instanceof NewsTechnicalTelegramAccount) {
-            $directory = storage_path('app/private/telegram/news_accounts');
-        } else {
-            $legacyPath = storage_path('app/private/telegram/technical');
-            if ($account->is_primary && (is_file($legacyPath.'.session') || is_file($legacyPath))) {
-                return $legacyPath;
-            }
-            $directory = storage_path('app/private/telegram/accounts');
-        }
+        $directory = $account instanceof NewsTechnicalTelegramAccount
+            ? storage_path('app/private/telegram/news_accounts')
+            : storage_path('app/private/telegram/accounts');
 
         if (! is_dir($directory) && ! mkdir($directory, 0770, true) && ! is_dir($directory)) {
             throw new RuntimeException('Не удалось создать каталог Telegram-сессий.');
         }
 
-        return $directory.'/'.$account->sessionKey();
+        $accountPath = $directory.'/'.$account->sessionKey();
+
+        if ($account instanceof TechnicalTelegramAccount) {
+            $this->migrateLegacyAlertSession($account, $accountPath);
+        }
+
+        return $accountPath;
+    }
+
+    private function migrateLegacyAlertSession(TechnicalTelegramAccount $account, string $accountPath): void
+    {
+        if (! $account->is_primary || $this->hasSessionFiles($accountPath)) {
+            return;
+        }
+
+        $legacyPath = storage_path('app/private/telegram/technical');
+        if (! $this->hasSessionFiles($legacyPath)) {
+            return;
+        }
+
+        foreach ($this->sessionFiles($legacyPath) as $source) {
+            if (! is_file($source)) {
+                continue;
+            }
+
+            $suffix = substr($source, strlen($legacyPath));
+            $destination = $accountPath.$suffix;
+
+            if (! @rename($source, $destination)) {
+                throw new RuntimeException('Не удалось перенести старую Telegram-сессию в отдельный аккаунт.');
+            }
+        }
+    }
+
+    private function hasSessionFiles(string $basePath): bool
+    {
+        foreach ($this->sessionFiles($basePath) as $path) {
+            if (is_file($path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function sessionFiles(string $basePath): array
+    {
+        return [
+            $basePath,
+            $basePath.'.session',
+            $basePath.'.session-journal',
+            $basePath.'.session-shm',
+            $basePath.'.session-wal',
+            $basePath.'-journal',
+            $basePath.'-shm',
+            $basePath.'-wal',
+        ];
     }
 
     private function run(array $arguments, TechnicalTelegramAccount|NewsTechnicalTelegramAccount $account): array
