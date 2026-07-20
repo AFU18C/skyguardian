@@ -107,7 +107,7 @@ function renderHead(string $title): void
     echo '<!doctype html><html lang="ru"><head><meta charset="utf-8">';
     echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<title>' . e($title) . ' — ' . APP_NAME . '</title>';
-    echo '<link rel="stylesheet" href="/assets/app.css"></head><body>';
+    echo '<link rel="stylesheet" href="/assets/app.css?v=4"></head><body>';
 }
 
 function renderFoot(): void

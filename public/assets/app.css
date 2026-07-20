@@ -238,36 +238,36 @@ fieldset small, .editor-block small { display: block; color: var(--muted); margi
     .maintenance-card, .auth-card, .state-card { padding: 28px 22px; }
 }
 
-/* FIX_SIDEBAR_NAV_ALIGNMENT */
+/* FIX_SIDEBAR_NAV_FINAL */
 .sidebar nav {
+    display: grid;
     width: 100%;
+    gap: 5px;
 }
 
 .sidebar .nav-link {
-    position: relative;
     display: flex;
     align-items: center;
     width: 100%;
     min-height: 52px;
     margin: 0;
-    padding: 12px 18px 12px 20px;
+    padding: 12px 16px;
     box-sizing: border-box;
-    border-radius: 14px;
+    border: 1px solid transparent;
+    border-radius: 12px;
     overflow: hidden;
 }
 
 .sidebar .nav-link.active {
+    padding-left: 13px;
+    color: #ffffff;
     background: rgba(79, 124, 255, 0.22);
+    border-left: 4px solid var(--primary);
     box-shadow: none;
 }
 
 .sidebar .nav-link.active::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 7px;
-    bottom: 7px;
-    width: 4px;
-    border-radius: 0 4px 4px 0;
-    background: var(--primary);
+    display: none;
+    content: none;
 }
+
