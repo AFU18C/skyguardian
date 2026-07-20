@@ -112,7 +112,8 @@ function renderHead(string $title): void
 
 function renderFoot(): void
 {
-    echo '<script src="/assets/app.js?v=20260721-10"></script></body></html>';
+    $appJsVersion = (string) (filemtime(__DIR__ . '/assets/app.js') ?: time());
+    echo '<script src="/assets/app.js?v=' . $appJsVersion . '"></script></body></html>';
 }
 
 function renderError(int $code, string $title, string $text): void
