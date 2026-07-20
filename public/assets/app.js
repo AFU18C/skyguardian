@@ -14,18 +14,22 @@
         root.querySelectorAll('[data-accordion]').forEach((card) => {
             if (card.dataset.accordionBound) return;
             card.dataset.accordionBound = '1';
+
             const trigger = card.querySelector('.accordion-trigger');
             const edit = card.querySelector('.edit-trigger');
-            const open = () => {
-                card.classList.add('open');
-                trigger?.setAttribute('aria-expanded', 'true');
-            };
-            trigger?.addEventListener('click', () => {
+            trigger?.querySelector('.chevron')?.remove();
+
+            if (trigger) {
+                trigger.style.pointerEvents = 'none';
+                trigger.style.cursor = 'default';
+            }
+
+            edit?.addEventListener('click', () => {
                 const next = !card.classList.contains('open');
                 card.classList.toggle('open', next);
-                trigger.setAttribute('aria-expanded', next ? 'true' : 'false');
+                trigger?.setAttribute('aria-expanded', next ? 'true' : 'false');
+                if (next) card.querySelector('input, select, textarea')?.focus();
             });
-            edit?.addEventListener('click', open);
         });
     };
     bindAccordions();
