@@ -30,18 +30,8 @@
     const qrDialog = document.createElement('dialog');
     qrDialog.setAttribute('aria-labelledby', 'telegramQrTitle');
     Object.assign(qrDialog.style, {
-        position: 'fixed',
-        inset: '0',
-        width: '100vw',
-        height: '100dvh',
-        maxWidth: 'none',
-        maxHeight: 'none',
-        margin: '0',
-        padding: '12px',
-        border: '0',
-        background: 'transparent',
-        overflow: 'hidden',
-        boxSizing: 'border-box'
+        position: 'fixed', inset: '0', width: '100vw', height: '100dvh', maxWidth: 'none', maxHeight: 'none',
+        margin: '0', padding: '12px', border: '0', background: 'transparent', overflow: 'hidden', boxSizing: 'border-box'
     });
     qrDialog.innerHTML = `
         <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
@@ -81,13 +71,7 @@
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
-            Object.assign(canvas.style, {
-                display: 'block',
-                width: `${size}px`,
-                height: `${size}px`,
-                maxWidth: '100%',
-                flex: '0 0 auto'
-            });
+            Object.assign(canvas.style, { display: 'block', width: `${size}px`, height: `${size}px`, maxWidth: '100%', flex: '0 0 auto' });
             const context = canvas.getContext('2d');
             if (!context) return;
             context.fillStyle = '#ffffff';
@@ -95,9 +79,7 @@
             context.drawImage(image, 0, 0, size, size);
             qrCode.replaceChildren(canvas);
         };
-        image.onerror = () => {
-            qrCode.innerHTML = '<div style="color:#b91c1c;text-align:center">Не удалось отобразить QR-код</div>';
-        };
+        image.onerror = () => { qrCode.innerHTML = '<div style="color:#b91c1c;text-align:center">Не удалось отобразить QR-код</div>'; };
         image.src = source;
     };
 
@@ -117,10 +99,7 @@
         pollTimer = null;
     };
 
-    qrDialog.addEventListener('close', () => {
-        stopPolling();
-        unlockPage();
-    });
+    qrDialog.addEventListener('close', () => { stopPolling(); unlockPage(); });
     qrDialog.querySelector('[data-qr-close]').addEventListener('click', () => qrDialog.close());
 
     const qrRequest = async (action = 'status', password = '') => {
@@ -178,9 +157,21 @@
 
     const accountCard = (account = {}, isNew = false) => {
         const connected = account.connected === true;
-        return `<article class="accordion-card open" data-account-card>
-            <div class="accordion-header"><div class="accordion-trigger"><span><strong>${escapeHtml(account.name || 'Новый технический аккаунт')}</strong><small>${connected ? 'Telegram подключён' : 'Telegram не подключён'}</small></span></div></div>
-            <div class="accordion-panel" style="display:block">
+        const active = account.active !== false;
+        const hasError = Boolean(account.error);
+        const statusColor = hasError ? '#ef4444' : (connected ? '#22c55e' : '#64748b');
+        const statusTitle = hasError ? 'Ошибка подключения' : (connected ? 'Telegram подключён' : 'Telegram не подключён');
+        const openClass = isNew ? ' open' : '';
+        return `<article class="accordion-card${openClass}" data-account-card data-account-id="${escapeHtml(account.id || '')}">
+            <div class="accordion-header">
+                <button type="button" class="accordion-trigger" data-account-toggle aria-expanded="${isNew ? 'true' : 'false'}">
+                    <span><strong>${escapeHtml(account.name || 'Новый технический аккаунт')}</strong><small><span aria-hidden="true" style="display:inline-block;width:10px;height:10px;margin-right:7px;border-radius:50%;background:${statusColor}"></span>${statusTitle}</small></span>
+                    <span class="chevron">⌄</span>
+                </button>
+                ${isNew ? '' : `<label class="switch" title="Включить или выключить аккаунт"><input type="checkbox" data-account-active ${active ? 'checked' : ''}><span></span></label>
+                <button type="button" class="icon-button edit-trigger" data-account-edit aria-label="Редактировать аккаунт">✎</button>`}
+            </div>
+            <div class="accordion-panel">
                 <form class="form-grid" data-account-form>
                     <input type="hidden" name="id" value="${escapeHtml(account.id || '')}">
                     <div class="grid-2">
@@ -208,18 +199,50 @@
         bindForms();
     };
 
+    const setCardOpen = (card, open) => {
+        card.classList.toggle('open', open);
+        card.querySelector('[data-account-toggle]')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+
     const bindForms = () => {
-        content.querySelectorAll('[data-account-form]').forEach((form) => {
-            if (form.dataset.bound) return;
-            form.dataset.bound = '1';
+        content.querySelectorAll('[data-account-card]').forEach((card) => {
+            if (card.dataset.bound) return;
+            card.dataset.bound = '1';
+
+            card.querySelector('[data-account-toggle]')?.addEventListener('click', () => setCardOpen(card, !card.classList.contains('open')));
+            card.querySelector('[data-account-edit]')?.addEventListener('click', () => {
+                setCardOpen(card, true);
+                card.querySelector('input, select, textarea')?.focus();
+            });
+
+            const activeToggle = card.querySelector('[data-account-active]');
+            activeToggle?.addEventListener('change', async () => {
+                const id = card.dataset.accountId || '';
+                activeToggle.disabled = true;
+                try {
+                    await request({ csrf, section, action: 'toggle', id, active: activeToggle.checked ? '1' : '0' });
+                    const account = accounts.find((item) => item.id === id);
+                    if (account) account.active = activeToggle.checked;
+                } catch (error) {
+                    activeToggle.checked = !activeToggle.checked;
+                    window.alert(error.message || 'Не удалось изменить состояние аккаунта.');
+                } finally {
+                    activeToggle.disabled = false;
+                }
+            });
+
+            const form = card.querySelector('[data-account-form]');
+            if (!form) return;
             form.addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const fields = new FormData(form);
+                const id = fields.get('id') || '';
+                const account = accounts.find((item) => item.id === id);
                 try {
                     await request({
-                        csrf, section, action: 'save', id: fields.get('id') || '',
+                        csrf, section, action: 'save', id,
                         name: fields.get('name') || '', api_id: fields.get('api_id') || '',
-                        api_hash: fields.get('api_hash') || '', active: '1'
+                        api_hash: fields.get('api_hash') || '', active: account?.active === false ? '0' : '1'
                     });
                     await load();
                 } catch (error) { window.alert(error.message); }
