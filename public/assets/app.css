@@ -237,3 +237,37 @@ fieldset small, .editor-block small { display: block; color: var(--muted); margi
     .qr-box { align-items: stretch; flex-direction: column; }
     .maintenance-card, .auth-card, .state-card { padding: 28px 22px; }
 }
+
+/* FIX_SIDEBAR_NAV_ALIGNMENT */
+.sidebar nav {
+    width: 100%;
+}
+
+.sidebar .nav-link {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 52px;
+    margin: 0;
+    padding: 12px 18px 12px 20px;
+    box-sizing: border-box;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.sidebar .nav-link.active {
+    background: rgba(79, 124, 255, 0.22);
+    box-shadow: none;
+}
+
+.sidebar .nav-link.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    bottom: 7px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--primary);
+}
