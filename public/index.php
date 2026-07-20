@@ -112,7 +112,7 @@ function renderHead(string $title): void
 
 function renderFoot(): void
 {
-    echo '<script src="/assets/app.js?v=20260721-2"></script></body></html>';
+    echo '<script src="/assets/app.js?v=20260721-7"></script></body></html>';
 }
 
 function renderError(int $code, string $title, string $text): void
