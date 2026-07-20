@@ -1,5 +1,10 @@
 /storage/skyguardian.json
 /storage/*.tmp
+/storage/telegram-sessions/
+/public/MadelineProto.log
+/MadelineProto.log
+*.session
+*.session.lock
 .env
 .DS_Store
 /vendor/
