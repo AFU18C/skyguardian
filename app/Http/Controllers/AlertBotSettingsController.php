@@ -178,6 +178,7 @@ class AlertBotSettingsController extends Controller
         $account->update(['telegram_api_credential_id' => $validated['telegram_api_credential_id']]);
 
         try {
+            $telethon->resetSession($account);
             $result = $telethon->sendCode($validated['technical_phone'], $account->fresh('telegramApiCredential'));
             $account->update([
                 'label' => $validated['label'] ?: $account->label,
