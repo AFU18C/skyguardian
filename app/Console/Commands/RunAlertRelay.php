@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\AlertSource;
 use App\Services\Telegram\TelethonAccountService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class RunAlertRelay extends Command
@@ -16,10 +15,24 @@ class RunAlertRelay extends Command
 
     public function handle(TelethonAccountService $telethon): int
     {
-        $lock = Cache::lock('skyguardian-alert-relay', 300);
+        $lockDirectory = storage_path('app/private/telegram');
+        if (! is_dir($lockDirectory) && ! mkdir($lockDirectory, 0770, true) && ! is_dir($lockDirectory)) {
+            $this->error('Не удалось создать каталог блокировки тревожного relay.');
 
-        if (! $lock->get()) {
+            return self::FAILURE;
+        }
+
+        $lockHandle = fopen($lockDirectory.'/alert-relay.lock', 'c+');
+        if ($lockHandle === false) {
+            $this->error('Не удалось открыть файл блокировки тревожного relay.');
+
+            return self::FAILURE;
+        }
+
+        if (! flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            fclose($lockHandle);
             $this->warn('Сервис автопубликации уже запущен.');
+
             return self::SUCCESS;
         }
 
@@ -29,16 +42,14 @@ class RunAlertRelay extends Command
         try {
             do {
                 $this->processSources($telethon);
-                $lock->forceRelease();
-                $lock = Cache::lock('skyguardian-alert-relay', 300);
-                $lock->get();
 
                 if (! $this->option('once')) {
                     sleep($sleep);
                 }
             } while (! $this->option('once'));
         } finally {
-            $lock->release();
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
         }
 
         return self::SUCCESS;
@@ -97,13 +108,20 @@ class RunAlertRelay extends Command
 
             try {
                 $result = $telethon->relayOnce($source);
-                $lastMessageId = (int) ($result['last_message_id'] ?? $source->last_source_message_id ?? 0);
-                $received = (int) ($result['received'] ?? 0);
-                $published = (int) ($result['published'] ?? 0);
+                $lastMessageId = max(
+                    (int) ($source->last_source_message_id ?? 0),
+                    (int) ($result['last_message_id'] ?? 0),
+                );
+                $received = max(0, (int) ($result['received'] ?? 0));
+                $published = max(0, (int) ($result['published'] ?? 0));
+                $partialFailure = (bool) ($result['partial_failure'] ?? false);
+                $partialMessage = $partialFailure
+                    ? mb_substr((string) ($result['message'] ?? 'Часть сообщений не удалось опубликовать.'), 0, 2000)
+                    : null;
 
                 $updates = [
                     'last_source_message_id' => $lastMessageId ?: null,
-                    'last_error' => null,
+                    'last_error' => $partialMessage,
                 ];
 
                 if ($received > 0) {
@@ -115,10 +133,17 @@ class RunAlertRelay extends Command
                 }
 
                 $source->update($updates);
+
+                if ($partialFailure) {
+                    $failedId = (int) ($result['failed_message_id'] ?? 0);
+                    $suffix = $failedId > 0 ? " Сообщение #{$failedId} будет повторено." : '';
+                    $this->warn("{$source->label}: частичная ошибка — {$partialMessage}.{$suffix}");
+                }
             } catch (Throwable $exception) {
-                $source->update(['last_error' => $exception->getMessage()]);
+                $message = mb_substr($exception->getMessage(), 0, 2000);
+                $source->update(['last_error' => $message]);
                 report($exception);
-                $this->error("{$source->label}: {$exception->getMessage()}");
+                $this->error("{$source->label}: {$message}");
             }
         }
     }
