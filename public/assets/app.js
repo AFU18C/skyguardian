@@ -119,5 +119,10 @@
         settingsScript.src = '/assets/settings-accounts-v2.js?v=4';
         settingsScript.defer = true;
         document.body.appendChild(settingsScript);
+
+        const refineScript = document.createElement('script');
+        refineScript.src = '/assets/account-controls-refine.js?v=1';
+        refineScript.defer = true;
+        document.body.appendChild(refineScript);
     }
 })();
