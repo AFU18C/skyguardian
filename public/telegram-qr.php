@@ -59,8 +59,11 @@ try {
     }
 
     $state = $service->getQrCode($action === 'status');
+    if (($state['needs_2fa'] ?? false) === true) {
+        $state['logged_in'] = false;
+    }
 
-    if (($state['logged_in'] ?? false) === true && ($state['needs_2fa'] ?? false) === false) {
+    if (($state['logged_in'] ?? false) === true) {
         $profile = $service->getAccount();
         $storageFile = $root . '/storage/skyguardian.json';
         $data = is_file($storageFile)
