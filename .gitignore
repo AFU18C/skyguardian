@@ -1,0 +1,4 @@
+/storage/skyguardian.json
+/storage/*.tmp
+.env
+.DS_Store
