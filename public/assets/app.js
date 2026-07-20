@@ -121,7 +121,7 @@
         document.body.appendChild(settingsScript);
 
         const refineScript = document.createElement('script');
-        refineScript.src = '/assets/account-controls-refine.js?v=1';
+        refineScript.src = '/assets/account-controls-refine.js?v=2';
         refineScript.defer = true;
         document.body.appendChild(refineScript);
     }
