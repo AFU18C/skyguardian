@@ -116,13 +116,8 @@
 
     if (/^\/(news|alerts)\/settings\/?$/.test(window.location.pathname)) {
         const settingsScript = document.createElement('script');
-        settingsScript.src = '/assets/settings-accounts-v2.js?v=2';
+        settingsScript.src = '/assets/settings-accounts-v2.js?v=3';
         settingsScript.defer = true;
         document.body.appendChild(settingsScript);
-
-        const spoilerScript = document.createElement('script');
-        spoilerScript.src = '/assets/account-spoiler.js?v=1';
-        spoilerScript.defer = true;
-        document.body.appendChild(spoilerScript);
     }
 })();
