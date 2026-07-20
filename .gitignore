@@ -2,3 +2,4 @@
 /storage/*.tmp
 .env
 .DS_Store
+/vendor/
