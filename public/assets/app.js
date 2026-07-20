@@ -115,14 +115,16 @@
     document.querySelectorAll('[data-autohide]').forEach((notice) => window.setTimeout(() => notice.remove(), 4500));
 
     if (/^\/(news|alerts)\/settings\/?$/.test(window.location.pathname)) {
+        const assetVersion = Date.now().toString();
+
         const settingsScript = document.createElement('script');
-        settingsScript.src = '/assets/settings-accounts-v2.js?v=4';
-        settingsScript.defer = true;
+        settingsScript.src = `/assets/settings-accounts-v2.js?v=${assetVersion}`;
+        settingsScript.async = false;
         document.body.appendChild(settingsScript);
 
         const refineScript = document.createElement('script');
-        refineScript.src = '/assets/account-controls-refine.js?v=4';
-        refineScript.defer = true;
+        refineScript.src = `/assets/account-controls-refine.js?v=${assetVersion}`;
+        refineScript.async = false;
         document.body.appendChild(refineScript);
     }
 })();
