@@ -48,20 +48,6 @@
         editor.addEventListener('input', sync);
         editor.closest('form')?.addEventListener('submit', sync);
         sync();
-
-        block?.querySelectorAll('[data-command]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const command = button.dataset.command;
-                editor.focus();
-                if (command === 'createLink') {
-                    const url = window.prompt('Введите ссылку:');
-                    if (url) document.execCommand('createLink', false, url);
-                } else if (command) {
-                    document.execCommand(command, false);
-                }
-                sync();
-            });
-        });
     });
 
     const token = document.querySelector('input[name="csrf"]')?.value || '';
@@ -122,4 +108,34 @@
     document.querySelectorAll('[data-autohide]').forEach((notice) => {
         window.setTimeout(() => notice.remove(), 4500);
     });
+
+    const qrContainer = document.getElementById('telegramQr');
+    const accountId = window.SG_TELEGRAM_ACCOUNT;
+    if (qrContainer && accountId) {
+        let stopped = false;
+        const loadQr = async (wait = false) => {
+            if (stopped) return;
+            try {
+                const response = await fetch(`/group/accounts/${encodeURIComponent(accountId)}/telegram/qr${wait ? '?wait=1' : ''}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result.error || 'Не удалось получить QR-код.');
+                if (result.logged_in) {
+                    stopped = true;
+                    qrContainer.innerHTML = '<div class="notice success"><strong>Telegram подключён.</strong><br>Можно вернуться к настройке канала.</div>';
+                    window.setTimeout(() => window.location.assign('/group'), 1200);
+                    return;
+                }
+                if (result.svg) {
+                    qrContainer.innerHTML = result.svg;
+                }
+                window.setTimeout(() => loadQr(true), 300);
+            } catch (error) {
+                qrContainer.innerHTML = `<div class="notice error">${String(error.message || error)}</div>`;
+                window.setTimeout(() => loadQr(false), 3000);
+            }
+        };
+        loadQr(false);
+    }
 })();
