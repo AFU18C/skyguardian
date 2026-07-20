@@ -31,13 +31,16 @@
     const qrDialog = document.createElement('dialog');
     qrDialog.className = 'modal';
     qrDialog.style.padding = '0';
-    qrDialog.style.width = 'min(94vw, 430px)';
-    qrDialog.style.maxWidth = '94vw';
-    qrDialog.style.overflow = 'hidden';
-    qrDialog.innerHTML = `<div class="modal-body" style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden">
+    qrDialog.style.width = 'calc(100vw - 24px)';
+    qrDialog.style.maxWidth = '430px';
+    qrDialog.style.maxHeight = 'calc(100dvh - 24px)';
+    qrDialog.style.margin = 'auto';
+    qrDialog.style.overflowX = 'hidden';
+    qrDialog.style.overflowY = 'auto';
+    qrDialog.innerHTML = `<div class="modal-body" style="width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden;padding:20px">
         <h2 style="margin-top:0">Подключение Telegram</h2>
         <p data-qr-message>Подготовка QR-кода…</p>
-        <div data-qr-code style="display:grid;place-items:center;width:100%;max-width:100%;min-height:220px;padding:12px;box-sizing:border-box;overflow:hidden;background:#fff;border-radius:14px"></div>
+        <div data-qr-code style="display:grid;place-items:center;width:min(100%,300px);aspect-ratio:1/1;margin:0 auto;padding:8px;box-sizing:border-box;overflow:hidden;background:#fff;border-radius:14px"></div>
         <form data-qr-2fa class="hidden" style="margin-top:16px">
             <label>Пароль двухэтапной аутентификации<input type="password" autocomplete="current-password" required></label>
             <button class="button primary full" type="submit" style="margin-top:12px">Подтвердить пароль</button>
@@ -54,13 +57,22 @@
     const fitQrSvg = () => {
         const svg = qrCode.querySelector('svg');
         if (!svg) return;
+
+        const rawWidth = Number.parseFloat(svg.getAttribute('width') || '400');
+        const rawHeight = Number.parseFloat(svg.getAttribute('height') || String(rawWidth));
+        if (!svg.hasAttribute('viewBox')) {
+            svg.setAttribute('viewBox', `0 0 ${rawWidth || 400} ${rawHeight || rawWidth || 400}`);
+        }
+
         svg.removeAttribute('width');
         svg.removeAttribute('height');
-        svg.style.display = 'block';
-        svg.style.width = '100%';
-        svg.style.height = 'auto';
-        svg.style.maxWidth = '340px';
-        svg.style.maxHeight = '62vh';
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+        svg.style.setProperty('display', 'block', 'important');
+        svg.style.setProperty('width', '100%', 'important');
+        svg.style.setProperty('height', '100%', 'important');
+        svg.style.setProperty('max-width', '100%', 'important');
+        svg.style.setProperty('max-height', '100%', 'important');
+        svg.style.setProperty('overflow', 'hidden', 'important');
     };
 
     const stopPolling = () => {
