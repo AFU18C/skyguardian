@@ -114,6 +114,43 @@
 
     document.querySelectorAll('[data-autohide]').forEach((notice) => window.setTimeout(() => notice.remove(), 4500));
 
+    const channelMatch = window.location.pathname.match(/^\/(news|alerts)\/channels\/?$/);
+    if (channelMatch) {
+        const section = channelMatch[1];
+        const accountSelects = [...document.querySelectorAll('select[name="account_id"]')];
+
+        fetch(`/settings-account.php?section=${encodeURIComponent(section)}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            cache: 'no-store'
+        })
+            .then((response) => response.json().then((data) => ({ response, data })))
+            .then(({ response, data }) => {
+                if (!response.ok || data.ok !== true || !Array.isArray(data.accounts)) {
+                    throw new Error(data.message || 'Не удалось загрузить технические аккаунты.');
+                }
+
+                const accounts = data.accounts.filter((account) => account && account.active !== false);
+                accountSelects.forEach((select) => {
+                    const selectedId = select.value;
+                    select.replaceChildren(new Option('Выберите аккаунт', ''));
+                    accounts.forEach((account) => {
+                        const option = new Option(String(account.name || account.id || 'Технический аккаунт'), String(account.id || ''));
+                        option.selected = String(account.id || '') === selectedId;
+                        select.add(option);
+                    });
+                });
+
+                if (accounts.length > 0) {
+                    document.querySelectorAll('.notice.warning').forEach((notice) => {
+                        if (notice.textContent?.includes('технический аккаунт')) notice.remove();
+                    });
+                }
+            })
+            .catch((error) => {
+                console.error('Technical accounts loading failed:', error);
+            });
+    }
+
     if (/^\/(news|alerts)\/settings\/?$/.test(window.location.pathname)) {
         const assetVersion = Date.now().toString();
 
