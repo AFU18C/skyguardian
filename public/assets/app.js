@@ -115,22 +115,8 @@
     document.querySelectorAll('[data-autohide]').forEach((notice) => window.setTimeout(() => notice.remove(), 4500));
 
     if (/^\/(news|alerts)\/settings\/?$/.test(window.location.pathname)) {
-        const style = document.createElement('link');
-        style.rel = 'stylesheet';
-        style.href = '/assets/telegram-qr-mobile.css?v=1';
-        document.head.appendChild(style);
-
-        const observer = new MutationObserver(() => {
-            document.querySelectorAll('dialog.modal').forEach((candidate) => {
-                if (candidate.querySelector('[data-qr-code]')) {
-                    candidate.classList.add('telegram-qr-dialog');
-                }
-            });
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-
         const script = document.createElement('script');
-        script.src = '/assets/settings-accounts.js?v=5';
+        script.src = '/assets/settings-accounts-v2.js?v=1';
         script.defer = true;
         document.body.appendChild(script);
     }
