@@ -112,7 +112,11 @@ function renderHead(string $title): void
 
 function renderFoot(): void
 {
-    $appJsVersion = (string) (filemtime(__DIR__ . '/assets/app.js') ?: time());
+    $appJsPath = __DIR__ . '/assets/app.js';
+    $appJsVersion = is_file($appJsPath)
+        ? (string) filemtime($appJsPath)
+        : (string) time();
+
     echo '<script src="/assets/app.js?v=' . $appJsVersion . '"></script></body></html>';
 }
 
