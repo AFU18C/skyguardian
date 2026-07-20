@@ -24,3 +24,8 @@ Homestead.yaml
 Thumbs.db
 /storage/backups/
 .env.backup.*
+
+# Local Python environment
+.telethon-venv/
+__pycache__/
+*.py[cod]
