@@ -31,6 +31,11 @@ if ($csrf === '' || $sessionCsrf === '' || !hash_equals($sessionCsrf, $csrf)) {
     respond(['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.'], 419);
 }
 
+$section = (string) ($_POST['section'] ?? '');
+if (!in_array($section, ['news', 'alerts'], true)) {
+    respond(['ok' => false, 'message' => 'Неизвестный раздел.'], 422);
+}
+
 $accountId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) ($_POST['account_id'] ?? ''));
 $apiId = filter_var($_POST['api_id'] ?? null, FILTER_VALIDATE_INT);
 $apiHash = trim((string) ($_POST['api_hash'] ?? ''));
@@ -40,7 +45,7 @@ if ($accountId === '' || !$apiId || $apiHash === '') {
     respond(['ok' => false, 'message' => 'Сначала сохраните аккаунт и заполните API ID и API Hash.'], 422);
 }
 
-$sessionDirectory = $root . '/storage/telegram-sessions';
+$sessionDirectory = $root . '/storage/telegram-sessions/' . $section;
 if (!is_dir($sessionDirectory) && !mkdir($sessionDirectory, 0775, true) && !is_dir($sessionDirectory)) {
     respond(['ok' => false, 'message' => 'Не удалось создать каталог Telegram-сессий.'], 500);
 }
@@ -70,9 +75,13 @@ try {
             ? json_decode((string) file_get_contents($storageFile), true)
             : [];
         $data = is_array($data) ? $data : [];
-        $data['accounts'] = is_array($data['accounts'] ?? null) ? $data['accounts'] : [];
+        $data[$section] = is_array($data[$section] ?? null) ? $data[$section] : [];
+        $data[$section]['settings'] = is_array($data[$section]['settings'] ?? null) ? $data[$section]['settings'] : [];
+        $data[$section]['settings']['accounts'] = is_array($data[$section]['settings']['accounts'] ?? null)
+            ? $data[$section]['settings']['accounts']
+            : [];
 
-        foreach ($data['accounts'] as &$account) {
+        foreach ($data[$section]['settings']['accounts'] as &$account) {
             if ((string) ($account['id'] ?? '') !== $accountId) {
                 continue;
             }
