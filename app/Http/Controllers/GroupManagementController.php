@@ -11,6 +11,7 @@ use App\Services\Telegram\WelcomeSettingsStore;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
@@ -37,6 +38,21 @@ class GroupManagementController extends Controller
         ]);
 
         $chat = trim($data['chat']);
+        $rateLimitKey = 'telegram-delete-messages:'
+            .($request->user()?->getAuthIdentifier() ?? $request->ip())
+            .':'.hash('sha256', $chat);
+
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+            $seconds = max(1, RateLimiter::availableIn($rateLimitKey));
+
+            return response()->json([
+                'ok' => false,
+                'message' => 'Слишком много попыток. Повторите через '.$seconds.' сек.',
+            ], 429);
+        }
+
+        RateLimiter::hit($rateLimitKey, 60);
+
         $lockDirectory = storage_path('app/private/telegram');
         $lockHandle = null;
 
