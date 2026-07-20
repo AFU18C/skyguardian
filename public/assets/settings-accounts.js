@@ -30,10 +30,14 @@
 
     const qrDialog = document.createElement('dialog');
     qrDialog.className = 'modal';
-    qrDialog.innerHTML = `<div class="modal-body" style="width:min(92vw,430px)">
-        <h2>Подключение Telegram</h2>
+    qrDialog.style.padding = '0';
+    qrDialog.style.width = 'min(94vw, 430px)';
+    qrDialog.style.maxWidth = '94vw';
+    qrDialog.style.overflow = 'hidden';
+    qrDialog.innerHTML = `<div class="modal-body" style="width:100%;max-width:100%;box-sizing:border-box;overflow:hidden">
+        <h2 style="margin-top:0">Подключение Telegram</h2>
         <p data-qr-message>Подготовка QR-кода…</p>
-        <div data-qr-code style="display:grid;place-items:center;min-height:280px;padding:14px;background:#fff;border-radius:14px"></div>
+        <div data-qr-code style="display:grid;place-items:center;width:100%;max-width:100%;min-height:220px;padding:12px;box-sizing:border-box;overflow:hidden;background:#fff;border-radius:14px"></div>
         <form data-qr-2fa class="hidden" style="margin-top:16px">
             <label>Пароль двухэтапной аутентификации<input type="password" autocomplete="current-password" required></label>
             <button class="button primary full" type="submit" style="margin-top:12px">Подтвердить пароль</button>
@@ -46,6 +50,18 @@
     const qrCode = qrDialog.querySelector('[data-qr-code]');
     const qr2fa = qrDialog.querySelector('[data-qr-2fa]');
     const qrPassword = qr2fa.querySelector('input');
+
+    const fitQrSvg = () => {
+        const svg = qrCode.querySelector('svg');
+        if (!svg) return;
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        svg.style.display = 'block';
+        svg.style.width = '100%';
+        svg.style.height = 'auto';
+        svg.style.maxWidth = '340px';
+        svg.style.maxHeight = '62vh';
+    };
 
     const stopPolling = () => {
         if (pollTimer) window.clearTimeout(pollTimer);
@@ -95,6 +111,7 @@
             qr2fa.classList.add('hidden');
             qrMessage.textContent = 'Telegram → Настройки → Устройства → Подключить устройство.';
             qrCode.innerHTML = data.svg || '<div>Ожидание QR-кода…</div>';
+            fitQrSvg();
             pollTimer = window.setTimeout(() => showQrState('status'), 1800);
         } catch (error) {
             qrMessage.textContent = error.message || 'Не удалось подключиться к Telegram.';
