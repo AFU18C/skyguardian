@@ -37,18 +37,18 @@
         maxWidth: 'none',
         maxHeight: 'none',
         margin: '0',
-        padding: '16px',
+        padding: '12px',
         border: '0',
         background: 'transparent',
         overflow: 'hidden',
         boxSizing: 'border-box'
     });
     qrDialog.innerHTML = `
-        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden">
-            <section style="width:min(100%,360px);max-height:calc(100dvh - 32px);padding:20px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;border:1px solid #223652;border-radius:18px;background:#0c1728;color:#eef5ff;box-shadow:0 18px 50px rgba(0,0,0,.35)">
+        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0">
+            <section style="width:calc(100vw - 24px);max-width:360px;max-height:calc(100dvh - 24px);min-width:0;padding:20px;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;border:1px solid #223652;border-radius:18px;background:#0c1728;color:#eef5ff;box-shadow:0 18px 50px rgba(0,0,0,.35)">
                 <h2 id="telegramQrTitle" style="margin:0 0 12px;font-size:clamp(24px,7vw,32px);line-height:1.15;overflow-wrap:anywhere">Подключение Telegram</h2>
                 <p data-qr-message style="margin:0 0 16px;color:#8fa3bd;line-height:1.45;overflow-wrap:anywhere">Подготовка QR-кода…</p>
-                <div data-qr-code style="display:grid;place-items:center;width:min(260px,calc(100vw - 88px));height:min(260px,calc(100vw - 88px));margin:0 auto;padding:8px;box-sizing:border-box;overflow:hidden;background:#fff;border-radius:14px"></div>
+                <div data-qr-code style="display:flex;align-items:center;justify-content:center;width:240px;height:240px;max-width:100%;margin:0 auto;padding:8px;box-sizing:border-box;overflow:hidden;background:#fff;border-radius:14px;flex:0 0 auto;min-width:0"></div>
                 <form data-qr-2fa class="hidden" style="margin-top:16px">
                     <label>Пароль двухэтапной аутентификации<input type="password" autocomplete="current-password" required></label>
                     <button class="button primary full" type="submit" style="margin-top:12px">Подтвердить пароль</button>
@@ -64,20 +64,41 @@
     const qrPassword = qr2fa.querySelector('input');
 
     const renderQrImage = (svgMarkup) => {
-        const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
-        qrCode.innerHTML = '';
-        const image = document.createElement('img');
-        image.alt = 'QR-код Telegram';
+        const size = 224;
+        const parser = new DOMParser();
+        const documentSvg = parser.parseFromString(svgMarkup, 'image/svg+xml');
+        const svg = documentSvg.documentElement;
+        const width = Number.parseFloat(svg.getAttribute('width') || '400') || 400;
+        const height = Number.parseFloat(svg.getAttribute('height') || String(width)) || width;
+        if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.setAttribute('width', String(size));
+        svg.setAttribute('height', String(size));
+        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+        const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+        const image = new Image();
+        image.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            Object.assign(canvas.style, {
+                display: 'block',
+                width: `${size}px`,
+                height: `${size}px`,
+                maxWidth: '100%',
+                flex: '0 0 auto'
+            });
+            const context = canvas.getContext('2d');
+            if (!context) return;
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, size, size);
+            context.drawImage(image, 0, 0, size, size);
+            qrCode.replaceChildren(canvas);
+        };
+        image.onerror = () => {
+            qrCode.innerHTML = '<div style="color:#b91c1c;text-align:center">Не удалось отобразить QR-код</div>';
+        };
         image.src = source;
-        Object.assign(image.style, {
-            display: 'block',
-            width: '100%',
-            height: '100%',
-            maxWidth: '100%',
-            maxHeight: '100%',
-            objectFit: 'contain'
-        });
-        qrCode.appendChild(image);
     };
 
     const lockPage = () => {
