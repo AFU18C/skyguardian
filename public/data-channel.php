@@ -156,8 +156,12 @@ try {
         $found = false;
         foreach ($channels as &$channel) {
             if ((string) ($channel['id'] ?? '') !== $id) continue;
-            $channel['enabled'] = filter_var($_POST['enabled'] ?? false, FILTER_VALIDATE_BOOL);
+            $enabled = filter_var($_POST['enabled'] ?? false, FILTER_VALIDATE_BOOL);
+            $channel['enabled'] = $enabled;
             $channel['updated_at'] = gmdate(DATE_ATOM);
+            if ($enabled) {
+                $channel['enabled_since'] = gmdate(DATE_ATOM);
+            }
             $found = true;
             $updated = $channel;
             break;
@@ -237,6 +241,7 @@ try {
         'custom_text_position' => ((string) ($_POST['custom_text_position'] ?? 'after')) === 'before' ? 'before' : 'after',
         'custom_text' => mb_substr($customText, 0, 2000),
         'enabled' => (bool) ($existing['enabled'] ?? true),
+        'enabled_since' => $existing['enabled_since'] ?? ($existing['created_at'] ?? gmdate(DATE_ATOM)),
         'status' => (string) ($existing['status'] ?? 'waiting'),
         'last_check_at' => $existing['last_check_at'] ?? null,
         'last_publish_at' => $existing['last_publish_at'] ?? null,
