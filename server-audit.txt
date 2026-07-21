@@ -1,0 +1,275 @@
+AUDIT_TIME=2026-07-21T07:58:32+00:00
+== OS / UPTIME ==
+Linux bigxaos.whost.systems 6.8.0-136-generic #136-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 21:53:05 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+ 07:58:32 up 2 days,  8:44,  1 user,  load average: 0.01, 0.00, 0.00
+== CPU / MEMORY ==
+2
+               total        used        free      shared  buff/cache   available
+Mem:           1.9Gi       435Mi       446Mi       8.8Mi       1.3Gi       1.5Gi
+Swap:          1.0Gi        12Ki       1.0Gi
+NAME      TYPE  SIZE USED PRIO
+/swapfile file 1024M  12K   -2
+== DISK ==
+Filesystem     Type   Size  Used Avail Use% Mounted on
+tmpfs          tmpfs  197M  1.1M  196M   1% /run
+/dev/vda2      ext4    35G  5.2G   28G  16% /
+tmpfs          tmpfs  984M     0  984M   0% /dev/shm
+tmpfs          tmpfs  5.0M     0  5.0M   0% /run/lock
+tmpfs          tmpfs  197M   12K  197M   1% /run/user/0
+4.0K	/opt
+4.0K	/srv
+4.0K	/var/crash
+4.0K	/var/local
+4.0K	/var/mail
+4.0K	/var/opt
+4.0K	/var/snap
+8.0K	/var/www
+16K	/var/spool
+52K	/var/tmp
+41M	/var/backups
+62M	/var/log
+166M	/var/cache
+509M	/var/lib
+777M	/var
+== TOP MEMORY ==
+    PID COMMAND         %CPU %MEM   RSS
+    343 systemd-journal  0.0  2.6 54016
+  80398 php-fpm8.3       0.0  1.8 37144
+  80419 fail2ban-server  0.0  1.7 36184
+   1538 supervisord      0.0  1.4 28956
+    395 multipathd       0.0  1.3 27292
+    973 unattended-upgr  0.0  1.1 23232
+      1 systemd          0.0  0.6 13948
+    707 udisksd          0.0  0.6 13580
+   6845 systemd-resolve  0.0  0.6 13320
+    755 ModemManager     0.0  0.6 12960
+  80776 systemd          8.3  0.5 11464
+  80771 sshd             0.4  0.5 10700
+  77619 nginx            0.0  0.4  9480
+  77620 nginx            0.0  0.4  9416
+    637 systemd-network  0.0  0.4  9392
+    705 systemd-logind   0.0  0.4  9108
+   4874 upowerd          0.0  0.4  9064
+   1011 sshd             0.0  0.4  8352
+    432 systemd-udevd    0.0  0.4  8256
+== LISTENING PORTS ==
+Netid State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess                                                                            
+udp   UNCONN 0      0         127.0.0.54:53        0.0.0.0:*    users:(("systemd-resolve",pid=6845,fd=16))                                        
+udp   UNCONN 0      0      127.0.0.53%lo:53        0.0.0.0:*    users:(("systemd-resolve",pid=6845,fd=14))                                        
+tcp   LISTEN 0      511          0.0.0.0:443       0.0.0.0:*    users:(("nginx",pid=77620,fd=6),("nginx",pid=77619,fd=6),("nginx",pid=77618,fd=6))
+tcp   LISTEN 0      4096      127.0.0.54:53        0.0.0.0:*    users:(("systemd-resolve",pid=6845,fd=17))                                        
+tcp   LISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*    users:(("systemd-resolve",pid=6845,fd=15))                                        
+tcp   LISTEN 0      511          0.0.0.0:80        0.0.0.0:*    users:(("nginx",pid=77620,fd=7),("nginx",pid=77619,fd=7),("nginx",pid=77618,fd=7))
+tcp   LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*    users:(("sshd",pid=1011,fd=3),("systemd",pid=1,fd=192))                           
+tcp   LISTEN 0      511             [::]:443          [::]:*    users:(("nginx",pid=77620,fd=5),("nginx",pid=77619,fd=5),("nginx",pid=77618,fd=5))
+tcp   LISTEN 0      511             [::]:80           [::]:*    users:(("nginx",pid=77620,fd=8),("nginx",pid=77619,fd=8),("nginx",pid=77618,fd=8))
+tcp   LISTEN 0      4096            [::]:22           [::]:*    users:(("sshd",pid=1011,fd=4),("systemd",pid=1,fd=193))                           
+== RUNNING SERVICES ==
+  UNIT                        LOAD   ACTIVE SUB     DESCRIPTION
+  cron.service                loaded active running Regular background program processing daemon
+  dbus.service                loaded active running D-Bus System Message Bus
+  fail2ban.service            loaded active running Fail2Ban Service
+  getty@tty1.service          loaded active running Getty on tty1
+  ModemManager.service        loaded active running Modem Manager
+  multipathd.service          loaded active running Device-Mapper Multipath Device Controller
+  nginx.service               loaded active running A high performance web server and a reverse proxy server
+  php8.3-fpm.service          loaded active running The PHP 8.3 FastCGI Process Manager
+  polkit.service              loaded active running Authorization Manager
+  qemu-guest-agent.service    loaded active running QEMU Guest Agent
+  rsyslog.service             loaded active running System Logging Service
+  ssh.service                 loaded active running OpenBSD Secure Shell server
+  supervisor.service          loaded active running Supervisor process control system for UNIX
+  systemd-journald.service    loaded active running Journal Service
+  systemd-logind.service      loaded active running User Login Management
+  systemd-networkd.service    loaded active running Network Configuration
+  systemd-resolved.service    loaded active running Network Name Resolution
+  systemd-timesyncd.service   loaded active running Network Time Synchronization
+  udisks2.service             loaded active running Disk Manager
+  unattended-upgrades.service loaded active running Unattended Upgrades Shutdown
+  upower.service              loaded active running Daemon for power management
+  user@0.service              loaded active running User Manager for UID 0
+
+Legend: LOAD   → Reflects whether the unit definition was properly loaded.
+        ACTIVE → The high-level unit activation state, i.e. generalization of SUB.
+        SUB    → The low-level unit activation state, values depend on unit type.
+
+22 loaded units listed.
+== ENABLED SERVICES ==
+UNIT FILE                              STATE   PRESET
+apparmor.service                       enabled enabled
+apport.service                         enabled enabled
+blk-availability.service               enabled enabled
+cloud-config.service                   enabled enabled
+cloud-final.service                    enabled enabled
+cloud-init-local.service               enabled enabled
+cloud-init.service                     enabled enabled
+console-setup.service                  enabled enabled
+cron.service                           enabled enabled
+dmesg.service                          enabled enabled
+e2scrub_reap.service                   enabled enabled
+fail2ban.service                       enabled enabled
+finalrd.service                        enabled enabled
+getty@.service                         enabled enabled
+gpu-manager.service                    enabled enabled
+grub-common.service                    enabled enabled
+grub-initrd-fallback.service           enabled enabled
+keyboard-setup.service                 enabled enabled
+lvm2-monitor.service                   enabled enabled
+ModemManager.service                   enabled enabled
+multipathd.service                     enabled enabled
+networkd-dispatcher.service            enabled enabled
+networking.service                     enabled enabled
+nginx.service                          enabled enabled
+open-iscsi.service                     enabled enabled
+open-vm-tools.service                  enabled enabled
+php8.3-fpm.service                     enabled enabled
+pollinate.service                      enabled enabled
+rsyslog.service                        enabled enabled
+secureboot-db.service                  enabled enabled
+setvtrgb.service                       enabled enabled
+snapd.apparmor.service                 enabled enabled
+snapd.autoimport.service               enabled enabled
+snapd.core-fixup.service               enabled enabled
+snapd.recovery-chooser-trigger.service enabled enabled
+snapd.seeded.service                   enabled enabled
+snapd.service                          enabled enabled
+snapd.system-shutdown.service          enabled enabled
+supervisor.service                     enabled enabled
+sysstat.service                        enabled enabled
+systemd-networkd-wait-online.service   enabled enabled
+systemd-networkd.service               enabled enabled
+systemd-pstore.service                 enabled enabled
+systemd-resolved.service               enabled enabled
+systemd-timesyncd.service              enabled enabled
+thermald.service                       enabled enabled
+ua-reboot-cmds.service                 enabled enabled
+ubuntu-advantage.service               enabled enabled
+udisks2.service                        enabled enabled
+ufw.service                            enabled enabled
+unattended-upgrades.service            enabled enabled
+vgauth.service                         enabled enabled
+
+52 unit files listed.
+== DATABASE SERVICES ==
+mysql.service                                disabled        enabled
+redis-server.service                         disabled        enabled
+redis-server@.service                        disabled        enabled
+== DATABASE PACKAGES ==
+mysql-client-8.0	8.0.46-0ubuntu0.24.04.3
+mysql-client-core-8.0	8.0.46-0ubuntu0.24.04.3
+mysql-common	5.8+1.1.0build1
+mysql-server	8.0.46-0ubuntu0.24.04.3
+mysql-server-8.0	8.0.46-0ubuntu0.24.04.3
+mysql-server-core-8.0	8.0.46-0ubuntu0.24.04.3
+php8.3-mysql	8.3.6-0ubuntu0.24.04.10
+php8.3-redis	5.3.7+4.3.0-3ubuntu1
+redis-server	5:7.0.15-1ubuntu0.24.04.4
+redis-tools	5:7.0.15-1ubuntu0.24.04.4
+== DATABASE DIRECTORIES ==
+180M	/var/lib/mysql
+8.0K	/var/lib/redis
+== PHP VERSION / MODULES ==
+PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.3.6, Copyright (c) Zend Technologies
+    with Zend OPcache v8.3.6, Copyright (c), by Zend Technologies
+[PHP Modules]
+bcmath
+calendar
+Core
+ctype
+curl
+date
+dom
+exif
+FFI
+fileinfo
+filter
+ftp
+gd
+gettext
+hash
+iconv
+igbinary
+intl
+json
+libxml
+mbstring
+mysqli
+mysqlnd
+openssl
+pcntl
+pcre
+PDO
+pdo_mysql
+pdo_sqlite
+Phar
+posix
+random
+readline
+redis
+Reflection
+session
+shmop
+SimpleXML
+sockets
+sodium
+SPL
+sqlite3
+standard
+sysvmsg
+sysvsem
+sysvshm
+tokenizer
+xml
+xmlreader
+xmlwriter
+xsl
+Zend OPcache
+zip
+zlib
+
+[Zend Modules]
+Zend OPcache
+
+== PHP FPM ==
+php8.3-fpm.service                           enabled         enabled
+== NGINX ==
+nginx version: nginx/1.24.0 (Ubuntu)
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+== WEB DIRECTORIES ==
+d /var/www/SkyGuardianUa
+== CRON ==
+/etc/cron.d:
+total 28
+drwxr-xr-x   2 root root 4096 Jul 18 22:49 .
+drwxr-xr-x 119 root root 4096 Jul 21 07:00 ..
+-rw-r--r--   1 root root  802 Apr 16  2023 certbot
+-rw-r--r--   1 root root  201 Apr  8  2024 e2scrub_all
+-rw-r--r--   1 root root  712 Jan 19  2024 php
+-rw-r--r--   1 root root  102 Apr 23  2024 .placeholder
+-rw-r--r--   1 root root  396 Apr 23  2024 sysstat
+
+/etc/cron.daily:
+total 36
+drwxr-xr-x   2 root root 4096 Jul 18 22:48 .
+drwxr-xr-x 119 root root 4096 Jul 21 07:00 ..
+-rwxr-xr-x   1 root root  376 Apr 18  2024 apport
+-rwxr-xr-x   1 root root 1478 Mar 22  2024 apt-compat
+-rwxr-xr-x   1 root root  123 Feb  5  2024 dpkg
+-rwxr-xr-x   1 root root  377 Apr 23  2024 logrotate
+-rwxr-xr-x   1 root root 1395 Apr 23  2024 man-db
+-rw-r--r--   1 root root  102 Apr 23  2024 .placeholder
+-rwxr-xr-x   1 root root  518 Apr 23  2024 sysstat
+== FAILED UNITS ==
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.
+== AUTOREMOVE SIMULATION ==
+Reading package lists...
+Building dependency tree...
+Reading state information...
+0 upgraded, 0 newly installed, 0 to remove and 1 not upgraded.
+== JOURNAL SIZE ==
+Archived and active journals take up 38.5M in the file system.
