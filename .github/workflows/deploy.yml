@@ -57,15 +57,21 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'set -eu
             target=/var/www/SkyGuardianUa
             test "$target" = /var/www/SkyGuardianUa
-            install -d -m 750 "$target" "$target/storage"
+            install -d -m 755 "$target"\n            install -d -m 700 "$target/storage"
             rm -rf "$target/public.next"
             install -d "$target/public.next"
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
-            chmod 750 "$target/artisan"
+            chmod 755 "$target"\n            chmod 750 "$target/artisan"
             chmod 700 "$target/storage"
             find "$target/public" -type d -exec chmod 755 {} +
             find "$target/public" -type f -exec chmod 644 {} +
             rm -f /tmp/skyguardian-release.tar.gz
             test -f "$target/public/index.php"
             test -f "$target/artisan"
+            nginx_site=/etc/nginx/sites-enabled/skyguardian
+            if test -w "$nginx_site"; then
+              sed -i -E "/fastcgi_param SG_ADMIN_(EMAIL|PASSWORD)/d" "$nginx_site"
+              nginx -t
+              systemctl reload nginx
+            fi
           '
