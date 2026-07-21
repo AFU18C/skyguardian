@@ -330,6 +330,10 @@ telegramCheckButton?.addEventListener('click', async () => {
     if (!response.ok || !result.ok) throw new Error(result.message || 'Не удалось проверить подключение');
 
     const isAdmin = Boolean(result.membership?.is_administrator);
+    item.connection_status = isAdmin ? 'success' : 'error';
+    item.connection_checked_at = result.checked_at || new Date().toISOString();
+    writeGroupChannels();
+    renderGroupChannels();
     setTelegramCheckState(
       isAdmin ? 'success' : 'warning',
       isAdmin ? 'Бот подключён' : 'Недостаточно прав',
@@ -355,6 +359,10 @@ telegramCheckButton?.addEventListener('click', async () => {
     }
     toast(isAdmin ? 'Telegram подключён' : 'Боту нужны права администратора');
   } catch (error) {
+    item.connection_status = 'error';
+    item.connection_checked_at = new Date().toISOString();
+    writeGroupChannels();
+    renderGroupChannels();
     if (telegramInfoButton) telegramInfoButton.hidden = true;
     if (telegramDetails) telegramDetails.hidden = true;
     setTelegramCheckState('error', 'Ошибка подключения', error.message || 'Не удалось проверить Telegram');
@@ -414,6 +422,14 @@ function createGroupChannelCard(item) {
   name.textContent = item.name;
   info.append(name);
 
+  const connectionIndicator = document.createElement('span');
+  const connectionStatus = ['success', 'error'].includes(item.connection_status) ? item.connection_status : 'unverified';
+  connectionIndicator.className = 'group-connection-indicator ' + connectionStatus;
+  connectionIndicator.title = connectionStatus === 'success'
+    ? 'Бот проверен — доступ есть'
+    : (connectionStatus === 'error' ? 'Нет доступа к боту' : 'Бот ещё не проверен');
+  connectionIndicator.setAttribute('aria-label', connectionIndicator.title);
+
   const manage = document.createElement('button');
   manage.className = 'button group-manage-button';
   manage.type = 'button';
@@ -432,7 +448,7 @@ function createGroupChannelCard(item) {
   actions.className = 'group-card-actions';
   actions.append(manage, edit);
 
-  card.append(icon, info, actions);
+  card.append(icon, info, connectionIndicator, actions);
   return card;
 }
 
@@ -505,13 +521,17 @@ groupChannelForm?.addEventListener('submit', event => {
     return;
   }
 
+  const connectionChanged = existing
+    && (existing.chat_id !== values.chat_id.trim() || existing.bot_token !== token);
   const item = {
     id: values.group_channel_id || (globalThis.crypto?.randomUUID?.() || String(Date.now())),
     name: values.name.trim(),
     link: values.link.trim(),
     chat_id: values.chat_id.trim(),
     bot_token: token,
-    admin_id: values.admin_id.trim()
+    admin_id: values.admin_id.trim(),
+    connection_status: connectionChanged ? 'unverified' : (existing?.connection_status || 'unverified'),
+    connection_checked_at: connectionChanged ? null : (existing?.connection_checked_at || null)
   };
 
   const index = groupChannels.findIndex(channel => channel.id === item.id);
