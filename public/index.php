@@ -50,7 +50,7 @@ if ($action === 'telegram-check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $reply(503, ['ok' => false, 'message' => 'На сервере не установлено расширение PHP cURL.']);
     }
 
-    $telegramRequest = static function (string $method, array $parameters = []) use ($botToken): array {
+    $telegramRequest = static function (string $method, array $parameters = []) use ($botToken): mixed {
         $handle = curl_init('https://api.telegram.org/bot' . $botToken . '/' . $method);
         curl_setopt_array($handle, [
             CURLOPT_POST => true,
@@ -78,7 +78,7 @@ if ($action === 'telegram-check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException($description);
         }
 
-        return is_array($data['result'] ?? null) ? $data['result'] : [];
+        return $data['result'] ?? null;
     };
 
     try {
