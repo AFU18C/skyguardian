@@ -1203,7 +1203,7 @@ async function submitAutomation(operation) {
       telegramAutomationResult.textContent = payload.message;
       telegramAutomationResult.hidden = false;
     }
-    addTelegramJournal(operation === 'save' ? 'Автоматизация' : 'Проверка автоматизации', payload.message);
+    addTelegramJournal(activeGroupControlId, operation === 'save' ? 'Автоматизация' : 'Проверка автоматизации', 'success', payload.message);
     toast(payload.message);
   } catch (error) {
     if (telegramAutomationResult) {
@@ -1211,7 +1211,7 @@ async function submitAutomation(operation) {
       telegramAutomationResult.textContent = error.message || 'Ошибка автоматизации';
       telegramAutomationResult.hidden = false;
     }
-    addTelegramJournal('Ошибка автоматизации', error.message || 'Не удалось выполнить запрос', false);
+    addTelegramJournal(activeGroupControlId, 'Ошибка автоматизации', 'error', error.message || 'Не удалось выполнить запрос');
     setAutomationStatus({ enabled: false, telegram: { last_error_message: error.message || 'Ошибка' } });
   } finally {
     buttons.forEach(button => { button.disabled = false; });
