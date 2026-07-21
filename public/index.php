@@ -44,6 +44,11 @@ if ($action === 'telegram-automation' && $_SERVER['REQUEST_METHOD'] === 'POST') 
             $result = $automation->status(trim((string)($_POST['bot_token'] ?? '')), trim((string)($_POST['chat_id'] ?? '')), $baseUrl);
             $reply(200, ['ok' => true, 'message' => 'Статус автоматизации получен.', 'result' => $result]);
         }
+        if ($operation === 'group-toggle') {
+            $enabled = filter_var($_POST['enabled'] ?? false, FILTER_VALIDATE_BOOL);
+            $result = $automation->setGroupEnabled(trim((string)($_POST['bot_token'] ?? '')), trim((string)($_POST['chat_id'] ?? '')), $enabled, $baseUrl);
+            $reply(200, ['ok' => true, 'message' => $enabled ? 'Управление группой включено.' : 'Управление группой остановлено.', 'result' => $result]);
+        }
         $result = $automation->save($_POST, $baseUrl);
         $reply(200, ['ok' => true, 'message' => ($result['enabled'] ?? false) ? 'Автоматизация включена.' : 'Автоматизация сохранена и выключена.', 'result' => $result]);
     } catch (InvalidArgumentException $exception) {
@@ -558,7 +563,7 @@ if ($isPublicLanding || $isLoginRequest) {
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
     <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=33">
+    <link rel="stylesheet" href="/assets/app.css?v=34">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
