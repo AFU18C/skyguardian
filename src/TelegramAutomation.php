@@ -20,20 +20,32 @@ final class TelegramAutomation
     private function resolveStorageDir(string $preferredDir): string
     {
         $preferredDir = rtrim($preferredDir, '/');
-        $sessionDir = rtrim((string)session_save_path(), '/');
         $configuredDir = rtrim((string)getenv('SKYGUARDIAN_STORAGE_DIR'), '/');
+        $effectiveUid = function_exists('posix_geteuid') ? (string)posix_geteuid() : hash('sha256', PHP_SAPI . ':' . __DIR__);
+        $runtimeDir = rtrim(sys_get_temp_dir(), '/') . '/skyguardian-' . preg_replace('/[^A-Za-z0-9_-]/', '', $effectiveUid);
         $candidates = array_values(array_unique(array_filter([
             $configuredDir,
             $preferredDir,
-            $sessionDir !== '' ? $sessionDir . '/skyguardian' : '',
-            rtrim(sys_get_temp_dir(), '/') . '/skyguardian',
+            $runtimeDir,
         ])));
 
         foreach ($candidates as $candidate) {
             if (!is_dir($candidate) && !@mkdir($candidate, 0700, true) && !is_dir($candidate)) {
                 continue;
             }
-            if (!is_writable($candidate)) {
+
+            // is_writable() may be stale or misleading when a directory was
+            // created by another OS user. Accept it only after a real write.
+            clearstatcache(true, $candidate);
+            $probe = $candidate . '/.write-test-' . bin2hex(random_bytes(8));
+            $probeHandle = @fopen($probe, 'xb');
+            if ($probeHandle === false) {
+                continue;
+            }
+            $probeWritten = @fwrite($probeHandle, 'ok') === 2;
+            @fclose($probeHandle);
+            @unlink($probe);
+            if (!$probeWritten) {
                 continue;
             }
 
@@ -50,7 +62,7 @@ final class TelegramAutomation
             return $candidate;
         }
 
-        throw new RuntimeException('Сервер не нашёл защищённый каталог для настроек автоматизации.');
+        throw new RuntimeException('Сервер не нашёл каталог с фактическим правом записи для автоматизации.');
     }
 
     public function save(array $input, string $baseUrl): array
