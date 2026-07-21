@@ -161,7 +161,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=3">
+    <link rel="stylesheet" href="assets/app.css?v=5">
 </head>
 <body>
 <div class="app-shell">
@@ -225,13 +225,10 @@ function active(string $current, string $target): string
                 </article>
 
             <?php elseif ($isSettings): ?>
-                <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Настройка</h1><p>Будущие правила получения, обработки и публикации сообщений.</p></div><button class="button primary add-connection-button" type="button" data-tooltip="Технический аккаунт и API" aria-label="Добавить технический аккаунт и API" data-add-connection>Добавить</button></section>
+                <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Настройка</h1></div><button class="button primary add-connection-button" type="button" data-tooltip="Технический аккаунт и API" aria-label="Добавить технический аккаунт и API" data-add-connection>Добавить</button></section>
 
-                <article class="panel">
-                    <div class="panel-head">
-                        <div><span class="step-label">КАНАЛЫ ДАННЫХ</span><h2>Подключённые каналы данных</h2><p>Здесь будут отображаться подключённые каналы.</p></div>
-                    </div>
-                    <div class="empty-state large"><div>◇</div><strong>Подключённых каналов пока нет</strong></div>
+                <article class="panel technical-accounts-panel">
+                    <div class="empty-state"><div>◇</div><strong>Технических аккаунтов пока нет</strong></div>
                 </article>
             <?php else: ?>
                 <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
