@@ -65,6 +65,19 @@ $('[data-account-edit]')?.addEventListener('click', event => {
 });
 
 $('[data-add-connection]')?.addEventListener('click', () => openModal($('#connectionModal')));
+$('[data-add-source]')?.addEventListener('click', () => openModal($('#sourceModal')));
+
+const sourceForm = $('[data-source-form]');
+sourceForm?.addEventListener('submit', event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(sourceForm));
+  if (!values.name?.trim() || !values.source?.trim() || !values.account?.trim()) {
+    toast('Заполните все поля канала данных');
+    return;
+  }
+  closeModal($('#sourceModal'));
+  toast('Макет канала данных сохранён');
+});
 $('[data-qr]')?.addEventListener('click', () => openModal($('#qrModal')));
 $('[data-confirm-delete]')?.addEventListener('click', () => openModal($('#deleteModal')));
 $$('[data-modal-close]').forEach(button => button.addEventListener('click', () => closeModal(button.closest('.modal'))));
