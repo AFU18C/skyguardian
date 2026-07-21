@@ -21,8 +21,14 @@ if (!is_file($autoload)) {
 }
 require_once $autoload;
 
-$lockHandle = fopen($storageDir . '/data-channel-worker.lock', 'c+');
-if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
+$lockFile = $storageDir . '/data-channel-worker.lock';
+$lockHandle = @fopen($lockFile, 'c+');
+if ($lockHandle === false) {
+    error_log('Data channel worker: cannot open lock file ' . $lockFile);
+    exit(1);
+}
+if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    fclose($lockHandle);
     exit(0);
 }
 
@@ -153,9 +159,16 @@ foreach (['news', 'alerts'] as $scope) {
         $lastCheckTimestamp = isset($state['last_check_at']) ? strtotime((string) $state['last_check_at']) : false;
         if ($lastCheckTimestamp !== false && time() - $lastCheckTimestamp < $intervalSeconds($channel)) continue;
 
+        $states[$id] = array_merge($state, [
+            'status' => 'checking',
+            'worker_seen_at' => gmdate(DATE_ATOM),
+            'last_error' => null,
+        ]);
+        $writeJson($stateFile, $states);
+
         $account = $accountsById[(string) ($channel['account'] ?? '')] ?? null;
         if (!is_array($account) || !(bool) ($account['connected'] ?? false) || !(bool) ($account['enabled'] ?? true)) {
-            $states[$id] = array_merge($state, [
+            $states[$id] = array_merge($states[$id], [
                 'status' => 'paused',
                 'last_check_at' => gmdate(DATE_ATOM),
                 'last_error' => 'Технический аккаунт недоступен или выключен.',
@@ -185,22 +198,17 @@ foreach (['news', 'alerts'] as $scope) {
             usort($messages, static fn (array $a, array $b): int => ((int) $a['id']) <=> ((int) $b['id']));
 
             if (!$initialized) {
-                $latestId = $messages ? max(array_map(static fn (array $message): int => (int) $message['id'], $messages)) : 0;
                 $start = (string) ($channel['processing_start'] ?? 'new');
                 if ($start === 'new') {
-                    $states[$id] = array_merge($state, [
-                        'initialized' => true,
-                        'last_message_id' => $latestId,
-                        'status' => 'active',
-                        'last_check_at' => gmdate(DATE_ATOM),
-                        'last_error' => null,
-                    ]);
-                    $writeJson($stateFile, $states);
-                    continue;
+                    $createdAt = strtotime((string) ($channel['created_at'] ?? '')) ?: time();
+                    $messages = array_values(array_filter($messages, static fn (array $message): bool =>
+                        (int) ($message['date'] ?? 0) >= $createdAt
+                    ));
+                } else {
+                    $take = match ($start) { 'last_5' => 5, 'last_10' => 10, 'last_20' => 20, default => 0 };
+                    if ($take > 0 && count($messages) > $take) $messages = array_slice($messages, -$take);
                 }
-                $take = match ($start) { 'last_5' => 5, 'last_10' => 10, 'last_20' => 20, default => 0 };
-                if ($take > 0 && count($messages) > $take) $messages = array_slice($messages, -$take);
-                $states[$id] = array_merge($state, ['initialized' => true, 'last_message_id' => 0]);
+                $states[$id] = array_merge($states[$id], ['initialized' => true, 'last_message_id' => 0]);
                 $writeJson($stateFile, $states);
             }
 
@@ -221,6 +229,7 @@ foreach (['news', 'alerts'] as $scope) {
                 $states[$id]['last_message_id'] = $messageId;
                 $states[$id]['status'] = 'active';
                 $states[$id]['last_check_at'] = gmdate(DATE_ATOM);
+                $states[$id]['worker_seen_at'] = gmdate(DATE_ATOM);
                 $states[$id]['last_error'] = null;
                 $writeJson($stateFile, $states);
             }
@@ -229,13 +238,15 @@ foreach (['news', 'alerts'] as $scope) {
                 'initialized' => true,
                 'status' => 'active',
                 'last_check_at' => gmdate(DATE_ATOM),
+                'worker_seen_at' => gmdate(DATE_ATOM),
                 'last_error' => null,
             ]);
             $writeJson($stateFile, $states);
         } catch (Throwable $exception) {
-            $states[$id] = array_merge($state, [
+            $states[$id] = array_merge($states[$id] ?? $state, [
                 'status' => 'error',
                 'last_check_at' => gmdate(DATE_ATOM),
+                'worker_seen_at' => gmdate(DATE_ATOM),
                 'last_error' => mb_substr($exception->getMessage(), 0, 500),
             ]);
             $writeJson($stateFile, $states);
