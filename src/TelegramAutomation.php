@@ -115,12 +115,20 @@ final class TelegramAutomation
             $this->safeApi($token, 'deleteWebhook', ['drop_pending_updates' => 'false']);
         }
         if (!$enabled) {
-            $state = $this->readJson($this->stateFile);
-            $state['delete'] = array_values(array_filter((array)($state['delete'] ?? []), static fn($item): bool => (string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId));
-            $state['captcha'] = array_filter((array)($state['captcha'] ?? []), static fn($item): bool => (string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId);
-            $this->writeJson($this->stateFile, $state);
+            try {
+                $state = $this->readJson($this->stateFile);
+                $state['delete'] = array_values(array_filter((array)($state['delete'] ?? []), static fn($item): bool => is_array($item) && ((string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId)));
+                $state['captcha'] = array_filter((array)($state['captcha'] ?? []), static fn($item): bool => is_array($item) && ((string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId));
+                $this->writeJson($this->stateFile, $state);
+            } catch (Throwable $exception) {
+                $this->logRaw('group_cleanup_error', ['chat_id' => $chatId, 'error' => $exception->getMessage()]);
+            }
         }
-        $this->logRaw($enabled ? 'group_enabled' : 'group_disabled', ['chat_id' => $chatId]);
+        try {
+            $this->logRaw($enabled ? 'group_enabled' : 'group_disabled', ['chat_id' => $chatId]);
+        } catch (Throwable) {
+            // The switch state is already saved; logging must not fail the request.
+        }
         return $this->publicConfig($config, $webhookUrl);
     }
 
