@@ -127,7 +127,7 @@ if (!$isAuthenticated) {
 $page = $requestedPage ?? 'home';
 $allowedPages = [
     'home', 'news-sources', 'news-settings', 'alerts-sources',
-    'alerts-settings', 'group',
+    'alerts-settings', 'group', 'site',
 ];
 
 if (!in_array($page, $allowedPages, true)) {
@@ -141,6 +141,7 @@ $pageMeta = [
     'alerts-sources' => ['Каналы данных', 'Воздушная тревога'],
     'alerts-settings' => ['Настройка', 'Воздушная тревога'],
     'group' => ['Управление группой', 'Общие настройки'],
+    'site' => ['Управление сайтом', 'Общие настройки'],
 ];
 
 [$title, $section] = $pageMeta[$page];
@@ -188,6 +189,7 @@ function active(string $current, string $target): string
 
             <div class="nav-heading">ОБЩИЕ НАСТРОЙКИ</div>
             <a class="nav-link<?= active($page, 'group') ?>" href="?page=group"><span class="nav-icon">♟</span><span>Управление группой</span></a>
+            <a class="nav-link<?= active($page, 'site') ?>" href="?page=site"><span class="nav-icon">◎</span><span>Управление сайтом</span></a>
             <a class="nav-link logout" href="/?action=logout"><span class="nav-icon">↪</span><span>Выйти</span></a>
         </nav>
 
@@ -228,9 +230,12 @@ function active(string $current, string $target): string
                 <article class="panel technical-accounts-panel" data-tech-list data-tech-scope="<?= htmlspecialchars($page, ENT_QUOTES, 'UTF-8') ?>">
                     <div class="empty-state" data-tech-empty><div>◇</div><strong>Технических аккаунтов пока нет</strong></div>
                 </article>
-            <?php else: ?>
+            <?php elseif ($page === 'group'): ?>
                 <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
                 <article class="panel group-panel"><div class="empty-state large"><div>♟</div><strong>Группа пока не добавлена</strong><p>Форма подключения будет добавлена после утверждения дизайна и логики.</p><button class="button primary" data-toast="Функционал добавления появится на следующем этапе">Добавить группу</button></div></article>
+            <?php else: ?>
+                <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление сайтом</h1><p>Настройка сайта SkyGuardian.</p></div><div class="section-badge violet">◎</div></section>
+                <article class="panel group-panel"><div class="empty-state large"><div>◎</div><strong>Настройки сайта пока не добавлены</strong><p>Параметры управления сайтом будут добавлены на следующем этапе.</p></div></article>
             <?php endif; ?>
         </div>
     </main>
