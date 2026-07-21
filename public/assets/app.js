@@ -1,11 +1,17 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
-function toast(message) {
+function toast(message, type = 'success') {
+  const stack = $('#toasts');
+  if (!stack) return;
+  [...stack.querySelectorAll('.toast')].forEach(existing => {
+    if (existing.textContent === String(message)) existing.remove();
+  });
   const item = document.createElement('div');
-  item.className = 'toast';
+  item.className = 'toast' + (type === 'error' ? ' error' : '');
   item.textContent = message;
-  $('#toasts').append(item);
+  stack.append(item);
+  while (stack.children.length > 3) stack.firstElementChild?.remove();
   setTimeout(() => item.remove(), 3200);
 }
 
@@ -724,7 +730,7 @@ function createGroupChannelCard(item) {
     } catch (error) {
       toggle.checked = !nextEnabled;
       toggle.disabled = false;
-      toast(error.message || 'Не удалось изменить режим группы');
+      toast(error.message || 'Не удалось изменить режим группы', 'error');
     }
   });
 
