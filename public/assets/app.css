@@ -87,3 +87,28 @@
     grid-template-columns: minmax(0, 1fr) 120px;
   }
 }
+
+
+/* Custom publication text editor */
+.custom-text-setting{border:1px solid #29354a;border-radius:12px;background:#0a101c;overflow:hidden}
+.custom-text-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 16px;text-align:left}
+.custom-text-head strong,.custom-text-head small{display:block}
+.custom-text-head strong{font-size:11px;color:#eef3fa}
+.custom-text-head small{margin-top:5px;font-size:9px;color:var(--muted);line-height:1.4}
+.custom-text-editor{padding:0 16px 16px;border-top:1px solid #202b3e;text-align:left}
+.custom-text-editor[hidden],.telegram-preview[hidden]{display:none}
+.custom-text-editor>label{display:block;margin-top:15px}
+.editor-shell{overflow:hidden;border:1px solid #29354a;border-radius:10px;background:#080e18}
+.editor-shell:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px rgba(61,130,246,.08)}
+.editor-toolbar{display:flex;gap:5px;padding:7px;border-bottom:1px solid #202b3e;background:#0d1523}
+.editor-toolbar button{width:30px;height:28px;border:1px solid #29354a;border-radius:7px;background:#131d2d;color:#aab8ca;cursor:pointer}
+.editor-toolbar button:hover{border-color:#3d82f6;color:#fff}
+.source-form .editor-shell textarea{min-height:116px;border:0;border-radius:0;box-shadow:none;resize:vertical}
+.preview-toggle{width:100%;margin-top:12px}
+.telegram-preview{margin-top:12px;padding:14px;border:1px solid #26344a;border-radius:12px;background:linear-gradient(145deg,#111d2c,#0a121e)}
+.preview-label{display:block;margin-bottom:10px;font-size:8px;font-weight:800;letter-spacing:1.2px;color:#60728b}
+.telegram-message{max-width:88%;margin-left:auto;padding:11px 13px;border-radius:13px 13px 4px 13px;background:#245b50;color:#f3f7f8;font-size:11px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.telegram-message .preview-source{color:#c3ccd5}
+.telegram-message .preview-custom{color:#fff}
+.telegram-message .preview-divider{display:block;height:8px}
+@media(max-width:640px){.custom-text-head{padding:14px}.custom-text-editor{padding:0 14px 14px}.telegram-message{max-width:94%}}
