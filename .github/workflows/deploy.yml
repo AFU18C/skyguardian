@@ -33,9 +33,11 @@ jobs:
       - name: Validate PHP
         run: |
           php -l public/index.php
+          php -l public/telegram-account.php
           php -l artisan
           php artisan
           test -f vendor/autoload.php
+          test -f public/assets/telegram-account.js
 
       - name: Configure SSH
         env:
@@ -72,6 +74,9 @@ jobs:
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
             chmod 755 "$target"
             chmod 755 "$target/artisan"
+            if ! grep -q "telegram-account.js" "$target/public/index.php"; then
+              sed -i "s#<script src=\"assets/app.js?v=38\"></script>#<script src=\"assets/app.js?v=38\"></script><script src=\"assets/telegram-account.js?v=1\"></script>#" "$target/public/index.php"
+            fi
             if getent group www-data >/dev/null 2>&1; then
               chgrp www-data "$target/storage"
               chmod 2770 "$target/storage"
@@ -80,6 +85,10 @@ jobs:
               if test -f "$target/storage/admin.json"; then
                 chgrp www-data "$target/storage/admin.json"
                 chmod 640 "$target/storage/admin.json"
+              fi
+              if test -f "$target/storage/telegram-accounts.json"; then
+                chown www-data:www-data "$target/storage/telegram-accounts.json"
+                chmod 600 "$target/storage/telegram-accounts.json"
               fi
             else
               chmod 777 "$target/storage"
@@ -95,8 +104,11 @@ jobs:
             find "$target/vendor" -type f -exec chmod 644 {} +
             rm -f /tmp/skyguardian-release.tar.gz
             test -f "$target/public/index.php"
+            test -f "$target/public/telegram-account.php"
+            test -f "$target/public/assets/telegram-account.js"
             test -f "$target/artisan"
             test -f "$target/vendor/autoload.php"
+            grep -q "telegram-account.js" "$target/public/index.php"
             test -w "$target/storage/backups"
             test -w "$target/storage/telegram-sessions"
             nginx_site=/etc/nginx/sites-enabled/skyguardian
