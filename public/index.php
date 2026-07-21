@@ -1,6 +1,60 @@
 <?php
 
-$page = $_GET['page'] ?? 'home';
+$requestPath = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/', '/');
+$requestedPage = $_GET['page'] ?? null;
+$isAdminLogin = $requestedPage === 'login' || in_array($requestPath, ['/admin', '/admin/login'], true);
+$isPublicLanding = $requestedPage === null && !$isAdminLogin;
+
+if ($isPublicLanding || $isAdminLogin) {
+    $standaloneTitle = $isAdminLogin ? 'Вход для администратора' : 'Ведутся работы';
+    ?>
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070b15">
+    <meta name="robots" content="noindex, nofollow">
+    <title><?= htmlspecialchars($standaloneTitle) ?> — SkyGuardian</title>
+    <link rel="stylesheet" href="/assets/app.css?v=2">
+</head>
+<body class="standalone-page">
+    <main class="standalone-shell">
+        <a class="standalone-brand" href="/" aria-label="SkyGuardian — главная">
+            <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2.7 20 6v5.6c0 5.1-3.4 8.1-8 9.7-4.6-1.6-8-4.6-8-9.7V6l8-3.3Zm0 4.1-4.2 1.7v3.2c0 2.8 1.6 4.7 4.2 5.9 2.6-1.2 4.2-3.1 4.2-5.9V8.5L12 6.8Z"/></svg></span>
+            <span><strong>SkyGuardian</strong><small>CONTROL CENTER</small></span>
+        </a>
+
+        <?php if ($isAdminLogin): ?>
+            <section class="login-card">
+                <span class="standalone-kicker">ЗАЩИЩЁННЫЙ ДОСТУП</span>
+                <h1>Вход в панель</h1>
+                <p>Введите данные администратора для продолжения.</p>
+                <form class="login-form" method="post" action="/?page=home">
+                    <label><span>Логин</span><input name="login" autocomplete="username" placeholder="Введите логин" required></label>
+                    <label><span>Пароль</span><input name="password" type="password" autocomplete="current-password" placeholder="Введите пароль" required></label>
+                    <button class="button primary login-submit" type="submit">Войти</button>
+                </form>
+                <div class="login-note"><i></i><span>Доступ только для администратора</span></div>
+            </section>
+        <?php else: ?>
+            <section class="maintenance-card">
+                <div class="maintenance-icon" aria-hidden="true">✦</div>
+                <span class="standalone-kicker">SKYGUARDIAN</span>
+                <h1>Ведутся работы</h1>
+                <p>Мы готовим систему к запуску. Пожалуйста, зайдите позже.</p>
+                <div class="maintenance-status"><i></i><span>Система находится в разработке</span></div>
+            </section>
+            <a class="admin-entry" href="/?page=login">Вход для администратора</a>
+        <?php endif; ?>
+    </main>
+</body>
+</html>
+    <?php
+    exit;
+}
+
+$page = $requestedPage ?? 'home';
 $allowedPages = [
     'home', 'news-sources', 'news-settings', 'alerts-sources',
     'alerts-settings', 'group',
@@ -64,7 +118,7 @@ function active(string $current, string $target): string
 
             <div class="nav-heading">ОБЩИЕ НАСТРОЙКИ</div>
             <a class="nav-link<?= active($page, 'group') ?>" href="?page=group"><span class="nav-icon">♟</span><span>Управление группой</span></a>
-            <button class="nav-link logout" type="button" data-toast="Выход будет подключён на этапе функционала"><span class="nav-icon">↪</span><span>Выйти</span></button>
+            <a class="nav-link logout" href="/?page=login"><span class="nav-icon">↪</span><span>Выйти</span></a>
         </nav>
 
         <div class="sidebar-footer"><span class="status-dot online"></span><div><strong>Система доступна</strong><small>Макет интерфейса</small></div></div>
