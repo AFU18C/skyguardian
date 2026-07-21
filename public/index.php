@@ -150,6 +150,58 @@ $isSettings = str_ends_with($page, '-settings');
 $isAlerts = str_starts_with($page, 'alerts-');
 $accent = $isAlerts ? 'red' : 'blue';
 
+function serverMetrics(): array
+{
+    $cpuCount = 1;
+    if (is_readable('/proc/cpuinfo')) {
+        $cpuInfo = (string) file_get_contents('/proc/cpuinfo');
+        $detected = preg_match_all('/^processor\s*:/m', $cpuInfo);
+        $cpuCount = max(1, (int) $detected);
+    }
+
+    $load = sys_getloadavg();
+    $cpu = is_array($load) ? min(100, max(0, (($load[0] ?? 0) / $cpuCount) * 100)) : 0;
+
+    $memory = 0.0;
+    if (is_readable('/proc/meminfo')) {
+        $memoryInfo = (string) file_get_contents('/proc/meminfo');
+        preg_match('/^MemTotal:\s+(\d+)/m', $memoryInfo, $totalMatch);
+        preg_match('/^MemAvailable:\s+(\d+)/m', $memoryInfo, $availableMatch);
+        $total = (int) ($totalMatch[1] ?? 0);
+        $available = (int) ($availableMatch[1] ?? 0);
+        if ($total > 0) {
+            $memory = (($total - $available) / $total) * 100;
+        }
+    }
+
+    $diskTotal = @disk_total_space('/');
+    $diskFree = @disk_free_space('/');
+    $disk = ($diskTotal && $diskFree !== false) ? (($diskTotal - $diskFree) / $diskTotal) * 100 : 0;
+
+    $uptime = 'Недоступно';
+    if (is_readable('/proc/uptime')) {
+        $seconds = (int) floor((float) explode(' ', trim((string) file_get_contents('/proc/uptime')))[0]);
+        $days = intdiv($seconds, 86400);
+        $hours = intdiv($seconds % 86400, 3600);
+        $uptime = $days > 0 ? $days . ' д. ' . $hours . ' ч.' : $hours . ' ч. ' . intdiv($seconds % 3600, 60) . ' мин.';
+    }
+
+    $highest = max($cpu, $memory, $disk);
+    $level = $highest >= 90 ? 'critical' : ($highest >= 75 ? 'warning' : 'normal');
+    $labels = ['normal' => 'Нагрузка в норме', 'warning' => 'Высокая нагрузка', 'critical' => 'Критическая нагрузка'];
+
+    return [
+        'cpu' => (int) round($cpu),
+        'memory' => (int) round($memory),
+        'disk' => (int) round($disk),
+        'uptime' => $uptime,
+        'level' => $level,
+        'label' => $labels[$level],
+    ];
+}
+
+$serverMetrics = serverMetrics();
+
 function active(string $current, string $target): string
 {
     return $current === $target ? ' active' : '';
@@ -162,7 +214,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=15">
+    <link rel="stylesheet" href="assets/app.css?v=16">
 </head>
 <body>
 <div class="app-shell">
@@ -210,12 +262,43 @@ function active(string $current, string $target): string
 
         <div class="content">
             <?php if ($page === 'home'): ?>
-                <section class="page-title">
+                <section class="page-title home-title">
                     <div>
                         <span class="eyebrow">ГЛАВНАЯ</span>
-                        <h1>Страница в разработке</h1>
+                        <h1>Состояние системы</h1>
+                        <p>Актуальные показатели сервера SkyGuardian.</p>
+                    </div>
+                    <div class="server-health <?= htmlspecialchars($serverMetrics['level'], ENT_QUOTES, 'UTF-8') ?>">
+                        <i></i><span><?= htmlspecialchars($serverMetrics['label'], ENT_QUOTES, 'UTF-8') ?></span>
                     </div>
                 </section>
+
+                <article class="panel server-load-panel">
+                    <div class="server-load-head">
+                        <div><span class="step-label">СЕРВЕР</span><h2>Нагрузка сервера</h2><p>Показатели обновляются при открытии страницы.</p></div>
+                        <div class="server-pulse" aria-hidden="true"><span></span><i></i><span></span></div>
+                    </div>
+                    <div class="server-metrics">
+                        <?php foreach ([
+                            ['cpu', 'Процессор', 'Загрузка вычислительных ресурсов', '⌁'],
+                            ['memory', 'Оперативная память', 'Использовано доступной памяти', '▦'],
+                            ['disk', 'Дисковое пространство', 'Использовано хранилища', '◫'],
+                        ] as [$key, $metricTitle, $description, $icon]): $value = $serverMetrics[$key]; $metricLevel = $value >= 90 ? 'critical' : ($value >= 75 ? 'warning' : 'normal'); ?>
+                            <section class="server-metric <?= $metricLevel ?>">
+                                <div class="metric-top"><span class="metric-icon"><?= $icon ?></span><span class="metric-value"><?= $value ?><small>%</small></span></div>
+                                <strong><?= htmlspecialchars($metricTitle, ENT_QUOTES, 'UTF-8') ?></strong>
+                                <p><?= htmlspecialchars($description, ENT_QUOTES, 'UTF-8') ?></p>
+                                <div class="metric-track"><i style="width:<?= $value ?>%"></i></div>
+                            </section>
+                        <?php endforeach; ?>
+                        <section class="server-metric uptime">
+                            <div class="metric-top"><span class="metric-icon">◷</span><span class="uptime-value"><?= htmlspecialchars($serverMetrics['uptime'], ENT_QUOTES, 'UTF-8') ?></span></div>
+                            <strong>Время работы</strong>
+                            <p>Без перезапуска сервера</p>
+                            <div class="uptime-status"><i></i>Сервер доступен</div>
+                        </section>
+                    </div>
+                </article>
 
             <?php elseif ($isSources): ?>
                 <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Каналы данных</h1></div><button class="button primary add-connection-button" type="button" data-tooltip="Добавить канал данных" aria-label="Добавить канал данных" data-add-source>Добавить</button></section>
