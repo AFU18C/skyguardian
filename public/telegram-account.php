@@ -4,7 +4,10 @@ declare(strict_types=1);
 use Amp\CancelledException;
 use Amp\TimeoutCancellation;
 use danog\MadelineProto\API;
+use danog\MadelineProto\Logger;
+use danog\MadelineProto\Settings;
 use danog\MadelineProto\Settings\AppInfo;
+use danog\MadelineProto\Settings\Logger as LoggerSettings;
 
 $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 session_name('skyguardian_admin');
@@ -20,7 +23,11 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 
+ob_start();
 $reply = static function (int $status, array $payload): never {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code($status);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -33,10 +40,10 @@ if (($_SESSION['admin_authenticated'] ?? false) !== true) {
 $storageDir = dirname(__DIR__) . '/storage';
 $accountsFile = $storageDir . '/telegram-accounts.json';
 $sessionsDir = $storageDir . '/telegram-sessions';
-$madelineLog = $sessionsDir . '/MadelineProto.log';
 $autoload = dirname(__DIR__) . '/vendor/autoload.php';
+$logFile = $sessionsDir . '/MadelineProto.log';
 
-$ensureStorage = static function () use ($storageDir, $sessionsDir, $madelineLog): void {
+$ensureStorage = static function () use ($storageDir, $sessionsDir): void {
     foreach ([$storageDir, $sessionsDir] as $directory) {
         if (!is_dir($directory) && !mkdir($directory, 0770, true) && !is_dir($directory)) {
             throw new RuntimeException('Не удалось подготовить хранилище Telegram.');
@@ -45,12 +52,6 @@ $ensureStorage = static function () use ($storageDir, $sessionsDir, $madelineLog
             throw new RuntimeException('Хранилище Telegram недоступно для записи.');
         }
     }
-    if (!is_file($madelineLog) && touch($madelineLog) === false) {
-        throw new RuntimeException('Не удалось подготовить журнал Telegram.');
-    }
-    chmod($madelineLog, 0600);
-    ini_set('log_errors', '1');
-    ini_set('error_log', $madelineLog);
 };
 
 $readAccounts = static function () use ($accountsFile): array {
@@ -65,11 +66,11 @@ $readAccounts = static function () use ($accountsFile): array {
         fclose($handle);
     }
     $data = json_decode((string) $raw, true);
-    return is_array($data) ? $data : [];
+    return is_array($data) ? array_values($data) : [];
 };
 
 $writeAccounts = static function (array $accounts) use ($accountsFile, $storageDir): void {
-    $json = json_encode($accounts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    $json = json_encode(array_values($accounts), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     $temp = tempnam($storageDir, '.telegram-accounts-');
     if ($temp === false) throw new RuntimeException('Не удалось сохранить настройки Telegram.');
     try {
@@ -123,29 +124,53 @@ $removeTree = static function (string $path) use (&$removeTree): void {
     @rmdir($path);
 };
 
+$buildSettings = static function (array $account) use ($logFile): Settings {
+    $settings = new Settings();
+    $settings->setAppInfo(
+        (new AppInfo())
+            ->setApiId((int) $account['api_id'])
+            ->setApiHash((string) $account['api_hash'])
+            ->setShowPrompt(false)
+    );
+    $settings->setLogger(
+        (new LoggerSettings())
+            ->setType(Logger::LOGGER_FILE)
+            ->setExtra($logFile)
+            ->setLevel(Logger::LEVEL_ERROR)
+            ->setMaxSize(10 * 1024 * 1024)
+    );
+    return $settings;
+};
+
 $action = (string) ($_GET['action'] ?? $_POST['action'] ?? 'bootstrap');
-
-if ($action === 'bootstrap' && $_SERVER['REQUEST_METHOD'] === 'GET') {
-    $ensureStorage();
-    $accounts = array_map($publicAccount, $readAccounts());
-    $reply(200, [
-        'ok' => true,
-        'csrf' => (string) ($_SESSION['csrf_token'] ?? ''),
-        'accounts' => array_values($accounts),
-    ]);
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    $reply(405, ['ok' => false, 'message' => 'Метод не поддерживается.']);
-}
-
-$csrf = (string) ($_POST['_token'] ?? '');
-if ($csrf === '' || !hash_equals((string) ($_SESSION['csrf_token'] ?? ''), $csrf)) {
-    $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
-}
 
 try {
     $ensureStorage();
+    ini_set('log_errors', '1');
+    ini_set('error_log', $logFile);
+    chdir($sessionsDir);
+
+    if ($action === 'bootstrap' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+        $accounts = array_values(array_filter(
+            $readAccounts(),
+            static fn(array $account): bool => (bool) ($account['validated'] ?? false)
+        ));
+        $reply(200, [
+            'ok' => true,
+            'csrf' => (string) ($_SESSION['csrf_token'] ?? ''),
+            'accounts' => array_map($publicAccount, $accounts),
+        ]);
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        $reply(405, ['ok' => false, 'message' => 'Метод не поддерживается.']);
+    }
+
+    $csrf = (string) ($_POST['_token'] ?? '');
+    if ($csrf === '' || !hash_equals((string) ($_SESSION['csrf_token'] ?? ''), $csrf)) {
+        $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
+    }
+
     $accounts = $readAccounts();
 
     if ($action === 'check') {
@@ -175,33 +200,42 @@ try {
             'connected' => (bool) ($existing['connected'] ?? false),
             'updated_at' => gmdate(DATE_ATOM),
         ]);
-        if ($index >= 0) $accounts[$index] = $account; else $accounts[] = $account;
-        $writeAccounts($accounts);
 
-        $settings = (new AppInfo())->setApiId((int) $account['api_id'])->setApiHash((string) $account['api_hash']);
-        $api = new API($sessionsDir . '/' . $id . '.madeline', $settings);
-        $qr = $api->qrLogin();
-        $loggedIn = $qr === null && $api->getAuthorization() !== API::WAITING_PASSWORD;
-        if ($loggedIn) {
-            $self = (array) $api->getSelf();
-            $account['connected'] = true;
-            $account['connected_at'] = $account['connected_at'] ?? gmdate(DATE_ATOM);
-            $account['user'] = [
-                'id' => (string) ($self['id'] ?? ''),
-                'name' => trim((string) (($self['first_name'] ?? '') . ' ' . ($self['last_name'] ?? ''))),
-                'username' => (string) ($self['username'] ?? ''),
-                'phone' => (string) ($self['phone'] ?? ''),
-            ];
-            $index = $findAccountIndex($accounts, $id);
-            $accounts[$index] = $account;
+        $sessionPath = $sessionsDir . '/' . $id . '.madeline';
+        try {
+            $api = new API($sessionPath, $buildSettings($account));
+            $qr = $api->qrLogin();
+            $loggedIn = $qr === null && $api->getAuthorization() !== API::WAITING_PASSWORD;
+            if ($loggedIn) {
+                $self = (array) $api->getSelf();
+                $account['connected'] = true;
+                $account['connected_at'] = $account['connected_at'] ?? gmdate(DATE_ATOM);
+                $account['user'] = [
+                    'id' => (string) ($self['id'] ?? ''),
+                    'name' => trim((string) (($self['first_name'] ?? '') . ' ' . ($self['last_name'] ?? ''))),
+                    'username' => (string) ($self['username'] ?? ''),
+                    'phone' => (string) ($self['phone'] ?? ''),
+                ];
+            }
+            $account['validated'] = true;
+            if ($index >= 0) $accounts[$index] = $account; else $accounts[] = $account;
             $writeAccounts($accounts);
+        } catch (Throwable $exception) {
+            if ($index < 0) {
+                $removeTree($sessionPath);
+                foreach (glob($sessionPath . '*') ?: [] as $sessionItem) $removeTree($sessionItem);
+            }
+            throw $exception;
         }
+
         $reply(200, ['ok' => true, 'message' => 'Telegram API принят сервером.', 'account' => $publicAccount($account)]);
     }
 
     $id = trim((string) ($_POST['id'] ?? ''));
     $index = $findAccountIndex($accounts, $id);
-    if ($index < 0) throw new InvalidArgumentException('Подключение не найдено. Сначала проверьте API.');
+    if ($index < 0 || !(bool) ($accounts[$index]['validated'] ?? false)) {
+        throw new InvalidArgumentException('Подключение не найдено. Сначала проверьте API.');
+    }
     $account = (array) $accounts[$index];
 
     if ($action === 'toggle') {
@@ -215,19 +249,20 @@ try {
     if ($action === 'delete') {
         array_splice($accounts, $index, 1);
         $writeAccounts($accounts);
-        $removeTree($sessionsDir . '/' . $id . '.madeline');
-        foreach (glob($sessionsDir . '/' . $id . '.madeline*') ?: [] as $sessionPath) $removeTree($sessionPath);
+        $sessionPath = $sessionsDir . '/' . $id . '.madeline';
+        $removeTree($sessionPath);
+        foreach (glob($sessionPath . '*') ?: [] as $sessionItem) $removeTree($sessionItem);
         $reply(200, ['ok' => true, 'message' => 'Технический аккаунт удалён.']);
     }
 
     if (!is_file($autoload)) throw new RuntimeException('MadelineProto ещё не установлен на сервере.');
     require_once $autoload;
-    $settings = (new AppInfo())->setApiId((int) $account['api_id'])->setApiHash((string) $account['api_hash']);
-    $api = new API($sessionsDir . '/' . $id . '.madeline', $settings);
+    $api = new API($sessionsDir . '/' . $id . '.madeline', $buildSettings($account));
 
     $finishLogin = static function (API $api, array &$account, array &$accounts, int $index) use ($writeAccounts, $publicAccount, $reply): never {
         $self = (array) $api->getSelf();
         $account['connected'] = true;
+        $account['validated'] = true;
         $account['connected_at'] = $account['connected_at'] ?? gmdate(DATE_ATOM);
         $account['updated_at'] = gmdate(DATE_ATOM);
         $account['user'] = [
