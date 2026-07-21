@@ -381,11 +381,11 @@ final class TelegramAutomation
     private function publicConfig(array $config, string $webhookUrl): array
     {
         return [
-            'enabled' => (bool)$config['enabled'],
+            'enabled' => ($config['enabled'] ?? false) === true,
             'group_enabled' => ($config['group_enabled'] ?? true) !== false,
-            'mode' => $config['mode'],
+            'mode' => (string)($config['mode'] ?? 'webhook'),
             'webhook_url' => preg_replace('/key=[^&]+/', 'key=••••••', $webhookUrl),
-            'updated_at' => $config['updated_at'],
+            'updated_at' => (string)($config['updated_at'] ?? date(DATE_ATOM)),
         ];
     }
 
