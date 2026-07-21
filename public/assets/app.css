@@ -45,3 +45,20 @@
     border-radius: 0;
   }
 }
+
+.frequency-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, .38fr);
+  gap: 10px;
+}
+
+.frequency-control input,
+.frequency-control select {
+  width: 100%;
+}
+
+@media (max-width: 480px) {
+  .frequency-control {
+    grid-template-columns: minmax(0, 1fr) 120px;
+  }
+}
