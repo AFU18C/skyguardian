@@ -1,0 +1,17 @@
+{
+  "name": "skyguardian/control-center",
+  "description": "SkyGuardian Telegram control center",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.3",
+    "danog/madelineproto": "8.7.0"
+  },
+  "config": {
+    "sort-packages": true,
+    "optimize-autoloader": true,
+    "allow-plugins": {
+      "php-http/discovery": true
+    }
+  }
+}
