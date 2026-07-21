@@ -78,7 +78,7 @@ final class TelegramAutomation
 
     public function setGroupEnabled(string $token, string $chatId, bool $enabled, string $baseUrl): array
     {
-        if (!preg_match('/^\\d{6,12}:[A-Za-z0-9_-]{30,}$/', $token) || !preg_match('/^-?\\d+$/', $chatId)) {
+        if (!preg_match('/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $token) || !preg_match('/^-?\d+$/', $chatId)) {
             throw new InvalidArgumentException('Проверьте токен и Chat ID.');
         }
         $configs = $this->readJson($this->configFile);
