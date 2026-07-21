@@ -8,9 +8,10 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/SkyGuardianUa
-ExecStart=/bin/bash -lc "while true; do /usr/bin/php /var/www/SkyGuardianUa/bin/data-channel-worker.php; sleep 1; done"
+ExecStart=/bin/bash -lc "while true; do /usr/bin/timeout --signal=TERM --kill-after=10s 90s /usr/bin/php /var/www/SkyGuardianUa/bin/data-channel-worker.php; code=$?; if [ $code -eq 124 ] || [ $code -eq 137 ]; then echo 'SkyGuardian worker watchdog: timed out, restarting' >&2; fi; sleep 1; done"
 Restart=always
 RestartSec=3
+TimeoutStopSec=20
 NoNewPrivileges=true
 PrivateTmp=true
 
