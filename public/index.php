@@ -19,6 +19,55 @@ $requestedPage = $_GET['page'] ?? null;
 $action = $_GET['action'] ?? null;
 $isAuthenticated = ($_SESSION['admin_authenticated'] ?? false) === true;
 
+if ($action === 'backup' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    if (!$isAuthenticated) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'message' => 'Требуется авторизация.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $token = (string) ($_POST['_token'] ?? '');
+    if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), $token)) {
+        http_response_code(419);
+        echo json_encode(['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $projectRoot = dirname(__DIR__);
+    $backupDir = $projectRoot . '/storage/backups';
+    if (!is_dir($backupDir) && !mkdir($backupDir, 0750, true) && !is_dir($backupDir)) {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'message' => 'Не удалось создать папку резервных копий.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $createdAt = new DateTimeImmutable('now', new DateTimeZone('Europe/Kyiv'));
+    $backupPath = $backupDir . '/skyguardian-' . $createdAt->format('Ymd-His') . '.tar.gz';
+    $command = 'tar -czf ' . escapeshellarg($backupPath)
+        . ' --exclude=' . escapeshellarg('./storage/backups')
+        . ' --exclude=' . escapeshellarg('./.git')
+        . ' -C ' . escapeshellarg($projectRoot) . ' . 2>&1';
+    exec($command, $backupOutput, $backupCode);
+
+    if ($backupCode !== 0 || !is_file($backupPath) || filesize($backupPath) === 0) {
+        if (is_file($backupPath)) {
+            @unlink($backupPath);
+        }
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'message' => 'Не удалось создать резервную копию.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    echo json_encode([
+        'ok' => true,
+        'message' => 'Резервная копия создана.',
+        'created_at' => $createdAt->format('d.m.Y в H:i'),
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($action === 'reboot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
 
@@ -230,7 +279,30 @@ function serverMetrics(): array
     ];
 }
 
+function latestBackup(): array
+{
+    $files = glob(dirname(__DIR__) . '/storage/backups/skyguardian-*.tar.gz') ?: [];
+    $latest = null;
+    $latestTime = 0;
+
+    foreach ($files as $file) {
+        $modified = (int) @filemtime($file);
+        if ($modified > $latestTime && @filesize($file) > 0) {
+            $latest = $file;
+            $latestTime = $modified;
+        }
+    }
+
+    if ($latest === null) {
+        return ['display' => 'Ещё не создан', 'exists' => false];
+    }
+
+    $date = (new DateTimeImmutable('@' . $latestTime))->setTimezone(new DateTimeZone('Europe/Kyiv'));
+    return ['display' => $date->format('d.m.Y в H:i'), 'exists' => true];
+}
+
 $serverMetrics = serverMetrics();
+$latestBackup = latestBackup();
 
 function active(string $current, string $target): string
 {
@@ -244,7 +316,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=18">
+    <link rel="stylesheet" href="assets/app.css?v=19">
 </head>
 <body>
 <div class="app-shell">
@@ -327,7 +399,15 @@ function active(string $current, string $target): string
                             <div class="metric-top"><span class="metric-icon">◷</span><span class="uptime-value"><?= htmlspecialchars($serverMetrics['uptime'], ENT_QUOTES, 'UTF-8') ?></span></div>
                             <strong>Время работы</strong>
                             <p>Без перезапуска сервера</p>
-                            <div class="uptime-status"><i></i>Сервер доступен</div>
+                            
+                        </section>
+                        <section class="server-metric backup-metric">
+                            <div class="metric-top"><span class="metric-icon">⇩</span><span class="backup-state<?= $latestBackup['exists'] ? ' ready' : '' ?>" data-backup-state><?= $latestBackup['exists'] ? 'Сохранён' : 'Нет копии' ?></span></div>
+                            <strong>Последний бэкап</strong>
+                            <p data-backup-time><?= htmlspecialchars($latestBackup['display'], ENT_QUOTES, 'UTF-8') ?></p>
+                            <button class="button primary backup-button" type="button" data-backup-create data-csrf="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                                <span aria-hidden="true">＋</span>Сделать бэкап
+                            </button>
                         </section>
                     </div>
                     <div class="server-reboot-row">
@@ -473,6 +553,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=10"></script>
+<script src="assets/app.js?v=19"></script>
 </body>
 </html>
