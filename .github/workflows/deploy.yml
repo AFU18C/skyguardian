@@ -34,6 +34,7 @@ jobs:
         run: |
           php -l public/index.php
           php -l public/telegram-account.php
+          php -l public/telegram-account-core.php
           php -l artisan
           php artisan
           test -f vendor/autoload.php
@@ -111,6 +112,7 @@ jobs:
             rm -f /tmp/skyguardian-release.tar.gz
             test -f "$target/public/index.php"
             test -f "$target/public/telegram-account.php"
+            test -f "$target/public/telegram-account-core.php"
             test -f "$target/public/assets/telegram-account.js"
             test -f "$target/artisan"
             test -f "$target/vendor/autoload.php"
