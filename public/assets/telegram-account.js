@@ -17,6 +17,7 @@
   const qrStatusStrong = qrModal?.querySelector('.qr-status strong');
   const qrStatusSmall = qrModal?.querySelector('.qr-status small');
   const qrStatusDot = qrModal?.querySelector('.qr-status .status-dot');
+  const scope = list.dataset.techScope === 'news-settings' ? 'news' : 'alerts';
 
   let csrf = '';
   let accounts = [];
@@ -39,10 +40,12 @@
 
   const request = async (action, fields = {}, method = 'POST') => {
     const options = { method, headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' } };
-    let url = '/telegram-account.php?action=' + encodeURIComponent(action);
+    const params = new URLSearchParams({ action, scope });
+    const url = '/telegram-account.php?' + params.toString();
     if (method === 'POST') {
       const body = new FormData();
       body.set('_token', csrf);
+      body.set('scope', scope);
       Object.entries(fields).forEach(([key, value]) => body.set(key, String(value ?? '')));
       options.body = body;
     }
