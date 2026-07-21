@@ -220,6 +220,9 @@ techDeleteButton?.addEventListener('click', () => {
   if (pendingTechDeleteId) openModal($('#deleteModal'));
 });
 
+const groupChannelModal = $('#groupChannelModal');
+$('[data-add-group-channel]')?.addEventListener('click', () => openModal(groupChannelModal));
+
 const sourceModal = $('#sourceModal');
 const sourceForm = $('[data-source-form]');
 const sourceList = $('[data-source-list]');
