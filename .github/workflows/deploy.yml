@@ -1,0 +1,63 @@
+name: Deploy SkyGuardian template
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skyguardian-server-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate PHP template
+        run: php -l public/index.php
+
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SKYGUARDIAN_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_HOST"
+          test -n "$SSH_PORT"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload verified public files
+        env:
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+          SSH_USER: ${{ secrets.SKYGUARDIAN_SSH_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_USER"
+          tar -C public -czf /tmp/skyguardian-public.tar.gz .
+          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" /tmp/skyguardian-public.tar.gz "$SSH_USER@$SSH_HOST:/tmp/skyguardian-public.tar.gz"
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'set -eu
+            target=/var/www/SkyGuardianUa
+            test "$target" = /var/www/SkyGuardianUa
+            install -d "$target"
+            find "$target" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+            tar -xzf /tmp/skyguardian-public.tar.gz -C "$target"
+            rm -f /tmp/skyguardian-public.tar.gz
+            test -f "$target/index.php"
+            test -f "$target/assets/app.css"
+            test -f "$target/assets/app.js"
+          '
