@@ -168,3 +168,73 @@
   .connection-form-actions .button{width:100%;min-width:0}
   .connection-form-actions .button:only-child{grid-column:1/-1}
 }
+
+
+.server-load-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.button.danger {
+  color: #fff;
+  border-color: rgba(248, 113, 113, .55);
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  box-shadow: 0 10px 28px rgba(220, 38, 38, .22);
+}
+
+.button.danger:hover {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+}
+
+.server-reboot-button {
+  min-width: 168px;
+}
+
+.reboot-modal-card {
+  width: min(440px, calc(100vw - 28px));
+}
+
+.reboot-modal-card > p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.danger-text {
+  color: #f87171;
+}
+
+.reboot-warning {
+  display: grid;
+  gap: 5px;
+  margin: 20px 0;
+  padding: 15px 16px;
+  border: 1px solid rgba(248, 113, 113, .25);
+  border-radius: 12px;
+  background: rgba(127, 29, 29, .16);
+}
+
+.reboot-warning strong {
+  color: #fecaca;
+}
+
+.reboot-warning span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .server-load-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .server-reboot-button {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .reboot-modal-card .modal-actions {
+    grid-template-columns: 1fr;
+  }
+}
