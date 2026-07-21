@@ -1,4 +1,0 @@
-removed=/var/www/html
-removed=/etc/nginx/sites-available/skyguardian.backup-20260720-211925
-skyguardian_directory=preserved
-nginx_config=valid
