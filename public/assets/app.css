@@ -559,3 +559,17 @@
   .group-control-card .control-action-buttons{grid-template-columns:1fr}
   .group-control-card .control-action-buttons .button:last-child:nth-child(odd){grid-column:auto}
 }
+
+.automation-form{align-items:start}
+.automation-section{display:grid;gap:14px;margin:0;padding:16px;border:1px solid rgba(115,145,190,.22);border-radius:14px;background:rgba(8,15,28,.45)}
+.automation-section legend{padding:0 8px;color:#e7eefb;font-weight:700}
+.automation-inline{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.automation-inline label{display:grid;gap:7px}
+.automation-status.success{border-color:rgba(64,209,143,.45);background:rgba(25,112,73,.16)}
+.automation-status.warning{border-color:rgba(240,178,73,.4);background:rgba(122,82,19,.14)}
+.automation-status.error{border-color:rgba(244,91,105,.45);background:rgba(129,28,39,.14)}
+@media(max-width:680px){
+  .automation-section{padding:14px 12px}
+  .automation-inline{grid-template-columns:1fr}
+  .automation-form>label:not(.control-check){width:100%}
+}
