@@ -10,6 +10,9 @@ function toast(message) {
 }
 
 function openModal(modal) {
+  modal.scrollTop = 0;
+  const card = modal.querySelector('.modal-card');
+  if (card) card.scrollTop = 0;
   modal.classList.add('open');
   modal.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
