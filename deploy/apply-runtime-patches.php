@@ -26,6 +26,12 @@ $worker = $target . '/bin/data-channel-worker.php';
 $indexContent = file_get_contents($index);
 if ($indexContent === false) throw new RuntimeException('Cannot read index.php');
 $indexContent = str_replace('<option value="text_without_links">Только текст без ссылок</option>', '', $indexContent);
+if (!str_contains($indexContent, 'site-theme.css')) {
+    $indexContent = str_replace('</head>', '<link rel="stylesheet" href="/assets/site-theme.css?v=1"></head>', $indexContent);
+}
+if (!str_contains($indexContent, 'site-theme.js')) {
+    $indexContent = str_replace('</body>', '<script src="/assets/site-theme.js?v=1"></script></body>', $indexContent);
+}
 file_put_contents($index, $indexContent);
 
 $frequencyField = '<label class="full"><span>Частота проверки *</span><div class="frequency-control"><input name="check_frequency" type="number" inputmode="numeric" min="3" max="86400" step="1" placeholder="Введите частоту" required data-frequency-value><select name="check_frequency_unit" aria-label="Единица частоты проверки" required data-frequency-unit><option value="seconds">Секунды</option><option value="hours">Часы</option></select></div></label>';
