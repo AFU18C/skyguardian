@@ -716,7 +716,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=32">
+    <link rel="stylesheet" href="assets/app.css?v=33">
 </head>
 <body>
 <div class="app-shell">
