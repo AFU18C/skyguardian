@@ -589,3 +589,14 @@
 .group-channel-card.group-disabled .group-check-date::after{content:' · Остановлено';color:#a1a8b4}
 .group-channel-card.group-disabled .group-manage-button{cursor:not-allowed;opacity:.45}
 @media(max-width:640px){.group-master-switch span{width:40px;height:22px}.group-master-switch input:checked+span::after{left:20px}}
+
+/* Keep the master switch at the far left and card actions at the far right. */
+.group-channel-card .group-card-actions{
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  grid-column:1 / -1!important;
+  width:100%!important;
+  align-items:center;
+}
+.group-channel-card .group-master-switch{grid-column:1;justify-self:start;margin:0}
+.group-channel-card .group-card-buttons{grid-column:3;justify-self:end;margin:0}
