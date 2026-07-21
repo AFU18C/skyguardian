@@ -33,9 +33,10 @@ if (($_SESSION['admin_authenticated'] ?? false) !== true) {
 $storageDir = dirname(__DIR__) . '/storage';
 $accountsFile = $storageDir . '/telegram-accounts.json';
 $sessionsDir = $storageDir . '/telegram-sessions';
+$madelineLog = $sessionsDir . '/MadelineProto.log';
 $autoload = dirname(__DIR__) . '/vendor/autoload.php';
 
-$ensureStorage = static function () use ($storageDir, $sessionsDir): void {
+$ensureStorage = static function () use ($storageDir, $sessionsDir, $madelineLog): void {
     foreach ([$storageDir, $sessionsDir] as $directory) {
         if (!is_dir($directory) && !mkdir($directory, 0770, true) && !is_dir($directory)) {
             throw new RuntimeException('Не удалось подготовить хранилище Telegram.');
@@ -44,6 +45,12 @@ $ensureStorage = static function () use ($storageDir, $sessionsDir): void {
             throw new RuntimeException('Хранилище Telegram недоступно для записи.');
         }
     }
+    if (!is_file($madelineLog) && touch($madelineLog) === false) {
+        throw new RuntimeException('Не удалось подготовить журнал Telegram.');
+    }
+    chmod($madelineLog, 0600);
+    ini_set('log_errors', '1');
+    ini_set('error_log', $madelineLog);
 };
 
 $readAccounts = static function () use ($accountsFile): array {
