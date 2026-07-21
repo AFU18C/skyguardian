@@ -296,3 +296,17 @@
   .server-reboot-row{margin-top:12px;padding-top:12px}
   .server-reboot-button{width:100%;min-height:48px}
 }
+
+.backup-state{color:#8b99ad;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.backup-state.ready{color:#55dda9}
+.backup-metric>p{min-height:0;margin-bottom:13px;color:#aab6c6;font-size:12px;font-weight:700}
+.backup-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:9px 13px;font-size:11px}
+.backup-button:disabled{cursor:wait;opacity:.7}
+
+@media(max-width:640px){
+  .server-metric.backup-metric{min-height:132px}
+  .backup-metric .metric-top{float:none;display:flex;margin:0 0 10px}
+  .backup-metric>strong{position:absolute;left:71px;top:19px;padding:0}
+  .backup-metric>p{position:absolute;left:71px;top:41px;margin:0}
+  .backup-button{clear:both;width:100%;margin-top:8px}
+}
