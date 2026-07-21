@@ -1,0 +1,179 @@
+name: Full SkyGuardian server backup
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/full-server-backup.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skyguardian-server-maintenance
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SKYGUARDIAN_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_HOST"
+          test -n "$SSH_PORT"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Create and verify full backup
+        env:
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+          SSH_USER: ${{ secrets.SKYGUARDIAN_SSH_USER }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_USER"
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -se' <<'REMOTE'
+          set -Eeuo pipefail
+          umask 077
+
+          PROJECT=/var/www/SkyGuardianUa
+          BACKUP_ROOT=/root/skyguardian-backups
+          TS=$(date -u +%Y%m%dT%H%M%SZ)
+          WORK="$BACKUP_ROOT/.work-$TS"
+          ARCHIVE="$BACKUP_ROOT/skyguardian-full-$TS.tar.gz"
+          CHECKSUM="$ARCHIVE.sha256"
+
+          test "$PROJECT" = /var/www/SkyGuardianUa
+          test -d "$PROJECT"
+          install -d -m 700 "$BACKUP_ROOT" "$WORK"
+          trap 'rm -rf "$WORK"' EXIT
+
+          mkdir -p "$WORK/database" "$WORK/system" "$WORK/meta"
+
+          # Project files, including .env, storage and uploaded files.
+          tar --xattrs --acls --numeric-owner -C /var/www -cpf "$WORK/project.tar" SkyGuardianUa
+
+          # Database backup, detected safely from Laravel-style .env.
+          ENV_FILE="$PROJECT/.env"
+          if [ -f "$ENV_FILE" ]; then
+            get_env() {
+              local key="$1" value
+              value=$(grep -m1 -E "^[[:space:]]*${key}=" "$ENV_FILE" | cut -d= -f2- || true)
+              value=${value%$'\r'}
+              if [[ "$value" == \"*\" && "$value" == *\" ]]; then value=${value:1:${#value}-2}; fi
+              if [[ "$value" == \047*\047 && "$value" == *\047 ]]; then value=${value:1:${#value}-2}; fi
+              printf '%s' "$value"
+            }
+
+            DB_CONNECTION=$(get_env DB_CONNECTION)
+            DB_HOST=$(get_env DB_HOST); DB_HOST=${DB_HOST:-127.0.0.1}
+            DB_PORT=$(get_env DB_PORT)
+            DB_DATABASE=$(get_env DB_DATABASE)
+            DB_USERNAME=$(get_env DB_USERNAME)
+            DB_PASSWORD=$(get_env DB_PASSWORD)
+
+            case "$DB_CONNECTION" in
+              mysql|mariadb)
+                DB_PORT=${DB_PORT:-3306}
+                test -n "$DB_DATABASE"
+                test -n "$DB_USERNAME"
+                export MYSQL_PWD="$DB_PASSWORD"
+                if command -v mysqldump >/dev/null 2>&1; then
+                  mysqldump --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" \
+                    --single-transaction --quick --routines --events --triggers \
+                    --default-character-set=utf8mb4 "$DB_DATABASE" | gzip -9 > "$WORK/database/mysql.sql.gz"
+                  test -s "$WORK/database/mysql.sql.gz"
+                  gzip -t "$WORK/database/mysql.sql.gz"
+                else
+                  echo "mysqldump is not installed" >&2; exit 20
+                fi
+                unset MYSQL_PWD
+                ;;
+              pgsql|postgres|postgresql)
+                DB_PORT=${DB_PORT:-5432}
+                test -n "$DB_DATABASE"
+                test -n "$DB_USERNAME"
+                export PGPASSWORD="$DB_PASSWORD"
+                if command -v pg_dump >/dev/null 2>&1; then
+                  pg_dump --host="$DB_HOST" --port="$DB_PORT" --username="$DB_USERNAME" \
+                    --format=custom --file="$WORK/database/postgresql.dump" "$DB_DATABASE"
+                  test -s "$WORK/database/postgresql.dump"
+                else
+                  echo "pg_dump is not installed" >&2; exit 21
+                fi
+                unset PGPASSWORD
+                ;;
+              sqlite|sqlite3)
+                SQLITE_PATH="$DB_DATABASE"
+                [[ "$SQLITE_PATH" = /* ]] || SQLITE_PATH="$PROJECT/$SQLITE_PATH"
+                test -f "$SQLITE_PATH"
+                if command -v sqlite3 >/dev/null 2>&1; then
+                  sqlite3 "$SQLITE_PATH" ".backup '$WORK/database/database.sqlite'"
+                else
+                  cp -a "$SQLITE_PATH" "$WORK/database/database.sqlite"
+                fi
+                test -s "$WORK/database/database.sqlite"
+                ;;
+              '')
+                printf '%s\n' 'No DB_CONNECTION found; database dump was not created.' > "$WORK/database/NOTICE.txt"
+                ;;
+              *)
+                printf 'Unsupported DB_CONNECTION=%s\n' "$DB_CONNECTION" >&2
+                exit 22
+                ;;
+            esac
+          else
+            echo 'No .env file found; database dump was not created.' > "$WORK/database/NOTICE.txt"
+          fi
+
+          # Web server, services, scheduled tasks and relevant system metadata.
+          for path in \
+            /etc/nginx/nginx.conf \
+            /etc/nginx/sites-available \
+            /etc/nginx/sites-enabled \
+            /etc/apache2/sites-available \
+            /etc/apache2/sites-enabled \
+            /etc/systemd/system/skyguardian-poll.service \
+            /etc/systemd/system/skyguardian-poll.service.d \
+            /etc/supervisor \
+            /etc/cron.d \
+            /etc/crontab; do
+            if [ -e "$path" ]; then
+              cp -a --parents "$path" "$WORK/system/"
+            fi
+          done
+
+          crontab -l > "$WORK/system/root-crontab.txt" 2>/dev/null || true
+          systemctl cat skyguardian-poll.service > "$WORK/system/skyguardian-poll-effective.txt" 2>/dev/null || true
+          systemctl status skyguardian-poll.service --no-pager > "$WORK/system/skyguardian-poll-status.txt" 2>/dev/null || true
+          nginx -T > "$WORK/system/nginx-effective.txt" 2>&1 || true
+
+          {
+            echo "created_utc=$TS"
+            echo "hostname=$(hostname -f 2>/dev/null || hostname)"
+            echo "project=$PROJECT"
+            echo "git_commit=$(git -C "$PROJECT" rev-parse HEAD 2>/dev/null || echo unknown)"
+            echo "kernel=$(uname -srmo)"
+            echo "disk=$(df -h "$PROJECT" | tail -1)"
+          } > "$WORK/meta/manifest.txt"
+
+          tar --xattrs --acls --numeric-owner -C "$WORK" -czf "$ARCHIVE" .
+          test -s "$ARCHIVE"
+          tar -tzf "$ARCHIVE" >/dev/null
+          sha256sum "$ARCHIVE" > "$CHECKSUM"
+          chmod 600 "$ARCHIVE" "$CHECKSUM"
+
+          ARCHIVE_SIZE=$(du -h "$ARCHIVE" | awk '{print $1}')
+          ARCHIVE_SHA=$(cut -d' ' -f1 "$CHECKSUM")
+          printf 'BACKUP_OK path=%s size=%s sha256=%s\n' "$ARCHIVE" "$ARCHIVE_SIZE" "$ARCHIVE_SHA"
+          REMOTE
