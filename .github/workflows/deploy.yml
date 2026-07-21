@@ -39,6 +39,7 @@ jobs:
           php -l public/telegram-account-core.php
           php -l public/data-channel.php
           php -l public/data-channel-status.php
+          php -l public/data-channel-run.php
           php -l bin/data-channel-worker.php
           php -l artisan
           php artisan
@@ -93,9 +94,9 @@ jobs:
               sed -i -E "s#data-channel.js\?v=[0-9]+#data-channel.js?v=1#g" "$target/public/index.php"
             fi
             if ! grep -q "data-channel-runtime.js" "$target/public/index.php"; then
-              sed -i "s#</body>#<script src=\"assets/data-channel-runtime.js?v=1\"></script></body>#" "$target/public/index.php"
+              sed -i "s#</body>#<script src=\"assets/data-channel-runtime.js?v=2\"></script></body>#" "$target/public/index.php"
             else
-              sed -i -E "s#data-channel-runtime.js\?v=[0-9]+#data-channel-runtime.js?v=1#g" "$target/public/index.php"
+              sed -i -E "s#data-channel-runtime.js\?v=[0-9]+#data-channel-runtime.js?v=2#g" "$target/public/index.php"
             fi
 
             if getent group www-data >/dev/null 2>&1; then
@@ -104,6 +105,9 @@ jobs:
               install -d -m 2770 -o root -g www-data "$target/storage/backups"
               install -d -m 2770 -o root -g www-data "$target/storage/telegram-sessions"
               install -d -m 2770 -o root -g www-data "$target/storage/telegram-news-sessions"
+              touch "$target/storage/data-channel-worker.lock"
+              chown www-data:www-data "$target/storage/data-channel-worker.lock"
+              chmod 660 "$target/storage/data-channel-worker.lock"
               if test -f "$target/storage/admin.json"; then
                 chgrp www-data "$target/storage/admin.json"
                 chmod 640 "$target/storage/admin.json"
@@ -119,6 +123,8 @@ jobs:
               install -d -m 777 "$target/storage/backups"
               install -d -m 777 "$target/storage/telegram-sessions"
               install -d -m 777 "$target/storage/telegram-news-sessions"
+              touch "$target/storage/data-channel-worker.lock"
+              chmod 666 "$target/storage/data-channel-worker.lock"
               if test -f "$target/storage/admin.json"; then chmod 644 "$target/storage/admin.json"; fi
             fi
 
@@ -159,6 +165,7 @@ EOF
             test -f "$target/public/telegram-account-core.php"
             test -f "$target/public/data-channel.php"
             test -f "$target/public/data-channel-status.php"
+            test -f "$target/public/data-channel-run.php"
             test -f "$target/public/assets/telegram-account.js"
             test -f "$target/public/assets/data-channel.js"
             test -f "$target/public/assets/data-channel-runtime.js"
@@ -167,10 +174,11 @@ EOF
             test -f "$target/vendor/autoload.php"
             grep -q "telegram-account.js?v=3" "$target/public/index.php"
             grep -q "data-channel.js?v=1" "$target/public/index.php"
-            grep -q "data-channel-runtime.js?v=1" "$target/public/index.php"
+            grep -q "data-channel-runtime.js?v=2" "$target/public/index.php"
             test -w "$target/storage/backups"
             test -w "$target/storage/telegram-sessions"
             test -w "$target/storage/telegram-news-sessions"
+            test -w "$target/storage/data-channel-worker.lock"
             systemctl is-active --quiet skyguardian-data-channels.service
 
             nginx_site=/etc/nginx/sites-enabled/skyguardian
