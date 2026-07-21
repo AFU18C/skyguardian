@@ -17,4 +17,18 @@ The command requests the administrator email and password interactively. Passwor
 php -S 127.0.0.1:8080 -t public
 ```
 
-Telegram connections and data processing will be implemented after the interface is approved.
+## Telegram automation
+
+The administration panel can register a protected Telegram webhook for each configured bot. The public site must use HTTPS and `public/telegram-webhook.php` must be reachable from Telegram.
+
+Install the maintenance cron after deployment so expired captchas and delayed deletions are processed even when no new updates arrive:
+
+```bash
+sudo cp deploy/skyguardian-telegram.cron /etc/cron.d/skyguardian-telegram
+sudo chmod 644 /etc/cron.d/skyguardian-telegram
+sudo chown -R www-data:www-data storage
+```
+
+Webhook is the recommended mode. For polling, either enable the polling line in the cron template or install `deploy/skyguardian-telegram.service`; never run webhook and polling for the same bot simultaneously.
+
+Runtime tokens, state and logs are stored outside the public directory with mode `0600` and are ignored by Git.
