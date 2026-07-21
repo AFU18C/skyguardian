@@ -80,14 +80,48 @@ $containsAny = static function (string $text, array $terms): bool {
     return false;
 };
 
-$stripLinks = static function (string $text): string {
-    $text = preg_replace('~https?://\S+|www\.\S+|t\.me/\S+~iu', '', $text) ?? $text;
-    return trim(preg_replace("/[ \t]+\n/u", "\n", $text) ?? $text);
+$stripVisibleLinks = static function (string $text): string {
+    $text = preg_replace('~(?:https?://|www\.|t\.me/)[^\s<>]+~iu', '', $text) ?? $text;
+    $text = preg_replace("/[ \t]+\n/u", "\n", $text) ?? $text;
+    $text = preg_replace("/\n{3,}/u", "\n\n", $text) ?? $text;
+    return trim($text);
 };
 
-$customizeText = static function (string $text, array $channel): string {
+$sanitizeText = static function (array $message) use ($stripVisibleLinks): array {
+    $text = trim((string) ($message['message'] ?? ''));
+    $entities = is_array($message['entities'] ?? null) ? $message['entities'] : [];
+    $safeEntities = [];
+
+    foreach ($entities as $entity) {
+        if (!is_array($entity)) continue;
+        $type = (string) ($entity['_'] ?? '');
+        if (in_array($type, [
+            'messageEntityUrl',
+            'messageEntityTextUrl',
+            'messageEntityEmail',
+            'messageEntityPhone',
+            'messageEntityMention',
+            'messageEntityMentionName',
+            'messageEntityBotCommand',
+        ], true)) {
+            continue;
+        }
+        $safeEntities[] = $entity;
+    }
+
+    $cleanText = $stripVisibleLinks($text);
+    if ($cleanText !== $text) {
+        // После удаления видимого URL смещения Telegram entities меняются.
+        // Отправляем чистый текст без entities, чтобы не создать ошибочную ссылку.
+        $safeEntities = [];
+    }
+
+    return [$cleanText, $safeEntities];
+};
+
+$customizeText = static function (string $text, array $channel) use ($stripVisibleLinks): string {
     if (!(bool) ($channel['custom_text_enabled'] ?? false)) return $text;
-    $custom = trim((string) ($channel['custom_text'] ?? ''));
+    $custom = $stripVisibleLinks(trim((string) ($channel['custom_text'] ?? '')));
     if ($custom === '') return $text;
     if ((string) ($channel['custom_text_position'] ?? 'after') === 'before') {
         return trim($custom . ($text !== '' ? "\n\n" . $text : ''));
@@ -100,51 +134,50 @@ $intervalSeconds = static function (array $channel): int {
     return (string) ($channel['check_frequency_unit'] ?? 'seconds') === 'hours' ? $value * 3600 : $value;
 };
 
-$copyMessage = static function (API $api, string $destination, array $message, string $text): void {
-    $entities = is_array($message['entities'] ?? null) ? $message['entities'] : [];
+$sendTextOrMedia = static function (API $api, string $destination, array $message, string $text, array $entities, bool $includeMedia): void {
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
 
-    if ($hasMedia) {
-        $api->messages->sendMedia(
-            peer: $destination,
-            media: $message['media'],
-            message: $text,
-            entities: $entities
-        );
+    if ($includeMedia && $hasMedia) {
+        $parameters = [
+            'peer' => $destination,
+            'media' => $message['media'],
+            'message' => $text,
+        ];
+        if ($entities !== []) $parameters['entities'] = $entities;
+        $api->messages->sendMedia(...$parameters);
         return;
     }
 
     if ($text !== '') {
-        $api->messages->sendMessage(peer: $destination, message: $text, entities: $entities);
+        $parameters = ['peer' => $destination, 'message' => $text];
+        if ($entities !== []) $parameters['entities'] = $entities;
+        $api->messages->sendMessage(...$parameters);
     }
 };
 
-$publish = static function (API $api, array $channel, array $message) use ($stripLinks, $customizeText, $copyMessage): void {
+$publish = static function (API $api, array $channel, array $message) use ($sanitizeText, $customizeText, $sendTextOrMedia): void {
     $destination = (string) $channel['destination'];
     $format = (string) ($channel['publication_format'] ?? 'original');
-    $text = trim((string) ($message['message'] ?? ''));
+    if ($format === 'text_without_links') $format = 'text';
+
+    [$text, $entities] = $sanitizeText($message);
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
-
-    if ($format === 'original') {
-        $copyMessage($api, $destination, $message, $text);
-        return;
-    }
-
-    if ($format === 'text_without_links') $text = $stripLinks($text);
-    $text = $customizeText($text, $channel);
 
     if ($format === 'media') {
         if ($hasMedia) $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '');
         return;
     }
 
-    if ($format === 'text_and_media' && $hasMedia) {
-        $api->messages->sendMedia(peer: $destination, media: $message['media'], message: $text);
+    $customizedText = $customizeText($text, $channel);
+    if ($customizedText !== $text) $entities = [];
+
+    if ($format === 'text') {
+        $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, false);
         return;
     }
 
-    if ($text !== '') {
-        $api->messages->sendMessage(peer: $destination, message: $text);
+    if ($format === 'text_and_media' || $format === 'original') {
+        $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, true);
     }
 };
 
