@@ -54,6 +54,15 @@ $readJson = static function (string $file): array {
     return is_array($data) ? $data : [];
 };
 
+$intervalSeconds = static function (array $channel): int {
+    $value = max(1, (int) ($channel['check_frequency'] ?? 60));
+    return match ((string) ($channel['check_frequency_unit'] ?? 'seconds')) {
+        'hours' => $value * 3600,
+        'minutes' => $value * 60,
+        default => $value,
+    };
+};
+
 $states = $readJson($stateFile);
 $channels = array_values($readJson($channelsFile));
 $result = [];
@@ -62,11 +71,22 @@ foreach ($channels as $channel) {
     if (!is_array($channel)) continue;
     $id = (string) ($channel['id'] ?? '');
     if ($id === '') continue;
+
     $state = is_array($states[$id] ?? null) ? $states[$id] : [];
     $enabled = (bool) ($channel['enabled'] ?? true);
+    $interval = $intervalSeconds($channel);
+    $lastCheckAt = $state['last_check_at'] ?? null;
+    $lastCheckTimestamp = is_string($lastCheckAt) ? strtotime($lastCheckAt) : false;
+    $nextCheckAt = $enabled && $lastCheckTimestamp !== false
+        ? gmdate(DATE_ATOM, $lastCheckTimestamp + $interval)
+        : null;
+
     $result[$id] = [
         'status' => $enabled ? (string) ($state['status'] ?? 'waiting') : 'paused',
-        'last_check_at' => $state['last_check_at'] ?? null,
+        'enabled' => $enabled,
+        'interval_seconds' => $interval,
+        'next_check_at' => $nextCheckAt,
+        'last_check_at' => $lastCheckAt,
         'last_publish_at' => $state['last_publish_at'] ?? null,
         'worker_seen_at' => $state['worker_seen_at'] ?? null,
         'last_message_id' => (int) ($state['last_message_id'] ?? 0),
