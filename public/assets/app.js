@@ -67,6 +67,24 @@ $('[data-account-edit]')?.addEventListener('click', event => {
 $('[data-add-connection]')?.addEventListener('click', () => openModal($('#connectionModal')));
 $('[data-add-source]')?.addEventListener('click', () => openModal($('#sourceModal')));
 
+const frequencyValue = $('[data-frequency-value]');
+const frequencyUnit = $('[data-frequency-unit]');
+const frequencyHint = $('[data-frequency-hint]');
+
+function syncFrequencyLimits() {
+  if (!frequencyValue || !frequencyUnit) return;
+  const isHours = frequencyUnit.value === 'hours';
+  frequencyValue.min = isHours ? '1' : '3';
+  frequencyValue.max = isHours ? '24' : '86400';
+  frequencyValue.placeholder = isHours ? 'От 1 до 24' : 'От 3 до 86400';
+  if (frequencyHint) frequencyHint.textContent = isHours ? 'Допустимо: от 1 до 24 часов' : 'Допустимо: от 3 до 86 400 секунд';
+  const value = Number(frequencyValue.value);
+  if (frequencyValue.value && (value < Number(frequencyValue.min) || value > Number(frequencyValue.max))) frequencyValue.value = '';
+}
+
+frequencyUnit?.addEventListener('change', syncFrequencyLimits);
+syncFrequencyLimits();
+
 const sourceForm = $('[data-source-form]');
 sourceForm?.addEventListener('submit', event => {
   event.preventDefault();
