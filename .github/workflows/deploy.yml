@@ -35,10 +35,12 @@ jobs:
           php -l public/index.php
           php -l public/telegram-account.php
           php -l public/telegram-account-core.php
+          php -l public/data-channel.php
           php -l artisan
           php artisan
           test -f vendor/autoload.php
           test -f public/assets/telegram-account.js
+          test -f public/assets/data-channel.js
 
       - name: Configure SSH
         env:
@@ -80,6 +82,11 @@ jobs:
             else
               sed -i -E "s#telegram-account.js\?v=[0-9]+#telegram-account.js?v=3#g" "$target/public/index.php"
             fi
+            if ! grep -q "data-channel.js" "$target/public/index.php"; then
+              sed -i "s#</body>#<script src=\"assets/data-channel.js?v=1\"></script></body>#" "$target/public/index.php"
+            else
+              sed -i -E "s#data-channel.js\?v=[0-9]+#data-channel.js?v=1#g" "$target/public/index.php"
+            fi
             if getent group www-data >/dev/null 2>&1; then
               chgrp www-data "$target/storage"
               chmod 2770 "$target/storage"
@@ -90,10 +97,10 @@ jobs:
                 chgrp www-data "$target/storage/admin.json"
                 chmod 640 "$target/storage/admin.json"
               fi
-              for account_file in telegram-accounts.json telegram-news-accounts.json; do
-                if test -f "$target/storage/$account_file"; then
-                  chown www-data:www-data "$target/storage/$account_file"
-                  chmod 600 "$target/storage/$account_file"
+              for data_file in telegram-accounts.json telegram-news-accounts.json telegram-news-channels.json telegram-alerts-channels.json; do
+                if test -f "$target/storage/$data_file"; then
+                  chown www-data:www-data "$target/storage/$data_file"
+                  chmod 600 "$target/storage/$data_file"
                 fi
               done
             else
@@ -101,9 +108,7 @@ jobs:
               install -d -m 777 "$target/storage/backups"
               install -d -m 777 "$target/storage/telegram-sessions"
               install -d -m 777 "$target/storage/telegram-news-sessions"
-              if test -f "$target/storage/admin.json"; then
-                chmod 644 "$target/storage/admin.json"
-              fi
+              if test -f "$target/storage/admin.json"; then chmod 644 "$target/storage/admin.json"; fi
             fi
             find "$target/public" -type d -exec chmod 755 {} +
             find "$target/public" -type f -exec chmod 644 {} +
@@ -113,10 +118,13 @@ jobs:
             test -f "$target/public/index.php"
             test -f "$target/public/telegram-account.php"
             test -f "$target/public/telegram-account-core.php"
+            test -f "$target/public/data-channel.php"
             test -f "$target/public/assets/telegram-account.js"
+            test -f "$target/public/assets/data-channel.js"
             test -f "$target/artisan"
             test -f "$target/vendor/autoload.php"
             grep -q "telegram-account.js?v=3" "$target/public/index.php"
+            grep -q "data-channel.js?v=1" "$target/public/index.php"
             test -w "$target/storage/backups"
             test -w "$target/storage/telegram-sessions"
             test -w "$target/storage/telegram-news-sessions"
