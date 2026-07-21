@@ -296,7 +296,7 @@ if ($isPublicLanding || $isLoginRequest) {
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
     <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=24">
+    <link rel="stylesheet" href="/assets/app.css?v=25">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
@@ -454,7 +454,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=24">
+    <link rel="stylesheet" href="assets/app.css?v=25">
 </head>
 <body>
 <div class="app-shell">
@@ -603,7 +603,10 @@ function active(string $current, string $target): string
                 <section class="group-control-pane active" data-group-control-pane="overview">
                     <div class="control-status-card" data-telegram-status>
                         <div><span class="control-status-dot"></span><div><strong data-telegram-status-title>Подключение не проверено</strong><small data-telegram-status-text>Нажмите кнопку, чтобы проверить бота и его права</small></div></div>
-                        <button class="button primary" type="button" data-group-action="check" data-csrf="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">Проверить подключение</button>
+                        <div class="telegram-status-actions">
+                            <button class="button secondary" type="button" data-group-action="info" hidden>Информация</button>
+                            <button class="button primary" type="button" data-group-action="check" data-csrf="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">Проверить подключение</button>
+                        </div>
                     </div>
                     <div class="telegram-check-details" data-telegram-details hidden>
                         <article><small>Бот</small><strong data-telegram-bot>—</strong></article>
@@ -768,6 +771,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=21"></script>
+<script src="assets/app.js?v=22"></script>
 </body>
 </html>
