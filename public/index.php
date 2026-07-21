@@ -316,7 +316,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=21">
+    <link rel="stylesheet" href="assets/app.css?v=22">
 </head>
 <body>
 <div class="app-shell">
@@ -439,6 +439,53 @@ function active(string $current, string $target): string
             <?php endif; ?>
         </div>
     </main>
+</div>
+
+<div class="modal group-control-modal" id="groupControlModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card group-control-card" role="dialog" aria-modal="true" aria-labelledby="groupControlTitle">
+        <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
+        <div class="group-control-heading">
+            <span class="step-label">УПРАВЛЕНИЕ TELEGRAM</span>
+            <h2 id="groupControlTitle" data-group-control-title>Канал или группа</h2>
+            <p data-group-control-meta>Проверка подключения и доступные функции бота.</p>
+        </div>
+        <div class="group-control-layout">
+            <nav class="group-control-tabs" aria-label="Разделы управления">
+                <button class="active" type="button" data-group-control-tab="overview">Обзор</button>
+                <button type="button" data-group-control-tab="publications">Публикации</button>
+                <button type="button" data-group-control-tab="messages">Сообщения</button>
+                <button type="button" data-group-control-tab="members">Участники</button>
+                <button type="button" data-group-control-tab="invites">Заявки и ссылки</button>
+                <button type="button" data-group-control-tab="settings">Настройки</button>
+                <button type="button" data-group-control-tab="automation">Автоматизация</button>
+                <button type="button" data-group-control-tab="journal">Журнал</button>
+            </nav>
+            <div class="group-control-content">
+                <section class="group-control-pane active" data-group-control-pane="overview">
+                    <div class="control-status-card">
+                        <div><span class="control-status-dot"></span><div><strong>Подключение не проверено</strong><small>Проверка будет выполняться через защищённый серверный запрос</small></div></div>
+                        <button class="button primary" type="button" data-group-action="check">Проверить подключение</button>
+                    </div>
+                    <div class="control-feature-grid">
+                        <article><span>✎</span><strong>Публикации</strong><small>Текст, медиа, файлы, опросы, закрепление и тихая отправка</small></article>
+                        <article><span>☷</span><strong>Сообщения</strong><small>Просмотр доступных сообщений, удаление и закрепление</small></article>
+                        <article><span>♟</span><strong>Модерация</strong><small>Ограничение, блокировка, разблокировка и права администраторов</small></article>
+                        <article><span>↗</span><strong>Приглашения</strong><small>Заявки, временные ссылки, лимиты входов и отзыв ссылок</small></article>
+                        <article><span>⚙</span><strong>Настройки чата</strong><small>Название, описание, фото, разрешения, темы и реакции</small></article>
+                        <article><span>✦</span><strong>Автоматизация</strong><small>Антиспам, запрещённые слова, приветствие и автоудаление</small></article>
+                    </div>
+                </section>
+                <section class="group-control-pane" data-group-control-pane="publications"><h3>Публикации</h3><p>Отправка текста, фото, видео, файлов и опросов; предпросмотр, закрепление, тихая отправка и планирование.</p></section>
+                <section class="group-control-pane" data-group-control-pane="messages"><h3>Сообщения</h3><p>Последние доступные боту сообщения, поиск, удаление, закрепление, открепление и управление реакциями.</p></section>
+                <section class="group-control-pane" data-group-control-pane="members"><h3>Участники</h3><p>Поиск по Telegram ID, предупреждения, временные ограничения, блокировка, разблокировка и управление администраторами.</p></section>
+                <section class="group-control-pane" data-group-control-pane="invites"><h3>Заявки и приглашения</h3><p>Принятие и отклонение заявок, создание временных и постоянных ссылок, лимиты и отзыв приглашений.</p></section>
+                <section class="group-control-pane" data-group-control-pane="settings"><h3>Настройки группы или канала</h3><p>Название, описание, фотография, права участников, реакции, темы форума и разрешённые типы сообщений.</p></section>
+                <section class="group-control-pane" data-group-control-pane="automation"><h3>Автоматизация и защита</h3><p>Антиспам, фильтр ссылок и слов, капча, приветствие, автоудаление и уведомления администратору.</p></section>
+                <section class="group-control-pane" data-group-control-pane="journal"><h3>Журнал действий</h3><p>История команд, действий модерации, публикаций, ошибок и изменений настроек.</p></section>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="modal group-channel-modal" id="groupChannelModal" aria-hidden="true">
