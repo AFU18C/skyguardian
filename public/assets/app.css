@@ -442,3 +442,120 @@
 .journal-item.success{border-left-color:var(--green)}
 .journal-item>div{display:flex;justify-content:space-between;gap:12px}.journal-item time{color:var(--muted);font-size:11px}.journal-item small{display:block;margin-top:5px;color:var(--muted);white-space:pre-wrap}
 @media(max-width:680px){.telegram-action-form{grid-template-columns:1fr}.telegram-action-form label,.telegram-action-form .full{grid-column:1}.control-action-buttons{display:grid;grid-template-columns:1fr}.control-action-buttons .button{width:100%}.control-permissions{display:grid}.journal-item>div{align-items:flex-start}.journal-item time{white-space:nowrap}}
+
+
+/* Telegram control: consistent responsive form controls */
+.group-control-card button,
+.group-control-card input,
+.group-control-card select,
+.group-control-card textarea{font:inherit}
+.group-control-card select,
+.group-control-card textarea,
+.group-control-card input[type="text"],
+.group-control-card input[type="number"],
+.group-control-card input[type="url"]{
+  width:100%;
+  min-width:0;
+  border:1px solid #293950;
+  border-radius:11px;
+  background:#0b1422;
+  color:var(--text);
+  outline:none;
+  box-shadow:none;
+}
+.group-control-card select,
+.group-control-card input[type="text"],
+.group-control-card input[type="number"],
+.group-control-card input[type="url"]{height:46px;padding:0 13px}
+.group-control-card textarea{min-height:112px;padding:12px 13px;resize:vertical}
+.group-control-card select{
+  appearance:none;
+  -webkit-appearance:none;
+  padding-right:40px;
+  color-scheme:dark;
+  background-image:linear-gradient(45deg,transparent 50%,#8190a6 50%),linear-gradient(135deg,#8190a6 50%,transparent 50%);
+  background-position:calc(100% - 18px) 19px,calc(100% - 13px) 19px;
+  background-size:5px 5px,5px 5px;
+  background-repeat:no-repeat;
+}
+.group-control-card select option{background:#0b1422;color:var(--text)}
+.group-control-card input:focus,
+.group-control-card select:focus,
+.group-control-card textarea:focus{border-color:#3d82f6;box-shadow:0 0 0 3px rgba(61,130,246,.09)}
+.group-control-card input[type="checkbox"]{
+  appearance:none;
+  -webkit-appearance:none;
+  width:20px!important;
+  height:20px!important;
+  min-width:20px!important;
+  min-height:20px!important;
+  flex:0 0 20px;
+  margin:0;
+  padding:0;
+  border:1px solid #526681;
+  border-radius:6px;
+  background:#0d1726;
+  box-shadow:none;
+  cursor:pointer;
+}
+.group-control-card input[type="checkbox"]:checked{border-color:#4285f4;background:#4285f4}
+.group-control-card input[type="checkbox"]:checked::after{
+  content:"✓";
+  display:grid;
+  width:100%;
+  height:100%;
+  place-items:center;
+  color:#fff;
+  font-size:13px;
+  font-weight:900;
+  line-height:1;
+}
+.group-control-card .control-check{
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  min-height:38px;
+  color:#d9e2f0;
+  line-height:1.35;
+}
+.group-control-card .control-action-buttons{align-items:stretch}
+.group-control-card .control-action-buttons .button{min-height:44px;white-space:normal;line-height:1.25}
+.group-control-card .telegram-action-form>label{min-width:0}
+.group-control-card .telegram-action-form>label>span{line-height:1.35}
+
+@media(max-width:680px){
+  .group-control-card{overflow:hidden}
+  .group-control-heading p{overflow-wrap:anywhere;line-height:1.45}
+  .group-control-layout{display:flex;flex-direction:column}
+  .group-control-tabs{
+    flex:0 0 auto;
+    width:100%;
+    scroll-snap-type:x proximity;
+    scrollbar-width:none;
+    overscroll-behavior-x:contain;
+    -webkit-overflow-scrolling:touch;
+  }
+  .group-control-tabs::-webkit-scrollbar{display:none}
+  .group-control-tabs button{scroll-snap-align:start;min-height:44px;padding:10px 14px}
+  .group-control-content{flex:1 1 auto;overflow-y:auto;padding:16px 14px 24px}
+  .group-control-pane h3{font-size:20px;line-height:1.25}
+  .control-note{margin-bottom:14px;font-size:12px}
+  .telegram-action-form{gap:13px;margin-top:14px}
+  .telegram-action-form label{gap:8px;font-size:13px}
+  .group-control-card .control-check{min-height:34px}
+  .group-control-card .control-action-buttons{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:9px;
+  }
+  .group-control-card .control-action-buttons .button{width:100%;padding:10px 8px}
+  .group-control-card .control-action-buttons .button:last-child:nth-child(odd){grid-column:1/-1}
+  .control-permissions{display:grid;grid-template-columns:1fr;gap:12px;padding:14px}
+  .control-permissions .control-check{width:100%}
+}
+@media(max-width:390px){
+  .group-control-card .control-action-buttons{grid-template-columns:1fr}
+  .group-control-card .control-action-buttons .button:last-child:nth-child(odd){grid-column:auto}
+}
