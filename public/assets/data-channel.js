@@ -9,6 +9,7 @@
   const deleteButton = document.querySelector('[data-source-delete]');
   const modalLabel = document.querySelector('[data-source-modal-label]');
   const accountSelect = form.elements.account;
+  const formatSelect = form.elements.publication_format;
   const scope = list.dataset.sourceScope === 'news-sources' ? 'news' : 'alerts';
 
   let csrf = '';
@@ -18,7 +19,6 @@
   const labels = {
     original: 'Оригинал полностью',
     text: 'Только текст',
-    text_without_links: 'Только текст без ссылок',
     media: 'Только медиа',
     text_and_media: 'Текст и медиа'
   };
@@ -28,6 +28,14 @@
     last_5: 'Последние 5 сообщений',
     last_10: 'Последние 10 сообщений',
     last_20: 'Последние 20 сообщений'
+  };
+
+  const normalizeFormat = format => format === 'text_without_links' ? 'text' : format;
+
+  const removeObsoleteFormat = () => {
+    if (!formatSelect) return;
+    const option = formatSelect.querySelector('option[value="text_without_links"]');
+    if (option) option.remove();
   };
 
   const showToast = (message, error = false) => {
@@ -117,6 +125,7 @@
     if (empty) empty.hidden = channels.length > 0;
 
     channels.forEach(channel => {
+      channel.publication_format = normalizeFormat(channel.publication_format);
       const card = document.createElement('article');
       card.className = 'source-card';
       card.dataset.sourceId = channel.id;
@@ -177,6 +186,7 @@
 
   const reset = () => {
     form.reset();
+    removeObsoleteFormat();
     form.elements.source_id.value = '';
     renderAccounts('');
     if (deleteButton) deleteButton.hidden = true;
@@ -197,7 +207,7 @@
     form.elements.source.value = channel.source;
     renderAccounts(channel.account);
     form.elements.destination.value = channel.destination;
-    form.elements.publication_format.value = channel.publication_format;
+    form.elements.publication_format.value = normalizeFormat(channel.publication_format);
     form.elements.check_frequency.value = channel.check_frequency;
     form.elements.check_frequency_unit.value = channel.check_frequency_unit;
     form.elements.processing_start.value = channel.processing_start;
@@ -222,7 +232,7 @@
       source: data.source?.trim() || '',
       account: data.account || '',
       destination: data.destination?.trim() || '',
-      publication_format: data.publication_format || '',
+      publication_format: normalizeFormat(data.publication_format || ''),
       check_frequency: data.check_frequency || '',
       check_frequency_unit: data.check_frequency_unit || 'seconds',
       processing_start: data.processing_start || '',
@@ -245,6 +255,7 @@
     saveButton.textContent = 'Сохраняю…';
     try {
       const result = await request('save', values());
+      result.channel.publication_format = normalizeFormat(result.channel.publication_format);
       const index = channels.findIndex(item => item.id === result.channel.id);
       if (index >= 0) channels[index] = result.channel;
       else channels.push(result.channel);
@@ -259,9 +270,13 @@
 
   const bootstrap = async () => {
     try {
+      removeObsoleteFormat();
       const result = await request('bootstrap', {}, 'GET');
       csrf = result.csrf;
-      channels = Array.isArray(result.channels) ? result.channels : [];
+      channels = Array.isArray(result.channels) ? result.channels.map(channel => ({
+        ...channel,
+        publication_format: normalizeFormat(channel.publication_format)
+      })) : [];
       accounts = Array.isArray(result.accounts) ? result.accounts : [];
       localStorage.removeItem('skyguardian:' + (list.dataset.sourceScope || 'sources') + ':channels');
       renderAccounts('');
