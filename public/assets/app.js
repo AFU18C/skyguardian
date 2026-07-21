@@ -221,7 +221,173 @@ techDeleteButton?.addEventListener('click', () => {
 });
 
 const groupChannelModal = $('#groupChannelModal');
-$('[data-add-group-channel]')?.addEventListener('click', () => openModal(groupChannelModal));
+const groupChannelForm = $('[data-group-channel-form]');
+const groupChannelList = $('[data-group-channel-list]');
+const groupChannelEmpty = $('[data-group-channel-empty]');
+const groupChannelDelete = $('[data-group-channel-delete]');
+const groupChannelSave = $('[data-group-channel-save]');
+const groupChannelModalLabel = $('[data-group-channel-modal-label]');
+const groupChannelStorageKey = 'skyguardian:group:channels';
+let groupChannels = [];
+
+function readGroupChannels() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(groupChannelStorageKey) || '[]');
+    groupChannels = Array.isArray(saved) ? saved : [];
+  } catch {
+    groupChannels = [];
+  }
+}
+
+function writeGroupChannels() {
+  try {
+    localStorage.setItem(groupChannelStorageKey, JSON.stringify(groupChannels));
+  } catch {
+    toast('Не удалось сохранить данные в браузере');
+  }
+}
+
+function maskBotToken(token) {
+  const value = String(token || '');
+  if (!value) return 'Не указан';
+  if (value.length <= 10) return value.slice(0, 3) + '••••' + value.slice(-2);
+  return value.slice(0, 6) + '••••••••' + value.slice(-4);
+}
+
+function createGroupChannelCard(item) {
+  const card = document.createElement('article');
+  card.className = 'source-card';
+  card.dataset.groupChannelId = item.id;
+
+  const icon = document.createElement('div');
+  icon.className = 'source-card-icon';
+  icon.textContent = '✈';
+
+  const info = document.createElement('div');
+  info.className = 'source-card-info';
+  const name = document.createElement('strong');
+  name.textContent = item.name;
+  const route = document.createElement('span');
+  route.textContent = item.link + ' · Chat ID: ' + item.chat_id;
+  const details = document.createElement('small');
+  details.textContent = 'Токен: ' + maskBotToken(item.bot_token) + ' · Администратор: ' + item.admin_id;
+  info.append(name, route, details);
+
+  const status = document.createElement('span');
+  status.className = 'status-pill on';
+  status.append(document.createElement('i'), document.createTextNode('Добавлен'));
+
+  const edit = document.createElement('button');
+  edit.className = 'source-edit-button';
+  edit.type = 'button';
+  edit.title = 'Редактировать';
+  edit.setAttribute('aria-label', 'Редактировать канал ' + item.name);
+  edit.textContent = '✎';
+  edit.addEventListener('click', () => openGroupChannelEditor(item.id));
+
+  card.append(icon, info, status, edit);
+  return card;
+}
+
+function renderGroupChannels() {
+  if (!groupChannelList) return;
+  groupChannelList.querySelectorAll('[data-group-channel-id]').forEach(card => card.remove());
+  if (groupChannelEmpty) groupChannelEmpty.hidden = groupChannels.length > 0;
+  groupChannels.forEach(item => groupChannelList.append(createGroupChannelCard(item)));
+}
+
+function resetGroupChannelForm() {
+  if (!groupChannelForm) return;
+  groupChannelForm.reset();
+  groupChannelForm.elements.group_channel_id.value = '';
+  groupChannelForm.elements.bot_token.required = true;
+  groupChannelForm.elements.bot_token.placeholder = '123456789:AA...';
+  groupChannelDelete.hidden = true;
+  groupChannelSave.textContent = 'Добавить';
+  groupChannelModalLabel.textContent = 'ДОБАВЛЕНИЕ КАНАЛА';
+}
+
+function openGroupChannelEditor(id) {
+  const item = groupChannels.find(channel => channel.id === id);
+  if (!item || !groupChannelForm) return;
+  resetGroupChannelForm();
+  groupChannelForm.elements.group_channel_id.value = item.id;
+  groupChannelForm.elements.name.value = item.name;
+  groupChannelForm.elements.link.value = item.link;
+  groupChannelForm.elements.chat_id.value = item.chat_id;
+  groupChannelForm.elements.admin_id.value = item.admin_id;
+  groupChannelForm.elements.bot_token.value = '';
+  groupChannelForm.elements.bot_token.required = false;
+  groupChannelForm.elements.bot_token.placeholder = maskBotToken(item.bot_token) + ' — оставить без изменений';
+  groupChannelDelete.hidden = false;
+  groupChannelSave.textContent = 'Сохранить';
+  groupChannelModalLabel.textContent = 'РЕДАКТИРОВАНИЕ КАНАЛА';
+  openModal(groupChannelModal);
+}
+
+$('[data-add-group-channel]')?.addEventListener('click', () => {
+  resetGroupChannelForm();
+  openModal(groupChannelModal);
+});
+
+groupChannelForm?.addEventListener('submit', event => {
+  event.preventDefault();
+  if (!groupChannelForm.checkValidity()) {
+    groupChannelForm.reportValidity();
+    toast('Заполните обязательные поля');
+    return;
+  }
+
+  const values = Object.fromEntries(new FormData(groupChannelForm));
+  if (!/^-?\d+$/.test(values.chat_id.trim())) {
+    toast('Укажите корректный Telegram Chat ID');
+    groupChannelForm.elements.chat_id.focus();
+    return;
+  }
+  if (!/^\d+$/.test(values.admin_id.trim())) {
+    toast('Укажите корректный ID администратора');
+    groupChannelForm.elements.admin_id.focus();
+    return;
+  }
+
+  const existing = groupChannels.find(item => item.id === values.group_channel_id);
+  const token = values.bot_token.trim() || existing?.bot_token || '';
+  if (!token) {
+    toast('Укажите токен бота');
+    groupChannelForm.elements.bot_token.focus();
+    return;
+  }
+
+  const item = {
+    id: values.group_channel_id || (globalThis.crypto?.randomUUID?.() || String(Date.now())),
+    name: values.name.trim(),
+    link: values.link.trim(),
+    chat_id: values.chat_id.trim(),
+    bot_token: token,
+    admin_id: values.admin_id.trim()
+  };
+
+  const index = groupChannels.findIndex(channel => channel.id === item.id);
+  if (index >= 0) groupChannels[index] = item;
+  else groupChannels.push(item);
+  writeGroupChannels();
+  renderGroupChannels();
+  closeModal(groupChannelModal);
+  toast('Сохранено');
+});
+
+groupChannelDelete?.addEventListener('click', () => {
+  const id = groupChannelForm?.elements.group_channel_id.value;
+  if (!id) return;
+  groupChannels = groupChannels.filter(item => item.id !== id);
+  writeGroupChannels();
+  renderGroupChannels();
+  closeModal(groupChannelModal);
+  toast('Удалено');
+});
+
+readGroupChannels();
+renderGroupChannels();
 
 const sourceModal = $('#sourceModal');
 const sourceForm = $('[data-source-form]');
