@@ -26,17 +26,23 @@
   };
 
   const isWorkerUnresponsive = state => {
-    if (!state.worker_seen_at || state.status === 'paused') return false;
+    if (!state.enabled || state.status === 'paused' || state.status === 'error') return false;
 
-    const seenAt = new Date(state.worker_seen_at).getTime();
-    if (Number.isNaN(seenAt)) return false;
-
+    const now = Date.now();
+    const intervalMs = Math.max(1000, Number(state.interval_seconds || 60) * 1000);
+    const toleranceMs = Math.max(90000, Math.min(300000, Math.ceil(intervalMs * 0.5)));
     const nextCheckAt = state.next_check_at ? new Date(state.next_check_at).getTime() : NaN;
-    const deadline = Number.isNaN(nextCheckAt)
-      ? seenAt + 30000
-      : Math.max(seenAt + 30000, nextCheckAt + 30000);
+    const seenAt = state.worker_seen_at ? new Date(state.worker_seen_at).getTime() : NaN;
 
-    return Date.now() > deadline;
+    if (state.status === 'checking') {
+      return !Number.isNaN(seenAt) && now > seenAt + 120000;
+    }
+
+    if (!Number.isNaN(nextCheckAt)) {
+      return now > nextCheckAt + toleranceMs;
+    }
+
+    return !Number.isNaN(seenAt) && now > seenAt + intervalMs + toleranceMs;
   };
 
   const paint = (card, state) => {
