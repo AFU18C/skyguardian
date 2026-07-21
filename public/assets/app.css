@@ -360,3 +360,35 @@
  .control-status-card .button{width:100%}
  .control-feature-grid{grid-template-columns:1fr}
 }
+
+
+/* Telegram connection verification */
+.control-status-card.checking .control-status-dot { background:#f5b942; box-shadow:0 0 0 6px rgba(245,185,66,.12); animation:pulse 1.2s infinite; }
+.control-status-card.success .control-status-dot { background:#35d07f; box-shadow:0 0 0 6px rgba(53,208,127,.12); }
+.control-status-card.warning .control-status-dot { background:#f5b942; box-shadow:0 0 0 6px rgba(245,185,66,.12); }
+.control-status-card.error .control-status-dot { background:#ff5d68; box-shadow:0 0 0 6px rgba(255,93,104,.12); }
+.control-status-card.success { border-color:rgba(53,208,127,.3); }
+.control-status-card.warning { border-color:rgba(245,185,66,.3); }
+.control-status-card.error { border-color:rgba(255,93,104,.3); }
+.telegram-check-details { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:14px 0 18px; }
+.telegram-check-details[hidden] { display:none; }
+.telegram-check-details article { min-width:0; padding:14px 15px; border:1px solid rgba(142,160,196,.16); border-radius:14px; background:rgba(12,18,34,.72); }
+.telegram-check-details article small { display:block; margin-bottom:6px; color:#8491aa; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.telegram-check-details article strong { display:block; overflow-wrap:anywhere; color:#f4f7ff; font-size:14px; line-height:1.4; }
+.telegram-check-details .telegram-rights-card { grid-column:1/-1; }
+.telegram-rights-card > div { display:flex; flex-wrap:wrap; gap:7px; }
+.telegram-rights-card span { padding:6px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+.telegram-rights-card span.available { color:#68dfa0; background:rgba(53,208,127,.1); border:1px solid rgba(53,208,127,.2); }
+.telegram-rights-card span.missing { color:#ff8790; background:rgba(255,93,104,.08); border:1px solid rgba(255,93,104,.16); }
+.telegram-checked-at { grid-column:1/-1; color:#74819a; text-align:right; }
+@keyframes pulse { 50% { opacity:.45; transform:scale(.88); } }
+@media (max-width:760px) {
+  .telegram-check-details { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .telegram-check-details article { padding:12px; }
+  .telegram-check-details .telegram-rights-card { grid-column:1/-1; }
+  .telegram-checked-at { text-align:left; }
+}
+@media (max-width:420px) {
+  .telegram-check-details { grid-template-columns:1fr; }
+  .telegram-check-details .telegram-rights-card,.telegram-checked-at { grid-column:auto; }
+}
