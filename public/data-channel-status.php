@@ -13,7 +13,7 @@ session_set_cookie_params([
 session_start();
 
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
 $reply = static function (int $status, array $payload): never {
     http_response_code($status);
@@ -64,9 +64,10 @@ foreach ($channels as $channel) {
     if ($id === '') continue;
     $state = is_array($states[$id] ?? null) ? $states[$id] : [];
     $result[$id] = [
-        'status' => (string) ($state['status'] ?? ($channel['enabled'] ?? true ? 'waiting' : 'paused')),
+        'status' => (string) ($state['status'] ?? (($channel['enabled'] ?? true) ? 'waiting' : 'paused')),
         'last_check_at' => $state['last_check_at'] ?? null,
         'last_publish_at' => $state['last_publish_at'] ?? null,
+        'worker_seen_at' => $state['worker_seen_at'] ?? null,
         'last_message_id' => (int) ($state['last_message_id'] ?? 0),
         'published_count' => (int) ($state['published_count'] ?? 0),
         'last_error' => isset($state['last_error']) ? mb_substr((string) $state['last_error'], 0, 500) : null,
