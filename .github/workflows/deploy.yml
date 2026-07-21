@@ -58,7 +58,7 @@ jobs:
             target=/var/www/SkyGuardianUa
             test "$target" = /var/www/SkyGuardianUa
             install -d -m 755 "$target"
-            install -d -m 750 "$target/storage"
+            install -d -m 2770 "$target/storage"
             rm -rf "$target/public.next"
             install -d "$target/public.next"
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
@@ -66,13 +66,15 @@ jobs:
             chmod 750 "$target/artisan"
             if getent group www-data >/dev/null 2>&1; then
               chgrp www-data "$target/storage"
-              chmod 750 "$target/storage"
+              chmod 2770 "$target/storage"
+              install -d -m 2770 -o root -g www-data "$target/storage/backups"
               if test -f "$target/storage/admin.json"; then
                 chgrp www-data "$target/storage/admin.json"
                 chmod 640 "$target/storage/admin.json"
               fi
             else
-              chmod 755 "$target/storage"
+              chmod 777 "$target/storage"
+              install -d -m 777 "$target/storage/backups"
               if test -f "$target/storage/admin.json"; then
                 chmod 644 "$target/storage/admin.json"
               fi
@@ -82,6 +84,7 @@ jobs:
             rm -f /tmp/skyguardian-release.tar.gz
             test -f "$target/public/index.php"
             test -f "$target/artisan"
+            test -w "$target/storage/backups"
             nginx_site=/etc/nginx/sites-enabled/skyguardian
             if test -w "$nginx_site"; then
               sed -i -E "/fastcgi_param SG_ADMIN_(EMAIL|PASSWORD)/d" "$nginx_site"
