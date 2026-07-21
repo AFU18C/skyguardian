@@ -1,0 +1,88 @@
+checked_at_utc=2026-07-21T01:36:01Z
+=== OS_AND_DISK ===
+Linux bigxaos.whost.systems 6.8.0-136-generic #136-Ubuntu SMP PREEMPT_DYNAMIC Wed Jul  1 21:53:05 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/vda2      ext4   35G  5.2G   28G  16% /
+=== VAR_WWW ===
+d /var/www/html
+d /var/www/SkyGuardianUa
+f /var/www/html/index.nginx-debian.html
+4.0K	/var/www/SkyGuardianUa
+8.0K	/var/www/html
+16K	/var/www
+=== LARGE_TOP_LEVEL ===
+4.0K	/bin.usr-is-merged
+4.0K	/cdrom
+4.0K	/home
+4.0K	/lib.usr-is-merged
+4.0K	/media
+4.0K	/mnt
+4.0K	/opt
+4.0K	/sbin.usr-is-merged
+4.0K	/srv
+8.0K	/snap
+16K	/lost+found
+2.5M	/tmp
+7.9M	/etc
+50M	/root
+200M	/boot
+775M	/var
+3.1G	/usr
+5.2G	/
+=== NGINX_SITES ===
+/etc/nginx/sites-available:
+total 20
+drwxr-xr-x 2 root root 4096 Jul 20 21:19 .
+drwxr-xr-x 8 root root 4096 Jul 20 21:12 ..
+-rw-r--r-- 1 root root 2412 Nov 30  2023 default
+-rw-r--r-- 1 root root 1396 Jul 20 21:19 skyguardian
+-rw-r--r-- 1 root root 1411 Jul 20 21:12 skyguardian.backup-20260720-211925
+
+/etc/nginx/sites-enabled:
+total 8
+drwxr-xr-x 2 root root 4096 Jul 20 21:12 .
+drwxr-xr-x 8 root root 4096 Jul 20 21:12 ..
+lrwxrwxrwx 1 root root   38 Jul 20 21:12 skyguardian -> /etc/nginx/sites-available/skyguardian
+=== APACHE_SITES ===
+=== MYSQL_DATABASES ===
+ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (2)
+=== POSTGRES_DATABASES ===
+sudo: unknown user postgres
+sudo: error initializing audit plugin sudoers_audit
+=== DOCKER ===
+bash: line 9: docker: command not found
+bash: line 9: docker: command not found
+=== SERVICES ===
+  cron.service                loaded active running Regular background program processing daemon
+  dbus.service                loaded active running D-Bus System Message Bus
+  fail2ban.service            loaded active running Fail2Ban Service
+  getty@tty1.service          loaded active running Getty on tty1
+  ModemManager.service        loaded active running Modem Manager
+  multipathd.service          loaded active running Device-Mapper Multipath Device Controller
+  nginx.service               loaded active running A high performance web server and a reverse proxy server
+  php8.3-fpm.service          loaded active running The PHP 8.3 FastCGI Process Manager
+  polkit.service              loaded active running Authorization Manager
+  qemu-guest-agent.service    loaded active running QEMU Guest Agent
+  rsyslog.service             loaded active running System Logging Service
+  ssh.service                 loaded active running OpenBSD Secure Shell server
+  supervisor.service          loaded active running Supervisor process control system for UNIX
+  systemd-journald.service    loaded active running Journal Service
+  systemd-logind.service      loaded active running User Login Management
+  systemd-networkd.service    loaded active running Network Configuration
+  systemd-resolved.service    loaded active running Network Name Resolution
+  systemd-timesyncd.service   loaded active running Network Time Synchronization
+  systemd-udevd.service       loaded active running Rule-based Manager for Device Events and Files
+  udisks2.service             loaded active running Disk Manager
+  unattended-upgrades.service loaded active running Unattended Upgrades Shutdown
+  upower.service              loaded active running Daemon for power management
+  user@0.service              loaded active running User Manager for UID 0
+=== CRON ===
+no crontab for root
+total 28
+drwxr-xr-x   2 root root 4096 Jul 18 22:49 .
+drwxr-xr-x 119 root root 4096 Jul 19 01:33 ..
+-rw-r--r--   1 root root  802 Apr 16  2023 certbot
+-rw-r--r--   1 root root  201 Apr  8  2024 e2scrub_all
+-rw-r--r--   1 root root  712 Jan 19  2024 php
+-rw-r--r--   1 root root  102 Apr 23  2024 .placeholder
+-rw-r--r--   1 root root  396 Apr 23  2024 sysstat
