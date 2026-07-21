@@ -57,11 +57,13 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'set -eu
             target=/var/www/SkyGuardianUa
             test "$target" = /var/www/SkyGuardianUa
-            install -d -m 755 "$target"\n            install -d -m 700 "$target/storage"
+            install -d -m 755 "$target"
+            install -d -m 700 "$target/storage"
             rm -rf "$target/public.next"
             install -d "$target/public.next"
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
-            chmod 755 "$target"\n            chmod 750 "$target/artisan"
+            chmod 755 "$target"
+            chmod 750 "$target/artisan"
             chmod 700 "$target/storage"
             find "$target/public" -type d -exec chmod 755 {} +
             find "$target/public" -type f -exec chmod 644 {} +
