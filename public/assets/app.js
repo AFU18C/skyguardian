@@ -236,6 +236,7 @@ function openGroupControl(id) {
   resetTelegramCheck();
   restoreSavedTelegramCheck(item);
   renderTelegramJournal();
+  restoreAutomationForm(item);
   openModal(groupControlModal);
 }
 
@@ -1126,3 +1127,99 @@ rebootConfirmButton?.addEventListener('click', async () => {
     rebootConfirmButton.textContent = 'Перезагрузить';
   }
 });
+
+
+const telegramAutomationForm = $('[data-telegram-automation-form]');
+const telegramAutomationResult = $('[data-automation-result]');
+const telegramAutomationStatus = $('[data-automation-status]');
+const telegramAutomationCheck = $('[data-automation-check]');
+
+function restoreAutomationForm(item) {
+  if (!telegramAutomationForm || !item) return;
+  const settings = item.automation_settings || {};
+  for (const element of telegramAutomationForm.elements) {
+    if (!element.name || element.name === 'operation') continue;
+    if (element.type === 'checkbox') {
+      if (Object.prototype.hasOwnProperty.call(settings, element.name)) element.checked = Boolean(settings[element.name]);
+    } else if (Object.prototype.hasOwnProperty.call(settings, element.name)) {
+      element.value = String(settings[element.name]);
+    }
+  }
+  setAutomationStatus(item.automation_status || null);
+  if (telegramAutomationResult) telegramAutomationResult.hidden = true;
+}
+
+function setAutomationStatus(status) {
+  if (!telegramAutomationStatus) return;
+  telegramAutomationStatus.classList.remove('success', 'warning', 'error');
+  const strong = telegramAutomationStatus.querySelector('strong');
+  const text = telegramAutomationStatus.querySelector('p');
+  if (!status) {
+    if (strong) strong.textContent = 'Автоматизация не настроена';
+    if (text) text.textContent = 'Выберите функции и сохраните настройки. Для постоянной работы рекомендуется webhook.';
+    return;
+  }
+  const error = status.telegram?.last_error_message || '';
+  telegramAutomationStatus.classList.add(error ? 'error' : (status.enabled ? 'success' : 'warning'));
+  if (strong) strong.textContent = error ? 'Webhook сообщил об ошибке' : (status.enabled ? 'Автоматизация включена' : 'Автоматизация выключена');
+  if (text) {
+    const pending = Number(status.telegram?.pending_update_count || 0);
+    text.textContent = error || ('Режим: ' + (status.mode === 'polling' ? 'polling' : 'webhook') + (pending ? ' · ожидают обработки: ' + pending : ''));
+  }
+}
+
+function automationSettingsFromForm(form) {
+  const data = new FormData(form);
+  const settings = {};
+  for (const element of form.elements) {
+    if (!element.name || element.name === 'operation') continue;
+    settings[element.name] = element.type === 'checkbox' ? element.checked : String(data.get(element.name) || '');
+  }
+  return settings;
+}
+
+async function submitAutomation(operation) {
+  const item = groupChannels.find(channel => channel.id === activeGroupControlId);
+  if (!telegramAutomationForm || !item) return;
+  if (item.connection_status !== 'success') { toast('Сначала успешно проверьте подключение бота'); return; }
+  const body = new FormData(telegramAutomationForm);
+  body.set('_token', telegramCheckButton?.dataset.csrf || '');
+  body.set('bot_token', item.bot_token || '');
+  body.set('chat_id', item.chat_id || '');
+  body.set('operation', operation);
+  const buttons = [...telegramAutomationForm.querySelectorAll('button')];
+  buttons.forEach(button => { button.disabled = true; });
+  if (telegramAutomationResult) telegramAutomationResult.hidden = true;
+  try {
+    const response = await fetch('/?action=telegram-automation', { method: 'POST', credentials: 'same-origin', body });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.message || 'Не удалось применить автоматизацию');
+    if (operation === 'save') item.automation_settings = automationSettingsFromForm(telegramAutomationForm);
+    item.automation_status = payload.result || null;
+    writeGroupChannels();
+    setAutomationStatus(item.automation_status);
+    if (telegramAutomationResult) {
+      telegramAutomationResult.className = 'telegram-action-result full success';
+      telegramAutomationResult.textContent = payload.message;
+      telegramAutomationResult.hidden = false;
+    }
+    addTelegramJournal(operation === 'save' ? 'Автоматизация' : 'Проверка автоматизации', payload.message);
+    toast(payload.message);
+  } catch (error) {
+    if (telegramAutomationResult) {
+      telegramAutomationResult.className = 'telegram-action-result full error';
+      telegramAutomationResult.textContent = error.message || 'Ошибка автоматизации';
+      telegramAutomationResult.hidden = false;
+    }
+    addTelegramJournal('Ошибка автоматизации', error.message || 'Не удалось выполнить запрос', false);
+    setAutomationStatus({ enabled: false, telegram: { last_error_message: error.message || 'Ошибка' } });
+  } finally {
+    buttons.forEach(button => { button.disabled = false; });
+  }
+}
+
+telegramAutomationForm?.addEventListener('submit', event => {
+  event.preventDefault();
+  submitAutomation('save');
+});
+telegramAutomationCheck?.addEventListener('click', () => submitAutomation('status'));
