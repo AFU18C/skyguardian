@@ -807,7 +807,8 @@ groupChannelForm?.addEventListener('submit', event => {
     connection_status: connectionChanged ? 'unverified' : (existing?.connection_status || 'unverified'),
     connection_checked_at: connectionChanged ? null : (existing?.connection_checked_at || null),
     connection_message: connectionChanged ? '' : (existing?.connection_message || ''),
-    connection_details: connectionChanged ? null : (existing?.connection_details || null)
+    connection_details: connectionChanged ? null : (existing?.connection_details || null),
+    group_enabled: existing?.group_enabled !== false
   };
 
   const index = groupChannels.findIndex(channel => channel.id === item.id);
