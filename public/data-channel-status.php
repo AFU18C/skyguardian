@@ -63,8 +63,9 @@ foreach ($channels as $channel) {
     $id = (string) ($channel['id'] ?? '');
     if ($id === '') continue;
     $state = is_array($states[$id] ?? null) ? $states[$id] : [];
+    $enabled = (bool) ($channel['enabled'] ?? true);
     $result[$id] = [
-        'status' => (string) ($state['status'] ?? (($channel['enabled'] ?? true) ? 'waiting' : 'paused')),
+        'status' => $enabled ? (string) ($state['status'] ?? 'waiting') : 'paused',
         'last_check_at' => $state['last_check_at'] ?? null,
         'last_publish_at' => $state['last_publish_at'] ?? null,
         'worker_seen_at' => $state['worker_seen_at'] ?? null,
