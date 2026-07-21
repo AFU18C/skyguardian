@@ -220,6 +220,34 @@ techDeleteButton?.addEventListener('click', () => {
   if (pendingTechDeleteId) openModal($('#deleteModal'));
 });
 
+const groupControlModal = $('#groupControlModal');
+const groupControlTitle = $('[data-group-control-title]');
+const groupControlMeta = $('[data-group-control-meta]');
+let activeGroupControlId = null;
+
+function openGroupControl(id) {
+  const item = groupChannels.find(channel => channel.id === id);
+  if (!item) return;
+  activeGroupControlId = id;
+  if (groupControlTitle) groupControlTitle.textContent = item.name;
+  if (groupControlMeta) groupControlMeta.textContent = item.link + ' · Chat ID: ' + item.chat_id;
+  document.querySelectorAll('[data-group-control-tab]').forEach((button, index) => button.classList.toggle('active', index === 0));
+  document.querySelectorAll('[data-group-control-pane]').forEach((pane, index) => pane.classList.toggle('active', index === 0));
+  openModal(groupControlModal);
+}
+
+document.querySelectorAll('[data-group-control-tab]').forEach(button => {
+  button.addEventListener('click', () => {
+    const tab = button.dataset.groupControlTab;
+    document.querySelectorAll('[data-group-control-tab]').forEach(item => item.classList.toggle('active', item === button));
+    document.querySelectorAll('[data-group-control-pane]').forEach(pane => pane.classList.toggle('active', pane.dataset.groupControlPane === tab));
+  });
+});
+
+$('[data-group-action="check"]')?.addEventListener('click', () => {
+  toast('Серверное подключение Telegram будет добавлено следующим этапом');
+});
+
 const groupChannelModal = $('#groupChannelModal');
 const groupChannelForm = $('[data-group-channel-form]');
 const groupChannelList = $('[data-group-channel-list]');
@@ -277,6 +305,12 @@ function createGroupChannelCard(item) {
   status.className = 'status-pill on';
   status.append(document.createElement('i'), document.createTextNode('Добавлен'));
 
+  const manage = document.createElement('button');
+  manage.className = 'button group-manage-button';
+  manage.type = 'button';
+  manage.textContent = 'Управление';
+  manage.addEventListener('click', () => openGroupControl(item.id));
+
   const edit = document.createElement('button');
   edit.className = 'source-edit-button';
   edit.type = 'button';
@@ -285,7 +319,7 @@ function createGroupChannelCard(item) {
   edit.textContent = '✎';
   edit.addEventListener('click', () => openGroupChannelEditor(item.id));
 
-  card.append(icon, info, status, edit);
+  card.append(icon, info, status, manage, edit);
   return card;
 }
 
