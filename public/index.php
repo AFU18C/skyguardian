@@ -19,6 +19,154 @@ $requestedPage = $_GET['page'] ?? null;
 $action = $_GET['action'] ?? null;
 $isAuthenticated = ($_SESSION['admin_authenticated'] ?? false) === true;
 
+
+if ($action === 'telegram-manage' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    $reply = static function (int $status, array $payload): never {
+        http_response_code($status);
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    };
+    if (!$isAuthenticated) $reply(401, ['ok' => false, 'message' => 'Требуется авторизация.']);
+    if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), (string) ($_POST['_token'] ?? ''))) {
+        $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
+    }
+
+    $botToken = trim((string) ($_POST['bot_token'] ?? ''));
+    $chatId = trim((string) ($_POST['chat_id'] ?? ''));
+    $command = trim((string) ($_POST['command'] ?? ''));
+    if (!preg_match('/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $botToken) || !preg_match('/^-?\d+$/', $chatId)) {
+        $reply(422, ['ok' => false, 'message' => 'Проверьте токен и Chat ID.']);
+    }
+
+    $telegramRequest = static function (string $method, array $fields = []) use ($botToken): mixed {
+        $handle = curl_init('https://api.telegram.org/bot' . $botToken . '/' . $method);
+        curl_setopt_array($handle, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($fields),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        ]);
+        $body = curl_exec($handle);
+        $error = curl_error($handle);
+        $code = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        curl_close($handle);
+        if ($body === false || $error !== '') throw new RuntimeException('Telegram недоступен с VPS.');
+        $data = json_decode((string) $body, true);
+        if (!is_array($data) || $code >= 400 || ($data['ok'] ?? false) !== true) {
+            throw new RuntimeException((string) ($data['description'] ?? 'Telegram отклонил команду.'));
+        }
+        return $data['result'] ?? true;
+    };
+
+    try {
+        $result = true;
+        $message = 'Команда выполнена.';
+        $messageId = trim((string) ($_POST['message_id'] ?? ''));
+        $userId = trim((string) ($_POST['user_id'] ?? ''));
+        $requireId = static function (string $value, string $label) use ($reply): string {
+            if (!preg_match('/^\d+$/', $value)) $reply(422, ['ok' => false, 'message' => 'Укажите корректный ' . $label . '.']);
+            return $value;
+        };
+
+        switch ($command) {
+            case 'message-delete':
+                $telegramRequest('deleteMessage', ['chat_id' => $chatId, 'message_id' => $requireId($messageId, 'Message ID')]);
+                $message = 'Сообщение удалено.';
+                break;
+            case 'message-pin':
+                $telegramRequest('pinChatMessage', ['chat_id' => $chatId, 'message_id' => $requireId($messageId, 'Message ID'), 'disable_notification' => 'true']);
+                $message = 'Сообщение закреплено.';
+                break;
+            case 'message-unpin':
+                $telegramRequest('unpinChatMessage', ['chat_id' => $chatId, 'message_id' => $requireId($messageId, 'Message ID')]);
+                $message = 'Сообщение откреплено.';
+                break;
+            case 'member-info':
+                $result = $telegramRequest('getChatMember', ['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID')]);
+                $message = 'Данные участника получены.';
+                break;
+            case 'member-restrict':
+                $until = time() + max(60, min(31536000, (int) ($_POST['duration'] ?? 3600)));
+                $telegramRequest('restrictChatMember', ['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID'), 'permissions' => json_encode(['can_send_messages' => false], JSON_UNESCAPED_UNICODE), 'until_date' => $until]);
+                $message = 'Участник временно ограничен.';
+                break;
+            case 'member-unrestrict':
+                $permissions = ['can_send_messages' => true, 'can_send_audios' => true, 'can_send_documents' => true, 'can_send_photos' => true, 'can_send_videos' => true, 'can_send_video_notes' => true, 'can_send_voice_notes' => true, 'can_send_polls' => true, 'can_send_other_messages' => true, 'can_add_web_page_previews' => true, 'can_change_info' => false, 'can_invite_users' => true, 'can_pin_messages' => false, 'can_manage_topics' => false];
+                $telegramRequest('restrictChatMember', ['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID'), 'permissions' => json_encode($permissions, JSON_UNESCAPED_UNICODE)]);
+                $message = 'Ограничения участника сняты.';
+                break;
+            case 'member-ban':
+                $telegramRequest('banChatMember', ['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID'), 'revoke_messages' => isset($_POST['revoke_messages']) ? 'true' : 'false']);
+                $message = 'Участник заблокирован.';
+                break;
+            case 'member-unban':
+                $telegramRequest('unbanChatMember', ['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID'), 'only_if_banned' => 'true']);
+                $message = 'Участник разблокирован.';
+                break;
+            case 'member-promote':
+                $rights = ['can_manage_chat' => true, 'can_delete_messages' => true, 'can_restrict_members' => true, 'can_invite_users' => true, 'can_pin_messages' => true, 'can_manage_topics' => true];
+                $telegramRequest('promoteChatMember', array_merge(['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID')], $rights));
+                $message = 'Участник назначен администратором.';
+                break;
+            case 'member-demote':
+                $rights = ['can_manage_chat' => false, 'can_delete_messages' => false, 'can_restrict_members' => false, 'can_invite_users' => false, 'can_pin_messages' => false, 'can_manage_topics' => false, 'can_promote_members' => false, 'can_change_info' => false, 'can_manage_video_chats' => false];
+                $telegramRequest('promoteChatMember', array_merge(['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID')], $rights));
+                $message = 'Права администратора сняты.';
+                break;
+            case 'invite-create':
+                $fields = ['chat_id' => $chatId, 'creates_join_request' => isset($_POST['join_request']) ? 'true' : 'false'];
+                $name = trim((string) ($_POST['name'] ?? ''));
+                if ($name !== '') $fields['name'] = mb_substr($name, 0, 32);
+                $hours = max(0, min(8760, (int) ($_POST['hours'] ?? 0)));
+                $limit = max(0, min(99999, (int) ($_POST['member_limit'] ?? 0)));
+                if ($hours > 0) $fields['expire_date'] = time() + $hours * 3600;
+                if ($limit > 0 && !isset($_POST['join_request'])) $fields['member_limit'] = $limit;
+                $result = $telegramRequest('createChatInviteLink', $fields);
+                $message = 'Ссылка-приглашение создана.';
+                break;
+            case 'invite-revoke':
+                $link = trim((string) ($_POST['invite_link'] ?? ''));
+                if ($link === '') $reply(422, ['ok' => false, 'message' => 'Вставьте ссылку для отзыва.']);
+                $result = $telegramRequest('revokeChatInviteLink', ['chat_id' => $chatId, 'invite_link' => $link]);
+                $message = 'Ссылка отозвана.';
+                break;
+            case 'join-approve':
+            case 'join-decline':
+                $method = $command === 'join-approve' ? 'approveChatJoinRequest' : 'declineChatJoinRequest';
+                $telegramRequest($method, ['chat_id' => $chatId, 'user_id' => $requireId($userId, 'Telegram User ID')]);
+                $message = $command === 'join-approve' ? 'Заявка одобрена.' : 'Заявка отклонена.';
+                break;
+            case 'settings-title':
+                $title = trim((string) ($_POST['value'] ?? ''));
+                if ($title === '') $reply(422, ['ok' => false, 'message' => 'Введите новое название.']);
+                $telegramRequest('setChatTitle', ['chat_id' => $chatId, 'title' => mb_substr($title, 0, 128)]);
+                $message = 'Название обновлено.';
+                break;
+            case 'settings-description':
+                $telegramRequest('setChatDescription', ['chat_id' => $chatId, 'description' => mb_substr(trim((string) ($_POST['value'] ?? '')), 0, 255)]);
+                $message = 'Описание обновлено.';
+                break;
+            case 'settings-permissions':
+                $allowed = isset($_POST['allow_messages']);
+                $permissions = ['can_send_messages' => $allowed, 'can_send_audios' => $allowed && isset($_POST['allow_media']), 'can_send_documents' => $allowed && isset($_POST['allow_media']), 'can_send_photos' => $allowed && isset($_POST['allow_media']), 'can_send_videos' => $allowed && isset($_POST['allow_media']), 'can_send_video_notes' => $allowed && isset($_POST['allow_media']), 'can_send_voice_notes' => $allowed && isset($_POST['allow_media']), 'can_send_polls' => $allowed && isset($_POST['allow_polls']), 'can_send_other_messages' => $allowed && isset($_POST['allow_media']), 'can_add_web_page_previews' => $allowed && isset($_POST['allow_links']), 'can_invite_users' => isset($_POST['allow_invites']), 'can_pin_messages' => false, 'can_change_info' => false, 'can_manage_topics' => false];
+                $telegramRequest('setChatPermissions', ['chat_id' => $chatId, 'permissions' => json_encode($permissions, JSON_UNESCAPED_UNICODE)]);
+                $message = 'Разрешения участников обновлены.';
+                break;
+            default:
+                $reply(422, ['ok' => false, 'message' => 'Неизвестная команда управления.']);
+        }
+
+        $reply(200, ['ok' => true, 'message' => $message, 'result' => $result, 'performed_at' => (new DateTimeImmutable('now', new DateTimeZone('Europe/Kyiv')))->format(DATE_ATOM)]);
+    } catch (RuntimeException $exception) {
+        $reply(422, ['ok' => false, 'message' => $exception->getMessage()]);
+    } catch (Throwable) {
+        $reply(503, ['ok' => false, 'message' => 'Не удалось выполнить команду Telegram.']);
+    }
+}
+
 if ($action === 'telegram-publish' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
     $reply = static function (int $status, array $payload): never {
@@ -372,7 +520,7 @@ if ($isPublicLanding || $isLoginRequest) {
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
     <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=30">
+    <link rel="stylesheet" href="/assets/app.css?v=31">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
@@ -713,12 +861,65 @@ function active(string $current, string $target): string
                         <button class="button primary full" type="submit" data-csrf="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">Отправить в Telegram</button>
                     </form>
                 </section>
-                <section class="group-control-pane" data-group-control-pane="messages"><h3>Сообщения</h3><p>Последние доступные боту сообщения, поиск, удаление, закрепление, открепление и управление реакциями.</p></section>
-                <section class="group-control-pane" data-group-control-pane="members"><h3>Участники</h3><p>Поиск по Telegram ID, предупреждения, временные ограничения, блокировка, разблокировка и управление администраторами.</p></section>
-                <section class="group-control-pane" data-group-control-pane="invites"><h3>Заявки и приглашения</h3><p>Принятие и отклонение заявок, создание временных и постоянных ссылок, лимиты и отзыв приглашений.</p></section>
-                <section class="group-control-pane" data-group-control-pane="settings"><h3>Настройки группы или канала</h3><p>Название, описание, фотография, права участников, реакции, темы форума и разрешённые типы сообщений.</p></section>
-                <section class="group-control-pane" data-group-control-pane="automation"><h3>Автоматизация и защита</h3><p>Антиспам, фильтр ссылок и слов, капча, приветствие, автоудаление и уведомления администратору.</p></section>
-                <section class="group-control-pane" data-group-control-pane="journal"><h3>Журнал действий</h3><p>История команд, действий модерации, публикаций, ошибок и изменений настроек.</p></section>
+                <section class="group-control-pane" data-group-control-pane="messages">
+                    <h3>Управление сообщениями</h3>
+                    <p class="control-note">Telegram не отдаёт боту произвольную историю. Укажите Message ID из сообщения, которое бот получил или отправил.</p>
+                    <form class="telegram-action-form" data-telegram-action-form>
+                        <input type="hidden" name="command" value="message-pin">
+                        <label class="full"><span>Message ID</span><input name="message_id" inputmode="numeric" pattern="[0-9]+" required placeholder="Например, 125"></label>
+                        <div class="control-action-buttons full"><button class="button secondary" type="submit" data-command="message-pin">Закрепить</button><button class="button secondary" type="submit" data-command="message-unpin">Открепить</button><button class="button danger" type="submit" data-command="message-delete" data-confirm="Удалить сообщение без возможности восстановления?">Удалить</button></div>
+                        <div class="telegram-action-result full" data-action-result hidden></div>
+                    </form>
+                </section>
+                <section class="group-control-pane" data-group-control-pane="members">
+                    <h3>Участники и модерация</h3>
+                    <form class="telegram-action-form" data-telegram-action-form>
+                        <input type="hidden" name="command" value="member-info">
+                        <label><span>Telegram User ID</span><input name="user_id" inputmode="numeric" pattern="[0-9]+" required placeholder="5012107873"></label>
+                        <label><span>Ограничить на</span><select name="duration"><option value="3600">1 час</option><option value="86400">1 сутки</option><option value="604800">7 суток</option><option value="2592000">30 суток</option></select></label>
+                        <label class="control-check full"><input name="revoke_messages" type="checkbox"> Удалить сообщения при блокировке</label>
+                        <div class="control-action-buttons full"><button class="button secondary" type="submit" data-command="member-info">Проверить</button><button class="button secondary" type="submit" data-command="member-restrict">Ограничить</button><button class="button secondary" type="submit" data-command="member-unrestrict">Снять ограничения</button><button class="button danger" type="submit" data-command="member-ban" data-confirm="Заблокировать участника?">Заблокировать</button><button class="button secondary" type="submit" data-command="member-unban">Разблокировать</button><button class="button secondary" type="submit" data-command="member-promote" data-confirm="Назначить участника администратором?">Сделать администратором</button><button class="button secondary" type="submit" data-command="member-demote" data-confirm="Снять права администратора?">Снять права</button></div>
+                        <div class="telegram-action-result full" data-action-result hidden></div>
+                    </form>
+                </section>
+                <section class="group-control-pane" data-group-control-pane="invites">
+                    <h3>Заявки и приглашения</h3>
+                    <form class="telegram-action-form" data-telegram-action-form>
+                        <input type="hidden" name="command" value="invite-create">
+                        <label><span>Название ссылки</span><input name="name" maxlength="32" placeholder="Основная"></label>
+                        <label><span>Срок действия, часов</span><input name="hours" type="number" min="0" max="8760" value="0"></label>
+                        <label><span>Лимит входов</span><input name="member_limit" type="number" min="0" max="99999" value="0"></label>
+                        <label class="control-check"><input name="join_request" type="checkbox"> Вход только по заявке</label>
+                        <div class="control-action-buttons full"><button class="button primary" type="submit" data-command="invite-create">Создать ссылку</button></div>
+                        <label class="full"><span>Ссылка для отзыва</span><input name="invite_link" type="url" placeholder="https://t.me/+..."></label>
+                        <div class="control-action-buttons full"><button class="button danger" type="submit" data-command="invite-revoke" data-confirm="Отозвать эту ссылку?">Отозвать ссылку</button></div>
+                        <label class="full"><span>User ID заявки</span><input name="user_id" inputmode="numeric" pattern="[0-9]+" placeholder="Telegram User ID"></label>
+                        <div class="control-action-buttons full"><button class="button secondary" type="submit" data-command="join-approve">Одобрить заявку</button><button class="button secondary" type="submit" data-command="join-decline">Отклонить заявку</button></div>
+                        <div class="telegram-action-result full" data-action-result hidden></div>
+                    </form>
+                </section>
+                <section class="group-control-pane" data-group-control-pane="settings">
+                    <h3>Настройки группы или канала</h3>
+                    <form class="telegram-action-form" data-telegram-action-form>
+                        <input type="hidden" name="command" value="settings-title">
+                        <label class="full"><span>Название</span><input name="value" maxlength="128" placeholder="Новое название"></label>
+                        <div class="control-action-buttons full"><button class="button primary" type="submit" data-command="settings-title">Изменить название</button></div>
+                        <label class="full"><span>Описание</span><textarea name="description" rows="4" maxlength="255" placeholder="Описание чата"></textarea></label>
+                        <div class="control-action-buttons full"><button class="button secondary" type="submit" data-command="settings-description" data-value-field="description">Изменить описание</button></div>
+                        <div class="control-permissions full"><strong>Разрешения участников</strong><label class="control-check"><input name="allow_messages" type="checkbox" checked> Сообщения</label><label class="control-check"><input name="allow_media" type="checkbox" checked> Медиа и файлы</label><label class="control-check"><input name="allow_polls" type="checkbox" checked> Опросы</label><label class="control-check"><input name="allow_links" type="checkbox" checked> Ссылки</label><label class="control-check"><input name="allow_invites" type="checkbox" checked> Приглашения</label></div>
+                        <div class="control-action-buttons full"><button class="button secondary" type="submit" data-command="settings-permissions" data-confirm="Применить новые разрешения ко всем участникам?">Сохранить разрешения</button></div>
+                        <div class="telegram-action-result full" data-action-result hidden></div>
+                    </form>
+                </section>
+                <section class="group-control-pane" data-group-control-pane="automation">
+                    <h3>Автоматизация и защита</h3>
+                    <div class="automation-status"><strong>Требуется приём обновлений Telegram</strong><p>Антиспам, капча, приветствие, фильтры и автоудаление работают только через webhook или постоянный серверный polling. В текущем безопасном режиме они не включаются фиктивно.</p></div>
+                    <div class="control-feature-grid compact"><article><span>⌁</span><strong>Антиспам</strong><small>Массовые сообщения и флуд</small></article><article><span>⊘</span><strong>Фильтр</strong><small>Ссылки и запрещённые слова</small></article><article><span>✓</span><strong>Капча</strong><small>Проверка новых участников</small></article><article><span>✦</span><strong>Приветствие</strong><small>Сообщение новым участникам</small></article></div>
+                </section>
+                <section class="group-control-pane" data-group-control-pane="journal">
+                    <div class="journal-heading"><h3>Журнал действий</h3><button class="button secondary" type="button" data-journal-clear>Очистить</button></div>
+                    <div class="telegram-journal" data-telegram-journal><div class="empty-state"><strong>Действий пока нет</strong></div></div>
+                </section>
             </div>
         </div>
     </div>
