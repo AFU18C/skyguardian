@@ -75,25 +75,31 @@ jobs:
             chmod 755 "$target"
             chmod 755 "$target/artisan"
             if ! grep -q "telegram-account.js" "$target/public/index.php"; then
-              sed -i "s#<script src=\"assets/app.js?v=38\"></script>#<script src=\"assets/app.js?v=38\"></script><script src=\"assets/telegram-account.js?v=1\"></script>#" "$target/public/index.php"
+              sed -i "s#<script src=\"assets/app.js?v=38\"></script>#<script src=\"assets/app.js?v=38\"></script><script src=\"assets/telegram-account.js?v=2\"></script>#" "$target/public/index.php"
+            else
+              sed -i -E "s#telegram-account.js\?v=[0-9]+#telegram-account.js?v=2#g" "$target/public/index.php"
             fi
             if getent group www-data >/dev/null 2>&1; then
               chgrp www-data "$target/storage"
               chmod 2770 "$target/storage"
               install -d -m 2770 -o root -g www-data "$target/storage/backups"
               install -d -m 2770 -o root -g www-data "$target/storage/telegram-sessions"
+              install -d -m 2770 -o root -g www-data "$target/storage/telegram-news-sessions"
               if test -f "$target/storage/admin.json"; then
                 chgrp www-data "$target/storage/admin.json"
                 chmod 640 "$target/storage/admin.json"
               fi
-              if test -f "$target/storage/telegram-accounts.json"; then
-                chown www-data:www-data "$target/storage/telegram-accounts.json"
-                chmod 600 "$target/storage/telegram-accounts.json"
-              fi
+              for account_file in telegram-accounts.json telegram-news-accounts.json; do
+                if test -f "$target/storage/$account_file"; then
+                  chown www-data:www-data "$target/storage/$account_file"
+                  chmod 600 "$target/storage/$account_file"
+                fi
+              done
             else
               chmod 777 "$target/storage"
               install -d -m 777 "$target/storage/backups"
               install -d -m 777 "$target/storage/telegram-sessions"
+              install -d -m 777 "$target/storage/telegram-news-sessions"
               if test -f "$target/storage/admin.json"; then
                 chmod 644 "$target/storage/admin.json"
               fi
@@ -108,9 +114,10 @@ jobs:
             test -f "$target/public/assets/telegram-account.js"
             test -f "$target/artisan"
             test -f "$target/vendor/autoload.php"
-            grep -q "telegram-account.js" "$target/public/index.php"
+            grep -q "telegram-account.js?v=2" "$target/public/index.php"
             test -w "$target/storage/backups"
             test -w "$target/storage/telegram-sessions"
+            test -w "$target/storage/telegram-news-sessions"
             nginx_site=/etc/nginx/sites-enabled/skyguardian
             if test -w "$nginx_site"; then
               sed -i -E "/fastcgi_param SG_ADMIN_(EMAIL|PASSWORD)/d" "$nginx_site"
