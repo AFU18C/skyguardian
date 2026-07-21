@@ -1,0 +1,53 @@
+name: Check SkyGuardian server load
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/server-load.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SKYGUARDIAN_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Read server load
+        env:
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+          SSH_USER: ${{ secrets.SKYGUARDIAN_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" '
+            echo "=== UPTIME_AND_LOAD ==="
+            uptime
+            echo "=== CPU ==="
+            nproc
+            top -bn1 | head -n 5
+            echo "=== MEMORY ==="
+            free -h
+            echo "=== DISK ==="
+            df -hT /
+            echo "=== SWAP ==="
+            swapon --show || true
+            echo "=== TOP_CPU ==="
+            ps -eo pid,comm,%cpu,%mem --sort=-%cpu | head -n 11
+            echo "=== TOP_MEMORY ==="
+            ps -eo pid,comm,%cpu,%mem --sort=-%mem | head -n 11
+          '
