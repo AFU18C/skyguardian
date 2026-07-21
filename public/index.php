@@ -225,8 +225,8 @@ function active(string $current, string $target): string
             <?php elseif ($isSettings): ?>
                 <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Настройка</h1></div><button class="button primary add-connection-button" type="button" data-tooltip="Технический аккаунт и API" aria-label="Добавить технический аккаунт и API" data-add-connection>Добавить</button></section>
 
-                <article class="panel technical-accounts-panel">
-                    <div class="empty-state"><div>◇</div><strong>Технических аккаунтов пока нет</strong></div>
+                <article class="panel technical-accounts-panel" data-tech-list data-tech-scope="<?= htmlspecialchars($page, ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="empty-state" data-tech-empty><div>◇</div><strong>Технических аккаунтов пока нет</strong></div>
                 </article>
             <?php else: ?>
                 <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
@@ -290,7 +290,8 @@ function active(string $current, string $target): string
     <div class="modal-backdrop" data-modal-close></div>
     <div class="modal-card connection-modal-card" role="dialog" aria-modal="true" aria-labelledby="connectionTitle">
         <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
-        <div class="connection-modal-heading"><span class="step-label">ДОБАВЛЕНИЕ ПОДКЛЮЧЕНИЯ</span><h2 id="connectionTitle">Технический аккаунт и API</h2><p>Сначала сохраните данные Telegram API, затем подключите технический аккаунт.</p></div>
+        <div class="connection-modal-heading"><span class="step-label" data-tech-modal-label>ДОБАВЛЕНИЕ ПОДКЛЮЧЕНИЯ</span><h2 id="connectionTitle">Технический аккаунт и API</h2><p>Укажите данные Telegram API и подключите технический аккаунт.</p></div>
+                <input type="hidden" name="tech_account_id" value="" data-tech-account-id>
                 <section class="workspace-grid">
                     <article class="panel api-panel">
                         <div class="panel-head"><div><span class="step-label">ШАГ 1</span><h2>Telegram API</h2><p>Данные приложения из my.telegram.org</p></div><span class="status-pill off"><i></i>Не настроено</span></div>
@@ -298,7 +299,7 @@ function active(string $current, string $target): string
                             <label class="full"><span>Название подключения</span><input name="name" placeholder="Например: Основной API"></label>
                             <label><span>API ID</span><input name="api_id" inputmode="numeric" placeholder="12345678"></label>
                             <label><span>API Hash</span><div class="input-action"><input name="api_hash" type="password" placeholder="Введите API Hash"><button type="button" data-password>◉</button></div></label>
-                            <div class="form-actions full"><span class="form-hint">Все поля обязательны</span><button class="button primary" type="submit">Сохранить API</button></div>
+                            <div class="form-actions full"><span class="form-hint">Все поля обязательны</span><button class="button secondary" type="button" data-api-check>Проверить API</button></div>
                         </form>
                     </article>
 
@@ -310,10 +311,14 @@ function active(string $current, string $target): string
                         <div class="account-closed"><div class="empty-inline"><span>◇</span><div><strong>Аккаунт не подключён</strong><p>Сохраните API, затем подключитесь по QR-коду.</p></div></div><button class="button secondary" type="button" data-qr disabled>Подключить по QR-коду</button></div>
                         <div class="account-details" data-account-details>
                             <div class="details-grid"><label><span>Имя аккаунта</span><input value="Не подключён" disabled></label><label><span>Telegram ID</span><input value="—" disabled></label><label><span>Номер телефона</span><input value="—" disabled></label><label><span>Дата подключения</span><input value="—" disabled></label></div>
-                            <div class="form-actions danger-row"><button class="button danger" type="button" data-confirm-delete>Удалить</button><button class="button primary" type="button" data-save-account>Сохранить</button></div>
+                            
                         </div>
                     </article>
                 </section>
+                <div class="form-actions connection-form-actions">
+                    <button class="button danger" type="button" data-tech-delete hidden>Удалить</button>
+                    <button class="button primary" type="button" data-tech-save>Сохранить</button>
+                </div>
     </div>
 </div>
 
@@ -330,6 +335,6 @@ function active(string $current, string $target): string
 
 <div class="modal" id="deleteModal" aria-hidden="true"><div class="modal-backdrop" data-modal-close></div><div class="modal-card compact"><button class="modal-close" data-modal-close>×</button><div class="warning-icon">!</div><h2>Удалить аккаунт?</h2><p>Это демонстрационное окно подтверждения. На этапе функционала действие будет необратимым.</p><div class="modal-actions"><button class="button ghost" data-modal-close>Отмена</button><button class="button danger" data-delete>Удалить</button></div></div></div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=8"></script>
+<script src="assets/app.js?v=9"></script>
 </body>
 </html>
