@@ -1,0 +1,18 @@
+[Unit]
+Description=SkyGuardian Telegram polling
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/SkyGuardianUa
+ExecStart=/usr/bin/php /var/www/SkyGuardianUa/bin/telegram-poll.php
+Restart=always
+RestartSec=2
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
