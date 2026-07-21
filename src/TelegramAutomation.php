@@ -75,6 +75,52 @@ final class TelegramAutomation
         return $this->publicConfig($config, $webhookUrl);
     }
 
+    public function setGroupEnabled(string $token, string $chatId, bool $enabled, string $baseUrl): array
+    {
+        if (!preg_match('/^\\d{6,12}:[A-Za-z0-9_-]{30,}$/', $token) || !preg_match('/^-?\\d+$/', $chatId)) {
+            throw new InvalidArgumentException('Проверьте токен и Chat ID.');
+        }
+        $configs = $this->readJson($this->configFile);
+        $key = hash('sha256', $token . ':' . $chatId);
+        $config = is_array($configs[$key] ?? null) ? $configs[$key] : [
+            'id' => $key,
+            'secret' => bin2hex(random_bytes(24)),
+            'bot_token' => $token,
+            'chat_id' => $chatId,
+            'mode' => 'webhook',
+            'anti_spam' => false,
+            'spam_limit' => 5,
+            'spam_window' => 10,
+            'spam_mute' => 3600,
+            'filter_links' => false,
+            'forbidden_words' => [],
+            'captcha' => false,
+            'captcha_timeout' => 120,
+            'welcome' => false,
+            'welcome_text' => '',
+            'welcome_delete_after' => 0,
+            'violation_delete' => true,
+        ];
+        $config['enabled'] = $enabled;
+        $config['updated_at'] = date(DATE_ATOM);
+        $configs[$key] = $config;
+        $this->writeJson($this->configFile, $configs);
+        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret']);
+        if ($enabled && ($config['mode'] ?? 'webhook') === 'webhook') {
+            $this->api($token, 'setWebhook', ['url' => $webhookUrl, 'secret_token' => $config['secret'], 'allowed_updates' => json_encode(['message', 'callback_query', 'chat_member'], JSON_UNESCAPED_SLASHES), 'drop_pending_updates' => 'false']);
+        } else {
+            $this->api($token, 'deleteWebhook', ['drop_pending_updates' => 'false']);
+        }
+        if (!$enabled) {
+            $state = $this->readJson($this->stateFile);
+            $state['delete'] = array_values(array_filter((array)($state['delete'] ?? []), static fn($item): bool => (string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId));
+            $state['captcha'] = array_filter((array)($state['captcha'] ?? []), static fn($item): bool => (string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId);
+            $this->writeJson($this->stateFile, $state);
+        }
+        $this->logRaw($enabled ? 'group_enabled' : 'group_disabled', ['chat_id' => $chatId]);
+        return $this->publicConfig($config, $webhookUrl);
+    }
+
     public function findBySecret(string $secret): ?array
     {
         foreach ($this->readJson($this->configFile) as $config) {
