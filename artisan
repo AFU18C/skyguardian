@@ -33,6 +33,15 @@ function secret(string $label): string {
     return rtrim($value === false ? '' : $value, "\r\n");
 }
 
+function characterLength(string $value): int {
+    if (function_exists('mb_strlen')) {
+        return mb_strlen($value, 'UTF-8');
+    }
+
+    $count = preg_match_all('/./us', $value, $matches);
+    return $count === false ? strlen($value) : $count;
+}
+
 $email = prompt('Введите почту администратора: ');
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     fwrite(STDERR, "Ошибка: введите корректную почту.\n");
@@ -45,8 +54,9 @@ if ($password !== $confirmation) {
     fwrite(STDERR, "Ошибка: пароли не совпадают.\n");
     exit(1);
 }
-if (strlen($password) < 12) {
-    fwrite(STDERR, "Ошибка: пароль должен содержать не менее 12 символов.\n");
+$passwordLength = characterLength($password);
+if ($passwordLength < 6 || $passwordLength > 20) {
+    fwrite(STDERR, "Ошибка: пароль должен содержать от 6 до 20 символов.\n");
     exit(1);
 }
 
