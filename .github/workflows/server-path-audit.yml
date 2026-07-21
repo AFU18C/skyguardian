@@ -36,7 +36,10 @@ jobs:
             echo "NGINX_SITE_PATHS"
             find /etc/nginx/sites-enabled -maxdepth 1 -type f -o -type l 2>/dev/null | sort
             echo "SKYGUARDIAN_CONFIG"
-            grep -R -n -E "server_name|root " /etc/nginx/sites-enabled 2>/dev/null || true
+            sed -n "1,140p" /etc/nginx/sites-enabled/skyguardian 2>/dev/null || true
+            echo "LOCAL_HTTP_CHECK"
+            curl -sS -D - -H "Host: skyguardian.pp.ua" http://127.0.0.1/?page=login -o /tmp/sky-audit-body || true
+            sed -n "1,12p" /tmp/sky-audit-body 2>/dev/null || true
             echo "DEPLOYED_FILES"
             find /var/www/SkyGuardianUa -maxdepth 3 -type f -printf "%p\n" 2>/dev/null | sort
           '
