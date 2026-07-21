@@ -233,6 +233,7 @@ function openGroupControl(id) {
   if (groupControlMeta) groupControlMeta.textContent = item.link + ' · Chat ID: ' + item.chat_id;
   document.querySelectorAll('[data-group-control-tab]').forEach((button, index) => button.classList.toggle('active', index === 0));
   document.querySelectorAll('[data-group-control-pane]').forEach((pane, index) => pane.classList.toggle('active', index === 0));
+  resetTelegramCheck();
   openModal(groupControlModal);
 }
 
@@ -244,8 +245,107 @@ document.querySelectorAll('[data-group-control-tab]').forEach(button => {
   });
 });
 
-$('[data-group-action="check"]')?.addEventListener('click', () => {
-  toast('Серверное подключение Telegram будет добавлено следующим этапом');
+const telegramCheckButton = $('[data-group-action="check"]');
+const telegramStatusCard = $('[data-telegram-status]');
+const telegramStatusTitle = $('[data-telegram-status-title]');
+const telegramStatusText = $('[data-telegram-status-text]');
+const telegramDetails = $('[data-telegram-details]');
+
+function setTelegramCheckState(state, title, text) {
+  if (telegramStatusCard) {
+    telegramStatusCard.classList.remove('checking', 'success', 'warning', 'error');
+    if (state) telegramStatusCard.classList.add(state);
+  }
+  if (telegramStatusTitle) telegramStatusTitle.textContent = title;
+  if (telegramStatusText) telegramStatusText.textContent = text;
+}
+
+function resetTelegramCheck() {
+  setTelegramCheckState('', 'Подключение не проверено', 'Нажмите кнопку, чтобы проверить бота и его права');
+  if (telegramDetails) telegramDetails.hidden = true;
+  if (telegramCheckButton) {
+    telegramCheckButton.disabled = false;
+    telegramCheckButton.textContent = 'Проверить подключение';
+  }
+}
+
+function renderTelegramRights(rights) {
+  const container = $('[data-telegram-rights]');
+  if (!container) return;
+  container.replaceChildren();
+  const labels = {
+    can_manage_chat: 'Управление чатом',
+    can_delete_messages: 'Удаление сообщений',
+    can_manage_video_chats: 'Видеочаты',
+    can_restrict_members: 'Ограничение участников',
+    can_promote_members: 'Назначение администраторов',
+    can_change_info: 'Изменение данных',
+    can_invite_users: 'Приглашения',
+    can_post_messages: 'Публикация',
+    can_edit_messages: 'Редактирование сообщений',
+    can_pin_messages: 'Закрепление',
+    can_manage_topics: 'Темы'
+  };
+  Object.entries(labels).forEach(([key, label]) => {
+    const badge = document.createElement('span');
+    badge.className = rights?.[key] ? 'available' : 'missing';
+    badge.textContent = (rights?.[key] ? '✓ ' : '× ') + label;
+    container.append(badge);
+  });
+}
+
+telegramCheckButton?.addEventListener('click', async () => {
+  const item = groupChannels.find(channel => channel.id === activeGroupControlId);
+  if (!item || telegramCheckButton.disabled) return;
+
+  telegramCheckButton.disabled = true;
+  telegramCheckButton.textContent = 'Проверяю…';
+  setTelegramCheckState('checking', 'Проверяем подключение', 'Запрашиваем данные чата и права бота');
+  if (telegramDetails) telegramDetails.hidden = true;
+
+  try {
+    const body = new URLSearchParams({
+      _token: telegramCheckButton.dataset.csrf || '',
+      bot_token: item.bot_token || '',
+      chat_id: item.chat_id || ''
+    });
+    const response = await fetch('/?action=telegram-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      credentials: 'same-origin',
+      body
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.message || 'Не удалось проверить подключение');
+
+    const isAdmin = Boolean(result.membership?.is_administrator);
+    setTelegramCheckState(
+      isAdmin ? 'success' : 'warning',
+      isAdmin ? 'Бот подключён' : 'Недостаточно прав',
+      result.message || ''
+    );
+
+    const setText = (selector, value) => {
+      const element = $(selector);
+      if (element) element.textContent = value || '—';
+    };
+    const botUsername = result.bot?.username ? '@' + result.bot.username : result.bot?.name;
+    const chatUsername = result.chat?.username ? ' (@' + result.chat.username + ')' : '';
+    setText('[data-telegram-bot]', (botUsername || 'Без username') + ' · ID ' + (result.bot?.id || '—'));
+    setText('[data-telegram-chat]', (result.chat?.title || 'Без названия') + chatUsername);
+    setText('[data-telegram-type]', result.chat?.type_label || result.chat?.type);
+    setText('[data-telegram-members]', result.chat?.member_count == null ? 'Недоступно' : String(result.chat.member_count));
+    setText('[data-telegram-checked-at]', 'Проверено: ' + (result.checked_at || 'только что'));
+    renderTelegramRights(result.membership?.rights || {});
+    if (telegramDetails) telegramDetails.hidden = false;
+    toast(isAdmin ? 'Telegram подключён' : 'Боту нужны права администратора');
+  } catch (error) {
+    setTelegramCheckState('error', 'Ошибка подключения', error.message || 'Не удалось проверить Telegram');
+    toast(error.message || 'Не удалось проверить подключение');
+  } finally {
+    telegramCheckButton.disabled = false;
+    telegramCheckButton.textContent = 'Проверить снова';
+  }
 });
 
 const groupChannelModal = $('#groupChannelModal');
