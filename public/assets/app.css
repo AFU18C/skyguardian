@@ -297,16 +297,22 @@
   .server-reboot-button{width:100%;min-height:48px}
 }
 
-.backup-state{color:#8b99ad;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.backup-metric{display:grid;grid-template-columns:42px minmax(0,1fr);column-gap:14px;align-items:center}
+.backup-metric .metric-top{display:contents}
+.backup-metric .metric-icon{grid-column:1;grid-row:1 / span 2}
+.backup-state{grid-column:2;grid-row:1;justify-self:end;color:#8b99ad;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
 .backup-state.ready{color:#55dda9}
-.backup-metric>p{min-height:0;margin-bottom:13px;color:#aab6c6;font-size:12px;font-weight:700}
-.backup-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;padding:9px 13px;font-size:11px}
+.backup-metric>strong{grid-column:2;grid-row:1;align-self:end;padding-right:92px}
+.backup-metric>p{grid-column:2;grid-row:2;align-self:start;min-height:0;margin:5px 0 0;color:#aab6c6;font-size:12px;font-weight:700}
+.backup-button{grid-column:1 / -1;display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:42px;margin-top:16px;padding:10px 14px;font-size:11px}
 .backup-button:disabled{cursor:wait;opacity:.7}
 
 @media(max-width:640px){
-  .server-metric.backup-metric{min-height:132px}
-  .backup-metric .metric-top{float:none;display:flex;margin:0 0 10px}
-  .backup-metric>strong{position:absolute;left:71px;top:19px;padding:0}
-  .backup-metric>p{position:absolute;left:71px;top:41px;margin:0}
-  .backup-button{clear:both;width:100%;margin-top:8px}
+  .server-metric.backup-metric{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:13px;min-height:0;padding:14px}
+  .backup-metric .metric-top{display:contents;float:none;margin:0}
+  .backup-metric .metric-icon{grid-column:1;grid-row:1 / span 2}
+  .backup-state{grid-column:2;grid-row:1;align-self:start;justify-self:end;margin-top:2px;font-size:10px}
+  .backup-metric>strong{position:static;grid-column:2;grid-row:1;align-self:end;padding:0 78px 0 0}
+  .backup-metric>p{position:static;grid-column:2;grid-row:2;align-self:start;margin:5px 0 0}
+  .backup-button{grid-column:1 / -1;clear:none;width:100%;min-height:46px;margin-top:14px}
 }
