@@ -27,9 +27,9 @@ $indexContent = file_get_contents($index);
 if ($indexContent === false) throw new RuntimeException('Cannot read index.php');
 $indexContent = str_replace('<option value="text_without_links">Только текст без ссылок</option>', '', $indexContent);
 if (!str_contains($indexContent, 'site-theme.css')) {
-    $indexContent = str_replace('</head>', '<link rel="stylesheet" href="/assets/site-theme.css?v=2"></head>', $indexContent);
+    $indexContent = str_replace('</head>', '<link rel="stylesheet" href="/assets/site-theme.css?v=3"></head>', $indexContent);
 } else {
-    $indexContent = preg_replace('~site-theme\.css\?v=\d+~', 'site-theme.css?v=2', $indexContent) ?? $indexContent;
+    $indexContent = preg_replace('~site-theme\.css\?v=\d+~', 'site-theme.css?v=3', $indexContent) ?? $indexContent;
 }
 if (!str_contains($indexContent, 'site-theme.js')) {
     $indexContent = str_replace('</body>', '<script src="/assets/site-theme.js?v=2"></script></body>', $indexContent);
