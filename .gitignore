@@ -2,3 +2,6 @@
 *.log
 .idea/
 .vscode/
+storage/telegram-automation.json
+storage/telegram-automation-state.json
+storage/telegram-polling-offsets.json
