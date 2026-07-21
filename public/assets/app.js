@@ -85,12 +85,74 @@ function syncFrequencyLimits() {
 frequencyUnit?.addEventListener('change', syncFrequencyLimits);
 syncFrequencyLimits();
 
+const customTextToggle = $('[data-custom-text-toggle]');
+const customTextEditor = $('[data-custom-text-editor]');
+const customTextInput = $('[data-custom-text-input]');
+const customTextPosition = $('[data-custom-text-position]');
+const customTextPreview = $('[data-custom-text-preview]');
+const customTextPreviewContent = $('[data-custom-text-preview-content]');
+
+function renderCustomTextPreview() {
+  if (!customTextPreviewContent) return;
+  customTextPreviewContent.replaceChildren();
+  const source = document.createElement('span');
+  source.className = 'preview-source';
+  source.textContent = 'Пример текста сообщения из канала';
+  const custom = document.createElement('span');
+  custom.className = 'preview-custom';
+  custom.textContent = customTextInput?.value.trim() || 'Ваш собственный текст';
+  const divider = document.createElement('span');
+  divider.className = 'preview-divider';
+  if (customTextPosition?.value === 'before') customTextPreviewContent.append(custom, divider, source);
+  else customTextPreviewContent.append(source, divider, custom);
+}
+
+customTextToggle?.addEventListener('change', () => {
+  customTextEditor.hidden = !customTextToggle.checked;
+  if (!customTextToggle.checked) customTextPreview.hidden = true;
+  if (customTextToggle.checked) customTextInput?.focus();
+  renderCustomTextPreview();
+});
+
+$('[data-custom-text-preview-button]')?.addEventListener('click', () => {
+  customTextPreview.hidden = !customTextPreview.hidden;
+  renderCustomTextPreview();
+});
+customTextInput?.addEventListener('input', renderCustomTextPreview);
+customTextPosition?.addEventListener('change', renderCustomTextPreview);
+
+$('[data-editor-wrap]').forEach(button => button.addEventListener('click', () => {
+  if (!customTextInput) return;
+  const marker = button.dataset.editorWrap;
+  const start = customTextInput.selectionStart;
+  const end = customTextInput.selectionEnd;
+  const selected = customTextInput.value.slice(start, end) || 'текст';
+  customTextInput.setRangeText(marker + selected + marker, start, end, 'select');
+  customTextInput.focus();
+  customTextInput.dispatchEvent(new Event('input'));
+}));
+
+$('[data-editor-link]')?.addEventListener('click', () => {
+  if (!customTextInput) return;
+  const start = customTextInput.selectionStart;
+  const end = customTextInput.selectionEnd;
+  const selected = customTextInput.value.slice(start, end) || 'текст ссылки';
+  customTextInput.setRangeText('[' + selected + '](https://)', start, end, 'select');
+  customTextInput.focus();
+  customTextInput.dispatchEvent(new Event('input'));
+});
+
 const sourceForm = $('[data-source-form]');
 sourceForm?.addEventListener('submit', event => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(sourceForm));
   if (!values.name?.trim() || !values.source?.trim() || !values.account?.trim()) {
     toast('Заполните все поля канала данных');
+    return;
+  }
+  if (customTextToggle?.checked && !values.custom_text?.trim()) {
+    toast('Введите собственный текст');
+    customTextInput?.focus();
     return;
   }
   closeModal($('#sourceModal'));
