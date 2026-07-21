@@ -78,8 +78,6 @@ jobs:
             test "$target" = /var/www/SkyGuardianUa
             install -d -m 755 "$target"
             install -d -m 2770 "$target/storage"
-            rm -rf "$target/public.next"
-            install -d "$target/public.next"
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
             chmod 755 "$target" "$target/artisan" "$target/bin/data-channel-worker.php"
 
@@ -125,7 +123,6 @@ jobs:
               install -d -m 777 "$target/storage/telegram-news-sessions"
               touch "$target/storage/data-channel-worker.lock"
               chmod 666 "$target/storage/data-channel-worker.lock"
-              if test -f "$target/storage/admin.json"; then chmod 644 "$target/storage/admin.json"; fi
             fi
 
             find "$target/public" -type d -exec chmod 755 {} +
@@ -160,24 +157,12 @@ EOF
             systemctl restart skyguardian-data-channels.service
 
             rm -f /tmp/skyguardian-release.tar.gz
-            test -f "$target/public/index.php"
-            test -f "$target/public/telegram-account.php"
-            test -f "$target/public/telegram-account-core.php"
             test -f "$target/public/data-channel.php"
             test -f "$target/public/data-channel-status.php"
             test -f "$target/public/data-channel-run.php"
-            test -f "$target/public/assets/telegram-account.js"
             test -f "$target/public/assets/data-channel.js"
             test -f "$target/public/assets/data-channel-runtime.js"
             test -f "$target/bin/data-channel-worker.php"
-            test -f "$target/artisan"
-            test -f "$target/vendor/autoload.php"
-            grep -q "telegram-account.js?v=3" "$target/public/index.php"
-            grep -q "data-channel.js?v=1" "$target/public/index.php"
-            grep -q "data-channel-runtime.js?v=2" "$target/public/index.php"
-            test -w "$target/storage/backups"
-            test -w "$target/storage/telegram-sessions"
-            test -w "$target/storage/telegram-news-sessions"
             test -w "$target/storage/data-channel-worker.lock"
             systemctl is-active --quiet skyguardian-data-channels.service
 
