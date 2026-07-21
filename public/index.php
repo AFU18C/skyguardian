@@ -249,7 +249,7 @@ function active(string $current, string $target): string
             <label class="full"><span>Технический аккаунт</span><select name="account" required><option value="">Выберите аккаунт</option><option value="demo">Подключённый технический аккаунт</option></select></label>
             <label class="full"><span>Канал или группа для публикации</span><input name="destination" placeholder="@destination_channel или ссылка" required></label>
             <label class="full"><span>Формат публикации</span><select name="publication_format" required><option value="">Выберите формат публикации</option><option value="original">Оригинал полностью</option><option value="text">Только текст</option><option value="text_without_links">Только текст без ссылок</option><option value="media">Только медиа</option><option value="text_and_media">Текст и медиа</option></select></label>
-            <label class="full"><span>Частота проверки</span><select name="check_frequency" required><option value="">Выберите частоту проверки</option><option value="3">Каждые 3 секунды</option><option value="5">Каждые 5 секунд</option><option value="10">Каждые 10 секунд</option><option value="15">Каждые 15 секунд</option><option value="30">Каждые 30 секунд</option><option value="60">Каждую минуту</option><option value="300">Каждые 5 минут</option><option value="600">Каждые 10 минут</option><option value="900">Каждые 15 минут</option><option value="1800">Каждые 30 минут</option><option value="3600">Каждый час</option><option value="10800">Каждые 3 часа</option><option value="21600">Каждые 6 часов</option><option value="43200">Каждые 12 часов</option><option value="86400">Каждые 24 часа</option></select></label>
+            <label class="full"><span>Частота проверки</span><div class="frequency-control"><input name="check_frequency" type="number" inputmode="numeric" min="3" max="86400" step="1" placeholder="Введите частоту" required data-frequency-value><select name="check_frequency_unit" aria-label="Единица частоты проверки" required data-frequency-unit><option value="seconds">Секунды</option><option value="hours">Часы</option></select></div><small class="form-hint" data-frequency-hint>Допустимо: от 3 до 86 400 секунд</small></label>
             <div class="form-actions full"><span class="form-hint">Все поля обязательны</span><button class="button primary" type="submit">Добавить</button></div>
         </form>
     </div>
@@ -299,6 +299,6 @@ function active(string $current, string $target): string
 
 <div class="modal" id="deleteModal" aria-hidden="true"><div class="modal-backdrop" data-modal-close></div><div class="modal-card compact"><button class="modal-close" data-modal-close>×</button><div class="warning-icon">!</div><h2>Удалить аккаунт?</h2><p>Это демонстрационное окно подтверждения. На этапе функционала действие будет необратимым.</p><div class="modal-actions"><button class="button ghost" data-modal-close>Отмена</button><button class="button danger" data-delete>Удалить</button></div></div></div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=4"></script>
+<script src="assets/app.js?v=5"></script>
 </body>
 </html>
