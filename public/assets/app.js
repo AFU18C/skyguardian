@@ -417,6 +417,57 @@ telegramCheckButton?.addEventListener('click', async () => {
   }
 });
 
+const telegramPublishForm = $('[data-telegram-publish-form]');
+const telegramPublishKind = $('[data-publish-kind]');
+function syncTelegramPublishForm() {
+  if (!telegramPublishForm || !telegramPublishKind) return;
+  const kind = telegramPublishKind.value;
+  const media = $('[data-publish-media]');
+  const options = $('[data-publish-options]');
+  const anonymous = $('[data-publish-anonymous]');
+  const textLabel = $('[data-publish-text-label]');
+  if (media) media.hidden = !['photo', 'video', 'document'].includes(kind);
+  if (options) options.hidden = kind !== 'poll';
+  if (anonymous) anonymous.hidden = kind !== 'poll';
+  if (textLabel) textLabel.textContent = kind === 'poll' ? 'Вопрос *' : (kind === 'text' ? 'Текст *' : 'Подпись');
+}
+telegramPublishKind?.addEventListener('change', syncTelegramPublishForm);
+syncTelegramPublishForm();
+
+telegramPublishForm?.addEventListener('submit', async event => {
+  event.preventDefault();
+  const item = groupChannels.find(channel => channel.id === activeGroupControlId);
+  const submit = telegramPublishForm.querySelector('button[type="submit"]');
+  const resultBox = $('[data-publish-result]');
+  if (!item || !submit || submit.disabled) return;
+  if (item.connection_status !== 'success') {
+    toast('Сначала успешно проверьте подключение бота');
+    return;
+  }
+  const body = new FormData(telegramPublishForm);
+  body.set('_token', submit.dataset.csrf || '');
+  body.set('bot_token', item.bot_token || '');
+  body.set('chat_id', item.chat_id || '');
+  submit.disabled = true;
+  submit.textContent = 'Отправляю…';
+  if (resultBox) resultBox.hidden = true;
+  try {
+    const response = await fetch('/?action=telegram-publish', { method: 'POST', credentials: 'same-origin', body });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.message || 'Не удалось отправить публикацию');
+    if (resultBox) { resultBox.className = 'telegram-publish-result full success'; resultBox.textContent = '✓ ' + result.message; resultBox.hidden = false; }
+    telegramPublishForm.reset();
+    syncTelegramPublishForm();
+    toast('Публикация отправлена');
+  } catch (error) {
+    if (resultBox) { resultBox.className = 'telegram-publish-result full error'; resultBox.textContent = '! ' + (error.message || 'Ошибка отправки'); resultBox.hidden = false; }
+    toast(error.message || 'Не удалось отправить публикацию');
+  } finally {
+    submit.disabled = false;
+    submit.textContent = 'Отправить в Telegram';
+  }
+});
+
 const groupChannelModal = $('#groupChannelModal');
 const groupChannelForm = $('[data-group-channel-form]');
 const groupChannelList = $('[data-group-channel-list]');
