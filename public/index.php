@@ -57,8 +57,13 @@ if ($action === 'telegram-automation' && $_SERVER['REQUEST_METHOD'] === 'POST') 
         $message = $exception->getMessage();
         if (str_contains(strtolower($message), 'bad webhook')) $message = 'Telegram не принял webhook. Проверьте HTTPS и публичный адрес сайта.';
         $reply(422, ['ok' => false, 'message' => $message]);
-    } catch (Throwable) {
-        $reply(503, ['ok' => false, 'message' => 'Не удалось сохранить автоматизацию.']);
+    } catch (Throwable $exception) {
+        error_log('Telegram automation error: ' . $exception::class . ': ' . $exception->getMessage());
+        $message = $exception->getMessage();
+        if ($message === '') {
+            $message = 'Не удалось сохранить автоматизацию.';
+        }
+        $reply(503, ['ok' => false, 'message' => $message]);
     }
 }
 
@@ -721,7 +726,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=33">
+    <link rel="stylesheet" href="assets/app.css?v=38">
 </head>
 <body>
 <div class="app-shell">
@@ -1124,6 +1129,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=37"></script>
+<script src="assets/app.js?v=38"></script>
 </body>
 </html>
