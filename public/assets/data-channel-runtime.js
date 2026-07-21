@@ -18,9 +18,18 @@
 
     let label = 'Ожидает запуска';
     let enabledClass = 'on';
+    if (state.status === 'checking') label = 'Проверяет канал';
     if (state.status === 'active') label = 'Работает';
     if (state.status === 'paused') { label = 'Остановлен'; enabledClass = 'off'; }
     if (state.status === 'error') { label = 'Ошибка'; enabledClass = 'off'; }
+
+    if (state.worker_seen_at) {
+      const seen = new Date(state.worker_seen_at).getTime();
+      if (!Number.isNaN(seen) && Date.now() - seen > 30000 && state.status !== 'paused') {
+        label = 'Worker не отвечает';
+        enabledClass = 'off';
+      }
+    }
 
     pill.classList.toggle('on', enabledClass === 'on');
     pill.classList.toggle('off', enabledClass === 'off');
@@ -38,7 +47,7 @@
 
   const refresh = async () => {
     try {
-      const response = await fetch('/data-channel-status.php?scope=' + encodeURIComponent(scope), {
+      const response = await fetch('/data-channel-status.php?scope=' + encodeURIComponent(scope) + '&_=' + Date.now(), {
         credentials: 'same-origin',
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         cache: 'no-store'
@@ -50,7 +59,7 @@
         if (card) paint(card, state);
       });
     } catch {
-      // Следующая проверка повторит запрос; интерфейс не блокируем.
+      // Повторяем автоматически, не блокируя интерфейс.
     } finally {
       clearTimeout(timer);
       timer = setTimeout(refresh, 3000);
