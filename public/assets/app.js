@@ -491,3 +491,34 @@ $('[data-delete]')?.addEventListener('click', event => {
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') $$('.modal.open').forEach(closeModal);
 });
+
+
+const rebootModal = $('#rebootModal');
+const rebootConfirmButton = $('[data-reboot-confirm]');
+
+$('[data-reboot-open]')?.addEventListener('click', () => openModal(rebootModal));
+
+rebootConfirmButton?.addEventListener('click', async () => {
+  if (rebootConfirmButton.disabled) return;
+  rebootConfirmButton.disabled = true;
+  rebootConfirmButton.textContent = 'Запускаю…';
+
+  try {
+    const body = new URLSearchParams({ _token: rebootConfirmButton.dataset.csrf || '' });
+    const response = await fetch('/?action=reboot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      credentials: 'same-origin',
+      body
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.message || 'Не удалось запустить перезагрузку');
+
+    closeModal(rebootModal);
+    toast('Перезагрузка VPS запущена');
+  } catch (error) {
+    toast(error.message || 'Не удалось запустить перезагрузку');
+    rebootConfirmButton.disabled = false;
+    rebootConfirmButton.textContent = 'Перезагрузить';
+  }
+});
