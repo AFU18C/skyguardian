@@ -573,3 +573,18 @@
   .automation-inline{grid-template-columns:1fr}
   .automation-form>label:not(.control-check){width:100%}
 }
+
+
+/* Master switch for Telegram group control */
+.group-master-switch{display:inline-flex;align-items:center;flex:0 0 auto;cursor:pointer}
+.group-master-switch input{position:absolute;opacity:0;pointer-events:none}
+.group-master-switch span{position:relative;width:42px;height:23px;border:1px solid #40506a;border-radius:999px;background:#263246;transition:.2s}
+.group-master-switch span::after{content:'';position:absolute;top:3px;left:3px;width:15px;height:15px;border-radius:50%;background:#8d9aaf;transition:.2s}
+.group-master-switch input:checked+span{border-color:#35d07f;background:rgba(53,208,127,.25)}
+.group-master-switch input:checked+span::after{left:22px;background:#35d07f;box-shadow:0 0 10px rgba(53,208,127,.55)}
+.group-master-switch input:disabled+span{opacity:.55;cursor:wait}
+.group-channel-card.group-disabled{border-color:#303746;background:linear-gradient(145deg,#151923,#10141c);filter:saturate(.15)}
+.group-channel-card.group-disabled .source-card-icon,.group-channel-card.group-disabled .source-card-info,.group-channel-card.group-disabled .group-connection-indicator{opacity:.48}
+.group-channel-card.group-disabled .group-check-date::after{content:' · Остановлено';color:#a1a8b4}
+.group-channel-card.group-disabled .group-manage-button{cursor:not-allowed;opacity:.45}
+@media(max-width:640px){.group-master-switch span{width:40px;height:22px}.group-master-switch input:checked+span::after{left:20px}}
