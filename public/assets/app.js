@@ -64,7 +64,144 @@ $('[data-account-edit]')?.addEventListener('click', event => {
   $('[data-account-details]', account).classList.toggle('open');
 });
 
-$('[data-add-connection]')?.addEventListener('click', () => openModal($('#connectionModal')));
+const connectionModal = $('#connectionModal');
+const techList = $('[data-tech-list]');
+const techEmpty = $('[data-tech-empty]');
+const techIdInput = $('[data-tech-account-id]');
+const techDeleteButton = $('[data-tech-delete]');
+const techSaveButton = $('[data-tech-save]');
+const techModalLabel = $('[data-tech-modal-label]');
+const techScope = techList?.dataset.techScope || 'settings';
+const techStorageKey = 'skyguardian:' + techScope + ':technical-accounts';
+let technicalAccounts = [];
+let pendingTechDeleteId = '';
+
+function readTechnicalAccounts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(techStorageKey) || '[]');
+    technicalAccounts = Array.isArray(saved) ? saved : [];
+  } catch {
+    technicalAccounts = [];
+  }
+}
+
+function writeTechnicalAccounts() {
+  try {
+    localStorage.setItem(techStorageKey, JSON.stringify(technicalAccounts));
+  } catch {
+    toast('Не удалось сохранить данные в браузере');
+  }
+}
+
+function createTechnicalAccountCard(item) {
+  const card = document.createElement('article');
+  card.className = 'technical-account-card';
+  card.dataset.techAccountCard = item.id;
+
+  const icon = document.createElement('div');
+  icon.className = 'technical-account-icon';
+  icon.textContent = '♟';
+
+  const info = document.createElement('div');
+  info.className = 'technical-account-info';
+  const name = document.createElement('strong');
+  name.textContent = item.name;
+  const api = document.createElement('span');
+  api.textContent = 'API ID: ' + item.api_id;
+  const note = document.createElement('small');
+  note.textContent = item.connected ? 'Технический аккаунт подключён' : 'Технический аккаунт не подключён';
+  info.append(name, api, note);
+
+  const status = document.createElement('span');
+  status.className = 'status-pill ' + (item.connected ? 'on' : 'off');
+  const dot = document.createElement('i');
+  status.append(dot, document.createTextNode(item.connected ? 'Работает' : 'Не работает'));
+
+  const edit = document.createElement('button');
+  edit.className = 'technical-account-edit';
+  edit.type = 'button';
+  edit.title = 'Редактировать';
+  edit.setAttribute('aria-label', 'Редактировать технический аккаунт ' + item.name);
+  edit.textContent = '✎';
+  edit.addEventListener('click', () => openTechnicalAccountEditor(item.id));
+
+  card.append(icon, info, status, edit);
+  return card;
+}
+
+function renderTechnicalAccounts() {
+  if (!techList) return;
+  techList.querySelectorAll('[data-tech-account-card]').forEach(card => card.remove());
+  techEmpty.hidden = technicalAccounts.length > 0;
+  technicalAccounts.forEach(item => techList.append(createTechnicalAccountCard(item)));
+}
+
+function resetTechnicalAccountForm() {
+  apiForm?.reset();
+  if (techIdInput) techIdInput.value = '';
+  if (techDeleteButton) techDeleteButton.hidden = true;
+  if (techSaveButton) techSaveButton.textContent = 'Сохранить';
+  if (techModalLabel) techModalLabel.textContent = 'ДОБАВЛЕНИЕ ПОДКЛЮЧЕНИЯ';
+  const status = $('.status-pill', apiForm?.closest('.api-panel'));
+  status?.classList.remove('on');
+  status?.classList.add('off');
+  if (status) status.innerHTML = '<i></i>Не настроено';
+}
+
+function openTechnicalAccountEditor(id) {
+  const item = technicalAccounts.find(accountItem => accountItem.id === id);
+  if (!item || !apiForm || !connectionModal) return;
+  resetTechnicalAccountForm();
+  techIdInput.value = item.id;
+  apiForm.elements.name.value = item.name;
+  apiForm.elements.api_id.value = item.api_id;
+  apiForm.elements.api_hash.value = item.api_hash;
+  techDeleteButton.hidden = false;
+  techModalLabel.textContent = 'РЕДАКТИРОВАНИЕ ПОДКЛЮЧЕНИЯ';
+  const status = $('.status-pill', apiForm.closest('.api-panel'));
+  status.classList.remove('off');
+  status.classList.add('on');
+  status.innerHTML = '<i></i>Настроено';
+  openModal(connectionModal);
+}
+
+$('[data-add-connection]')?.addEventListener('click', () => {
+  resetTechnicalAccountForm();
+  openModal(connectionModal);
+});
+
+$('[data-api-check]')?.addEventListener('click', () => apiForm?.requestSubmit());
+
+techSaveButton?.addEventListener('click', () => {
+  if (!apiForm) return;
+  const values = Object.fromEntries(new FormData(apiForm));
+  if (!values.name?.trim() || !values.api_id?.trim() || !values.api_hash?.trim()) {
+    toast('Заполните все поля Telegram API');
+    apiForm.reportValidity();
+    return;
+  }
+  const id = techIdInput?.value || (globalThis.crypto?.randomUUID?.() || String(Date.now()));
+  const oldItem = technicalAccounts.find(item => item.id === id);
+  const item = {
+    id,
+    name: values.name.trim(),
+    api_id: values.api_id.trim(),
+    api_hash: values.api_hash.trim(),
+    connected: oldItem?.connected || false
+  };
+  const index = technicalAccounts.findIndex(accountItem => accountItem.id === id);
+  if (index >= 0) technicalAccounts[index] = item;
+  else technicalAccounts.push(item);
+  writeTechnicalAccounts();
+  renderTechnicalAccounts();
+  closeModal(connectionModal);
+  toast('Сохранено');
+});
+
+techDeleteButton?.addEventListener('click', () => {
+  pendingTechDeleteId = techIdInput?.value || '';
+  if (pendingTechDeleteId) openModal($('#deleteModal'));
+});
 
 const sourceModal = $('#sourceModal');
 const sourceForm = $('[data-source-form]');
@@ -311,6 +448,8 @@ sourceDeleteButton?.addEventListener('click', () => {
   toast('Удалено');
 });
 
+readTechnicalAccounts();
+renderTechnicalAccounts();
 readSources();
 renderSources();
 $('[data-qr]')?.addEventListener('click', () => openModal($('#qrModal')));
@@ -319,8 +458,17 @@ $$('[data-modal-close]').forEach(button => button.addEventListener('click', () =
 
 $('[data-save-account]')?.addEventListener('click', () => toast('Изменения успешно сохранены'));
 $('[data-delete]')?.addEventListener('click', event => {
+  if (pendingTechDeleteId) {
+    technicalAccounts = technicalAccounts.filter(item => item.id !== pendingTechDeleteId);
+    writeTechnicalAccounts();
+    renderTechnicalAccounts();
+    pendingTechDeleteId = '';
+    closeModal(event.currentTarget.closest('.modal'));
+    if (connectionModal) closeModal(connectionModal);
+    toast('Удалено');
+    return;
+  }
   closeModal(event.currentTarget.closest('.modal'));
-  toast('Демонстрация удаления завершена');
 });
 
 document.addEventListener('keydown', event => {
