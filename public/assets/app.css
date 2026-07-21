@@ -577,26 +577,91 @@
 
 
 /* Master switch for Telegram group control */
-.group-master-switch{display:inline-flex;align-items:center;flex:0 0 auto;cursor:pointer}
-.group-master-switch input{position:absolute;opacity:0;pointer-events:none}
-.group-master-switch span{position:relative;width:42px;height:23px;border:1px solid #40506a;border-radius:999px;background:#263246;transition:.2s}
-.group-master-switch span::after{content:'';position:absolute;top:3px;left:3px;width:15px;height:15px;border-radius:50%;background:#8d9aaf;transition:.2s}
-.group-master-switch input:checked+span{border-color:#35d07f;background:rgba(53,208,127,.25)}
-.group-master-switch input:checked+span::after{left:22px;background:#35d07f;box-shadow:0 0 10px rgba(53,208,127,.55)}
-.group-master-switch input:disabled+span{opacity:.55;cursor:wait}
+.group-channel-card .group-card-actions{
+  display:grid!important;
+  grid-template-columns:auto minmax(16px,1fr) auto!important;
+  grid-column:1 / -1!important;
+  width:100%!important;
+  align-items:center!important;
+  gap:12px!important;
+  margin-top:10px!important;
+}
+.group-channel-card .group-master-switch{
+  position:relative!important;
+  display:inline-flex!important;
+  grid-column:1!important;
+  justify-self:start!important;
+  align-items:center!important;
+  width:52px!important;
+  height:30px!important;
+  margin:0!important;
+  cursor:pointer!important;
+  -webkit-tap-highlight-color:transparent;
+}
+.group-channel-card .group-master-switch input{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  opacity:0!important;
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  z-index:2!important;
+}
+.group-channel-card .group-master-switch span{
+  position:absolute!important;
+  inset:0!important;
+  display:block!important;
+  width:auto!important;
+  height:auto!important;
+  border:1px solid rgba(255,105,120,.72)!important;
+  border-radius:999px!important;
+  background:linear-gradient(135deg,#8f2634,#5f1824)!important;
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.12),0 0 0 3px rgba(224,72,91,.08)!important;
+  transition:background .2s ease,border-color .2s ease,box-shadow .2s ease!important;
+}
+.group-channel-card .group-master-switch span::after{
+  content:''!important;
+  position:absolute!important;
+  top:3px!important;
+  left:3px!important;
+  width:22px!important;
+  height:22px!important;
+  border-radius:50%!important;
+  background:linear-gradient(145deg,#fff,#cbd4df)!important;
+  box-shadow:0 2px 6px rgba(0,0,0,.42),inset 0 1px 1px #fff!important;
+  transform:translateX(0)!important;
+  transition:transform .2s ease!important;
+}
+.group-channel-card .group-master-switch input:checked + span{
+  border-color:#42dc91!important;
+  background:linear-gradient(135deg,#159b5e,#0d6c44)!important;
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.16),0 0 0 3px rgba(53,208,127,.10),0 0 14px rgba(53,208,127,.24)!important;
+}
+.group-channel-card .group-master-switch input:checked + span::after{
+  left:3px!important;
+  transform:translateX(22px)!important;
+  background:linear-gradient(145deg,#fff,#d9f8e8)!important;
+}
+.group-channel-card .group-master-switch input:focus-visible + span{outline:2px solid #75a7ff!important;outline-offset:3px!important}
+.group-channel-card .group-master-switch input:disabled + span{opacity:.55!important;cursor:wait!important}
+.group-channel-card .group-card-buttons{
+  display:flex!important;
+  grid-column:3!important;
+  justify-self:end!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin:0!important;
+}
 .group-channel-card.group-disabled{border-color:#303746;background:linear-gradient(145deg,#151923,#10141c);filter:saturate(.15)}
 .group-channel-card.group-disabled .source-card-icon,.group-channel-card.group-disabled .source-card-info,.group-channel-card.group-disabled .group-connection-indicator{opacity:.48}
 .group-channel-card.group-disabled .group-check-date::after{content:' · Остановлено';color:#a1a8b4}
 .group-channel-card.group-disabled .group-manage-button{cursor:not-allowed;opacity:.45}
-@media(max-width:640px){.group-master-switch span{width:40px;height:22px}.group-master-switch input:checked+span::after{left:20px}}
-
-/* Keep the master switch at the far left and card actions at the far right. */
-.group-channel-card .group-card-actions{
-  display:grid!important;
-  grid-template-columns:auto minmax(0,1fr) auto;
-  grid-column:1 / -1!important;
-  width:100%!important;
-  align-items:center;
+@media(max-width:640px){
+  .group-channel-card .group-card-actions{grid-template-columns:52px minmax(10px,1fr) auto!important}
 }
-.group-channel-card .group-master-switch{grid-column:1;justify-self:start;margin:0}
-.group-channel-card .group-card-buttons{grid-column:3;justify-self:end;margin:0}
