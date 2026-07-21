@@ -244,7 +244,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=17">
+    <link rel="stylesheet" href="assets/app.css?v=18">
 </head>
 <body>
 <div class="app-shell">
@@ -307,7 +307,6 @@ function active(string $current, string $target): string
                     <div class="server-load-head">
                         <div><span class="step-label">СЕРВЕР</span><h2>Нагрузка сервера</h2><p>Показатели обновляются при открытии страницы.</p></div>
                         <div class="server-load-actions">
-                            <button class="button danger server-reboot-button" type="button" data-reboot-open>Перезагрузить VPS</button>
                             <div class="server-pulse" aria-hidden="true"><span></span><i></i><span></span></div>
                         </div>
                     </div>
@@ -330,6 +329,11 @@ function active(string $current, string $target): string
                             <p>Без перезапуска сервера</p>
                             <div class="uptime-status"><i></i>Сервер доступен</div>
                         </section>
+                    </div>
+                    <div class="server-reboot-row">
+                        <button class="button danger server-reboot-button" type="button" data-reboot-open>
+                            <span aria-hidden="true">↻</span>Перезагрузить VPS
+                        </button>
                     </div>
                 </article>
 
