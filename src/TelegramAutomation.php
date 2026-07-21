@@ -107,10 +107,12 @@ final class TelegramAutomation
         $configs[$key] = $config;
         $this->writeJson($this->configFile, $configs);
         $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret']);
+        // Persist the master switch first. Webhook synchronisation must never
+        // roll the UI state back when Telegram is temporarily unavailable.
         if ($enabled && ($config['enabled'] ?? false) === true && ($config['mode'] ?? 'webhook') === 'webhook') {
-            $this->api($token, 'setWebhook', ['url' => $webhookUrl, 'secret_token' => $config['secret'], 'allowed_updates' => json_encode(['message', 'callback_query', 'chat_member'], JSON_UNESCAPED_SLASHES), 'drop_pending_updates' => 'false']);
+            $this->safeApi($token, 'setWebhook', ['url' => $webhookUrl, 'secret_token' => $config['secret'], 'allowed_updates' => json_encode(['message', 'callback_query', 'chat_member'], JSON_UNESCAPED_SLASHES), 'drop_pending_updates' => 'false']);
         } else {
-            $this->api($token, 'deleteWebhook', ['drop_pending_updates' => 'false']);
+            $this->safeApi($token, 'deleteWebhook', ['drop_pending_updates' => 'false']);
         }
         if (!$enabled) {
             $state = $this->readJson($this->stateFile);
