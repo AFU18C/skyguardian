@@ -395,11 +395,7 @@ function createGroupChannelCard(item) {
   info.className = 'source-card-info';
   const name = document.createElement('strong');
   name.textContent = item.name;
-  const route = document.createElement('span');
-  route.textContent = item.link + ' · Chat ID: ' + item.chat_id;
-  const details = document.createElement('small');
-  details.textContent = 'Токен: ' + maskBotToken(item.bot_token) + ' · Администратор: ' + item.admin_id;
-  info.append(name, route, details);
+  info.append(name);
 
   const status = document.createElement('span');
   status.className = 'status-pill on';
@@ -419,7 +415,11 @@ function createGroupChannelCard(item) {
   edit.textContent = '✎';
   edit.addEventListener('click', () => openGroupChannelEditor(item.id));
 
-  card.append(icon, info, status, manage, edit);
+  const actions = document.createElement('div');
+  actions.className = 'group-card-actions';
+  actions.append(manage, edit);
+
+  card.append(icon, info, status, actions);
   return card;
 }
 
