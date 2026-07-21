@@ -19,6 +19,36 @@ $requestedPage = $_GET['page'] ?? null;
 $action = $_GET['action'] ?? null;
 $isAuthenticated = ($_SESSION['admin_authenticated'] ?? false) === true;
 
+if ($action === 'reboot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    if (!$isAuthenticated) {
+        http_response_code(401);
+        echo json_encode(['ok' => false, 'message' => 'Требуется авторизация.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $token = (string) ($_POST['_token'] ?? '');
+    if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), $token)) {
+        http_response_code(419);
+        echo json_encode(['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    session_write_close();
+    exec('sudo -n /usr/bin/systemctl reboot --no-block 2>&1', $rebootOutput, $rebootCode);
+
+    if ($rebootCode !== 0) {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'message' => 'Сервер не разрешил перезагрузку. Проверьте права службы.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    http_response_code(202);
+    echo json_encode(['ok' => true, 'message' => 'Перезагрузка VPS запущена.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($action === 'logout') {
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
@@ -214,7 +244,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=16">
+    <link rel="stylesheet" href="assets/app.css?v=17">
 </head>
 <body>
 <div class="app-shell">
@@ -276,7 +306,10 @@ function active(string $current, string $target): string
                 <article class="panel server-load-panel">
                     <div class="server-load-head">
                         <div><span class="step-label">СЕРВЕР</span><h2>Нагрузка сервера</h2><p>Показатели обновляются при открытии страницы.</p></div>
-                        <div class="server-pulse" aria-hidden="true"><span></span><i></i><span></span></div>
+                        <div class="server-load-actions">
+                            <button class="button danger server-reboot-button" type="button" data-reboot-open>Перезагрузить VPS</button>
+                            <div class="server-pulse" aria-hidden="true"><span></span><i></i><span></span></div>
+                        </div>
                     </div>
                     <div class="server-metrics">
                         <?php foreach ([
@@ -422,7 +455,20 @@ function active(string $current, string $target): string
 </div>
 
 <div class="modal" id="deleteModal" aria-hidden="true"><div class="modal-backdrop" data-modal-close></div><div class="modal-card compact"><button class="modal-close" data-modal-close>×</button><div class="warning-icon">!</div><h2>Удалить аккаунт?</h2><p>Это демонстрационное окно подтверждения. На этапе функционала действие будет необратимым.</p><div class="modal-actions"><button class="button ghost" data-modal-close>Отмена</button><button class="button danger" data-delete>Удалить</button></div></div></div>
+<div class="modal reboot-modal" id="rebootModal" aria-hidden="true">
+    <div class="modal-card reboot-modal-card" role="dialog" aria-modal="true" aria-labelledby="rebootTitle">
+        <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
+        <span class="step-label danger-text">ОПАСНОЕ ДЕЙСТВИЕ</span>
+        <h2 id="rebootTitle">Перезагрузить VPS?</h2>
+        <p>Все процессы SkyGuardian временно остановятся. Сайт будет недоступен несколько минут.</p>
+        <div class="reboot-warning"><strong>Полная перезагрузка сервера</strong><span>Несохранённые операции будут прерваны.</span></div>
+        <div class="modal-actions">
+            <button class="button ghost" type="button" data-modal-close>Отмена</button>
+            <button class="button danger" type="button" data-reboot-confirm data-csrf="<?= htmlspecialchars((string) ($_SESSION['csrf_token'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">Перезагрузить</button>
+        </div>
+    </div>
+</div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=9"></script>
+<script src="assets/app.js?v=10"></script>
 </body>
 </html>
