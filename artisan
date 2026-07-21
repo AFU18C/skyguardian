@@ -1,0 +1,77 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "Эта команда доступна только в консоли.\n");
+    exit(1);
+}
+
+$command = $argv[1] ?? '';
+if ($command !== 'admin:create') {
+    fwrite(STDOUT, "SkyGuardian\n\nДоступные команды:\n  admin:create  Создать или заменить администратора\n");
+    exit($command === '' ? 0 : 1);
+}
+
+function prompt(string $label): string {
+    fwrite(STDOUT, $label);
+    $value = fgets(STDIN);
+    return trim($value === false ? '' : $value);
+}
+
+function secret(string $label): string {
+    fwrite(STDOUT, $label);
+    $stty = trim((string) shell_exec('command -v stty 2>/dev/null'));
+    if ($stty !== '') {
+        shell_exec('stty -echo');
+    }
+    $value = fgets(STDIN);
+    if ($stty !== '') {
+        shell_exec('stty echo');
+    }
+    fwrite(STDOUT, PHP_EOL);
+    return rtrim($value === false ? '' : $value, "\r\n");
+}
+
+$email = prompt('Введите почту администратора: ');
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    fwrite(STDERR, "Ошибка: введите корректную почту.\n");
+    exit(1);
+}
+
+$password = secret('Введите пароль: ');
+$confirmation = secret('Повторите пароль: ');
+if ($password !== $confirmation) {
+    fwrite(STDERR, "Ошибка: пароли не совпадают.\n");
+    exit(1);
+}
+if (strlen($password) < 12) {
+    fwrite(STDERR, "Ошибка: пароль должен содержать не менее 12 символов.\n");
+    exit(1);
+}
+
+$storageDir = __DIR__ . '/storage';
+if (!is_dir($storageDir) && !mkdir($storageDir, 0700, true) && !is_dir($storageDir)) {
+    fwrite(STDERR, "Ошибка: не удалось создать каталог хранения.\n");
+    exit(1);
+}
+
+$data = [
+    'email' => $email,
+    'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+    'updated_at' => gmdate(DATE_ATOM),
+];
+$temp = $storageDir . '/admin.json.tmp';
+$file = $storageDir . '/admin.json';
+if (file_put_contents($temp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), LOCK_EX) === false) {
+    fwrite(STDERR, "Ошибка: не удалось сохранить администратора.\n");
+    exit(1);
+}
+chmod($temp, 0600);
+if (!rename($temp, $file)) {
+    @unlink($temp);
+    fwrite(STDERR, "Ошибка: не удалось завершить сохранение.\n");
+    exit(1);
+}
+chmod($file, 0600);
+fwrite(STDOUT, "Администратор успешно создан.\n");
