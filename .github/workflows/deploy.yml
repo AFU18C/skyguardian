@@ -6,6 +6,8 @@ on:
     paths:
       - 'public/**'
       - 'artisan'
+      - 'composer.json'
+      - 'composer.lock'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -19,15 +21,21 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install production dependencies
+        run: |
+          set -euo pipefail
+          composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
       - name: Validate PHP
         run: |
           php -l public/index.php
           php -l artisan
           php artisan
+          test -f vendor/autoload.php
 
       - name: Configure SSH
         env:
@@ -52,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$SSH_USER"
-          tar -czf /tmp/skyguardian-release.tar.gz public artisan
+          tar -czf /tmp/skyguardian-release.tar.gz public artisan composer.json vendor
           scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" /tmp/skyguardian-release.tar.gz "$SSH_USER@$SSH_HOST:/tmp/skyguardian-release.tar.gz"
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'set -eu
             target=/var/www/SkyGuardianUa
@@ -68,6 +76,7 @@ jobs:
               chgrp www-data "$target/storage"
               chmod 2770 "$target/storage"
               install -d -m 2770 -o root -g www-data "$target/storage/backups"
+              install -d -m 2770 -o root -g www-data "$target/storage/telegram-sessions"
               if test -f "$target/storage/admin.json"; then
                 chgrp www-data "$target/storage/admin.json"
                 chmod 640 "$target/storage/admin.json"
@@ -75,16 +84,21 @@ jobs:
             else
               chmod 777 "$target/storage"
               install -d -m 777 "$target/storage/backups"
+              install -d -m 777 "$target/storage/telegram-sessions"
               if test -f "$target/storage/admin.json"; then
                 chmod 644 "$target/storage/admin.json"
               fi
             fi
             find "$target/public" -type d -exec chmod 755 {} +
             find "$target/public" -type f -exec chmod 644 {} +
+            find "$target/vendor" -type d -exec chmod 755 {} +
+            find "$target/vendor" -type f -exec chmod 644 {} +
             rm -f /tmp/skyguardian-release.tar.gz
             test -f "$target/public/index.php"
             test -f "$target/artisan"
+            test -f "$target/vendor/autoload.php"
             test -w "$target/storage/backups"
+            test -w "$target/storage/telegram-sessions"
             nginx_site=/etc/nginx/sites-enabled/skyguardian
             if test -w "$nginx_site"; then
               sed -i -E "/fastcgi_param SG_ADMIN_(EMAIL|PASSWORD)/d" "$nginx_site"
