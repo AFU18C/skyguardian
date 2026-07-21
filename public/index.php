@@ -558,7 +558,7 @@ if ($isPublicLanding || $isLoginRequest) {
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
     <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=32">
+    <link rel="stylesheet" href="/assets/app.css?v=33">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
@@ -1119,6 +1119,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=32"></script>
+<script src="assets/app.js?v=33"></script>
 </body>
 </html>
