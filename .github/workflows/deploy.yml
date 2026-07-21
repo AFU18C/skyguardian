@@ -42,6 +42,7 @@ jobs:
           php -l public/data-channel-status.php
           php -l public/data-channel-run.php
           php -l bin/data-channel-worker.php
+          php -l deploy/apply-runtime-patches.php
           php -l artisan
           php artisan
           test -f vendor/autoload.php
@@ -81,13 +82,20 @@ jobs:
             install -d -m 755 "$target"
             install -d -m 2770 "$target/storage"
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
-            chmod 755 "$target" "$target/artisan" "$target/bin/data-channel-worker.php"
+            chmod 755 "$target" "$target/artisan" "$target/bin/data-channel-worker.php" "$target/deploy/apply-runtime-patches.php"
 
-            sed -i "s#<option value=\"text_without_links\">Только текст без ссылок</option>##g" "$target/public/index.php"
+            php "$target/deploy/apply-runtime-patches.php" "$target"
+            php -l "$target/public/index.php"
+            php -l "$target/public/data-channel.php"
+            php -l "$target/bin/data-channel-worker.php"
+
             if grep -q "text_without_links\|Только текст без ссылок" "$target/public/index.php"; then
               echo "Obsolete publication format is still present in deployed HTML" >&2
               exit 1
             fi
+            grep -q "name=\"fetch_limit\"" "$target/public/index.php"
+            grep -q "fetch_limit" "$target/public/data-channel.php"
+            grep -q "fetch_limit" "$target/bin/data-channel-worker.php"
 
             if ! grep -q "telegram-account.js" "$target/public/index.php"; then
               sed -i "s#<script src=\"assets/app.js?v=38\"></script>#<script src=\"assets/app.js?v=39\"></script><script src=\"assets/telegram-account.js?v=3\"></script>#" "$target/public/index.php"
@@ -95,9 +103,9 @@ jobs:
               sed -i -E "s#app.js\?v=[0-9]+#app.js?v=39#g; s#telegram-account.js\?v=[0-9]+#telegram-account.js?v=3#g" "$target/public/index.php"
             fi
             if ! grep -q "data-channel.js" "$target/public/index.php"; then
-              sed -i "s#</body>#<script src=\"assets/data-channel.js?v=2\"></script></body>#" "$target/public/index.php"
+              sed -i "s#</body>#<script src=\"assets/data-channel.js?v=3\"></script></body>#" "$target/public/index.php"
             else
-              sed -i -E "s#data-channel.js\?v=[0-9]+#data-channel.js?v=2#g" "$target/public/index.php"
+              sed -i -E "s#data-channel.js\?v=[0-9]+#data-channel.js?v=3#g" "$target/public/index.php"
             fi
             if ! grep -q "data-channel-runtime.js" "$target/public/index.php"; then
               sed -i "s#</body>#<script src=\"assets/data-channel-runtime.js?v=2\"></script></body>#" "$target/public/index.php"
