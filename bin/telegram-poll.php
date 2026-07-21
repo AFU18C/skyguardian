@@ -2,7 +2,7 @@
 <?php
 declare(strict_types=1);
 
-require dirname(__DIR__) . '/src/TelegramAutomation.php';
+require dirname(__DIR__) . '/public/TelegramAutomation.php';
 
 $automation = new TelegramAutomation(dirname(__DIR__) . '/storage');
 $offsetsFile = dirname(__DIR__) . '/storage/telegram-polling-offsets.json';
