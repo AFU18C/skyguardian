@@ -426,14 +426,29 @@ function active(string $current, string $target): string
                     <div class="empty-state" data-tech-empty><div>◇</div><strong>Технических аккаунтов пока нет</strong></div>
                 </article>
             <?php elseif ($page === 'group'): ?>
-                <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
-                <article class="panel group-panel"><div class="empty-state large"><div>♟</div><strong>Группа пока не добавлена</strong><p>Форма подключения будет добавлена после утверждения дизайна и логики.</p><button class="button primary" data-toast="Функционал добавления появится на следующем этапе">Добавить группу</button></div></article>
+                <section class="page-title">
+                    <div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1></div>
+                    <button class="button primary add-connection-button" type="button" data-add-group-channel>Добавить канал</button>
+                </section>
+                <article class="panel data-channels-panel" data-group-channel-list>
+                    <div class="empty-state" data-group-channel-empty><div>◇</div><strong>Каналы пока не добавлены</strong></div>
+                </article>
             <?php else: ?>
                 <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление сайтом</h1><p>Настройка сайта SkyGuardian.</p></div><div class="section-badge violet">◎</div></section>
                 <article class="panel group-panel"><div class="empty-state large"><div>◎</div><strong>Настройки сайта пока не добавлены</strong><p>Параметры управления сайтом будут добавлены на следующем этапе.</p></div></article>
             <?php endif; ?>
         </div>
     </main>
+</div>
+
+<div class="modal group-channel-modal" id="groupChannelModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card compact" role="dialog" aria-modal="true" aria-labelledby="groupChannelTitle">
+        <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
+        <span class="step-label">ДОБАВЛЕНИЕ КАНАЛА</span>
+        <h2 id="groupChannelTitle">Канал управления группой</h2>
+        <p>Поля этой формы настроим на следующем шаге.</p>
+    </div>
 </div>
 
 <div class="modal source-modal" id="sourceModal" aria-hidden="true">
@@ -548,6 +563,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=19"></script>
+<script src="assets/app.js?v=20"></script>
 </body>
 </html>
