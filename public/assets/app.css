@@ -665,3 +665,5 @@
 @media(max-width:640px){
   .group-channel-card .group-card-actions{grid-template-columns:52px minmax(10px,1fr) auto!important}
 }
+
+.toast.error{border-color:rgba(224,72,91,.55);background:#211521;color:#ffd7dc}.toast.error:before{content:"!";background:rgba(224,72,91,.16);color:#ff7f8f}
