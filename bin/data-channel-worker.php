@@ -100,16 +100,33 @@ $intervalSeconds = static function (array $channel): int {
     return (string) ($channel['check_frequency_unit'] ?? 'seconds') === 'hours' ? $value * 3600 : $value;
 };
 
-$publish = static function (API $api, array $channel, array $message) use ($stripLinks, $customizeText): void {
-    $source = (string) $channel['source'];
+$copyMessage = static function (API $api, string $destination, array $message, string $text): void {
+    $entities = is_array($message['entities'] ?? null) ? $message['entities'] : [];
+    $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
+
+    if ($hasMedia) {
+        $api->messages->sendMedia(
+            peer: $destination,
+            media: $message['media'],
+            message: $text,
+            entities: $entities
+        );
+        return;
+    }
+
+    if ($text !== '') {
+        $api->messages->sendMessage(peer: $destination, message: $text, entities: $entities);
+    }
+};
+
+$publish = static function (API $api, array $channel, array $message) use ($stripLinks, $customizeText, $copyMessage): void {
     $destination = (string) $channel['destination'];
-    $id = (int) ($message['id'] ?? 0);
     $format = (string) ($channel['publication_format'] ?? 'original');
     $text = trim((string) ($message['message'] ?? ''));
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
 
     if ($format === 'original') {
-        $api->messages->forwardMessages(from_peer: $source, id: [$id], to_peer: $destination);
+        $copyMessage($api, $destination, $message, $text);
         return;
     }
 
@@ -117,12 +134,12 @@ $publish = static function (API $api, array $channel, array $message) use ($stri
     $text = $customizeText($text, $channel);
 
     if ($format === 'media') {
-        if ($hasMedia) $api->messages->sendMedia(peer: $destination, media: $message, message: '');
+        if ($hasMedia) $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '');
         return;
     }
 
     if ($format === 'text_and_media' && $hasMedia) {
-        $api->messages->sendMedia(peer: $destination, media: $message, message: $text);
+        $api->messages->sendMedia(peer: $destination, media: $message['media'], message: $text);
         return;
     }
 
@@ -200,15 +217,17 @@ foreach (['news', 'alerts'] as $scope) {
             if (!$initialized) {
                 $start = (string) ($channel['processing_start'] ?? 'new');
                 if ($start === 'new') {
-                    $createdAt = strtotime((string) ($channel['created_at'] ?? '')) ?: time();
+                    $baseline = (string) ($state['resume_from_now_at'] ?? $channel['created_at'] ?? '');
+                    $baselineTimestamp = strtotime($baseline) ?: time();
                     $messages = array_values(array_filter($messages, static fn (array $message): bool =>
-                        (int) ($message['date'] ?? 0) >= $createdAt
+                        (int) ($message['date'] ?? 0) >= $baselineTimestamp
                     ));
                 } else {
                     $take = match ($start) { 'last_5' => 5, 'last_10' => 10, 'last_20' => 20, default => 0 };
                     if ($take > 0 && count($messages) > $take) $messages = array_slice($messages, -$take);
                 }
                 $states[$id] = array_merge($states[$id], ['initialized' => true, 'last_message_id' => 0]);
+                unset($states[$id]['resume_from_now_at']);
                 $writeJson($stateFile, $states);
             }
 
