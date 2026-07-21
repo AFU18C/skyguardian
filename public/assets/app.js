@@ -493,6 +493,41 @@ document.addEventListener('keydown', event => {
 });
 
 
+
+const backupButton = $('[data-backup-create]');
+backupButton?.addEventListener('click', async () => {
+  if (backupButton.disabled) return;
+  const originalText = backupButton.innerHTML;
+  backupButton.disabled = true;
+  backupButton.textContent = 'Создаю бэкап…';
+
+  try {
+    const body = new URLSearchParams({ _token: backupButton.dataset.csrf || '' });
+    const response = await fetch('/?action=backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      credentials: 'same-origin',
+      body
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.message || 'Не удалось создать бэкап');
+
+    const time = $('[data-backup-time]');
+    const state = $('[data-backup-state]');
+    if (time) time.textContent = result.created_at;
+    if (state) {
+      state.textContent = 'Сохранён';
+      state.classList.add('ready');
+    }
+    toast('Резервная копия создана');
+  } catch (error) {
+    toast(error.message || 'Не удалось создать бэкап');
+  } finally {
+    backupButton.disabled = false;
+    backupButton.innerHTML = originalText;
+  }
+});
+
 const rebootModal = $('#rebootModal');
 const rebootConfirmButton = $('[data-reboot-confirm]');
 
