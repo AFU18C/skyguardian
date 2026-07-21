@@ -87,6 +87,13 @@ if ($action === 'telegram-manage' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $reply(422, ['ok' => false, 'message' => 'Проверьте токен и Chat ID.']);
     }
 
+
+
+    require_once __DIR__ . '/TelegramAutomation.php';
+    $automation = new TelegramAutomation($storageDir);
+    if (!$automation->isGroupEnabled($botToken, $chatId)) {
+        $reply(423, ['ok' => false, 'message' => 'Управление группой остановлено. Включите группу перед выполнением запросов Telegram.']);
+    }
     $telegramRequest = static function (string $method, array $fields = []) use ($botToken): mixed {
         $handle = curl_init('https://api.telegram.org/bot' . $botToken . '/' . $method);
         curl_setopt_array($handle, [
@@ -234,6 +241,13 @@ if ($action === 'telegram-publish' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!preg_match('/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $botToken) || !preg_match('/^-?\d+$/', $chatId)) {
         $reply(422, ['ok' => false, 'message' => 'Проверьте токен и Chat ID.']);
     }
+
+
+    require_once __DIR__ . '/TelegramAutomation.php';
+    $automation = new TelegramAutomation($storageDir);
+    if (!$automation->isGroupEnabled($botToken, $chatId)) {
+        $reply(423, ['ok' => false, 'message' => 'Управление группой остановлено. Включите группу перед выполнением запросов Telegram.']);
+    }
     if (!in_array($kind, ['text', 'photo', 'video', 'document', 'poll'], true)) {
         $reply(422, ['ok' => false, 'message' => 'Неизвестный тип публикации.']);
     }
@@ -317,6 +331,13 @@ if ($action === 'telegram-check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (!preg_match('/^-?\\d+$/', $chatId)) {
         $reply(422, ['ok' => false, 'message' => 'Telegram Chat ID имеет неверный формат.']);
+    }
+
+
+    require_once __DIR__ . '/TelegramAutomation.php';
+    $automation = new TelegramAutomation($storageDir);
+    if (!$automation->isGroupEnabled($botToken, $chatId)) {
+        $reply(423, ['ok' => false, 'message' => 'Управление группой остановлено. Включите группу перед выполнением запросов Telegram.']);
     }
     if (!function_exists('curl_init')) {
         $reply(503, ['ok' => false, 'message' => 'На сервере не установлено расширение PHP cURL.']);
