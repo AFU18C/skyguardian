@@ -226,6 +226,13 @@ function active(string $current, string $target): string
 
             <?php elseif ($isSettings): ?>
                 <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Настройка</h1><p>Будущие правила получения, обработки и публикации сообщений.</p></div><button class="button primary add-connection-button" type="button" data-tooltip="Технический аккаунт и API" aria-label="Добавить технический аккаунт и API" data-add-connection>Добавить</button></section>
+
+                <article class="panel">
+                    <div class="panel-head">
+                        <div><span class="step-label">КАНАЛЫ ДАННЫХ</span><h2>Подключённые каналы данных</h2><p>Здесь будут отображаться подключённые каналы.</p></div>
+                    </div>
+                    <div class="empty-state large"><div>◇</div><strong>Подключённых каналов пока нет</strong></div>
+                </article>
             <?php else: ?>
                 <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
                 <article class="panel group-panel"><div class="empty-state large"><div>♟</div><strong>Группа пока не добавлена</strong><p>Форма подключения будет добавлена после утверждения дизайна и логики.</p><button class="button primary" data-toast="Функционал добавления появится на следующем этапе">Добавить группу</button></div></article>
