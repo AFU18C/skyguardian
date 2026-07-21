@@ -19,6 +19,82 @@ $requestedPage = $_GET['page'] ?? null;
 $action = $_GET['action'] ?? null;
 $isAuthenticated = ($_SESSION['admin_authenticated'] ?? false) === true;
 
+if ($action === 'telegram-publish' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    $reply = static function (int $status, array $payload): never {
+        http_response_code($status);
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    };
+    if (!$isAuthenticated) $reply(401, ['ok' => false, 'message' => 'Требуется авторизация.']);
+    if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), (string) ($_POST['_token'] ?? ''))) {
+        $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
+    }
+
+    $botToken = trim((string) ($_POST['bot_token'] ?? ''));
+    $chatId = trim((string) ($_POST['chat_id'] ?? ''));
+    $kind = (string) ($_POST['kind'] ?? 'text');
+    $text = trim((string) ($_POST['text'] ?? ''));
+    if (!preg_match('/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $botToken) || !preg_match('/^-?\d+$/', $chatId)) {
+        $reply(422, ['ok' => false, 'message' => 'Проверьте токен и Chat ID.']);
+    }
+    if (!in_array($kind, ['text', 'photo', 'video', 'document', 'poll'], true)) {
+        $reply(422, ['ok' => false, 'message' => 'Неизвестный тип публикации.']);
+    }
+    if (($kind === 'text' || $kind === 'poll') && $text === '') {
+        $reply(422, ['ok' => false, 'message' => $kind === 'poll' ? 'Введите вопрос опроса.' : 'Введите текст публикации.']);
+    }
+
+    $method = 'sendMessage';
+    $parameters = ['chat_id' => $chatId, 'disable_notification' => isset($_POST['silent']) ? 'true' : 'false'];
+    if ($kind === 'text') $parameters['text'] = $text;
+    if ($kind === 'poll') {
+        $options = array_values(array_filter(array_map('trim', preg_split('/\R/', (string) ($_POST['poll_options'] ?? '')) ?: [])));
+        if (count($options) < 2 || count($options) > 12) $reply(422, ['ok' => false, 'message' => 'Укажите от 2 до 12 вариантов ответа, каждый с новой строки.']);
+        $method = 'sendPoll';
+        $parameters['question'] = $text;
+        $parameters['options'] = json_encode($options, JSON_UNESCAPED_UNICODE);
+        $parameters['is_anonymous'] = isset($_POST['anonymous']) ? 'true' : 'false';
+    }
+    if (in_array($kind, ['photo', 'video', 'document'], true)) {
+        $file = $_FILES['media'] ?? null;
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) $file['tmp_name'])) {
+            $reply(422, ['ok' => false, 'message' => 'Выберите файл для отправки.']);
+        }
+        if ((int) $file['size'] > 49 * 1024 * 1024) $reply(422, ['ok' => false, 'message' => 'Файл превышает лимит 49 МБ.']);
+        $method = ['photo' => 'sendPhoto', 'video' => 'sendVideo', 'document' => 'sendDocument'][$kind];
+        $parameters[$kind] = new CURLFile((string) $file['tmp_name'], (string) ($file['type'] ?: 'application/octet-stream'), basename((string) $file['name']));
+        if ($text !== '') $parameters['caption'] = $text;
+    }
+
+    $request = static function (string $telegramMethod, array $fields) use ($botToken): array {
+        $handle = curl_init('https://api.telegram.org/bot' . $botToken . '/' . $telegramMethod);
+        curl_setopt_array($handle, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $fields, CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 60]);
+        $body = curl_exec($handle);
+        $error = curl_error($handle);
+        $code = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        curl_close($handle);
+        if ($body === false || $error !== '') throw new RuntimeException('Telegram недоступен с VPS.');
+        $data = json_decode((string) $body, true);
+        if (!is_array($data) || $code >= 400 || ($data['ok'] ?? false) !== true) throw new RuntimeException((string) ($data['description'] ?? 'Telegram отклонил публикацию.'));
+        return (array) ($data['result'] ?? []);
+    };
+
+    try {
+        $message = $request($method, $parameters);
+        if (isset($_POST['pin']) && isset($message['message_id'])) {
+            $request('pinChatMessage', ['chat_id' => $chatId, 'message_id' => (string) $message['message_id'], 'disable_notification' => 'true']);
+        }
+        $reply(200, ['ok' => true, 'message' => 'Публикация отправлена.', 'message_id' => $message['message_id'] ?? null]);
+    } catch (RuntimeException $exception) {
+        $message = $exception->getMessage();
+        if (str_contains(strtolower($message), 'not enough rights')) $message = 'У бота недостаточно прав для этого действия.';
+        $reply(422, ['ok' => false, 'message' => $message]);
+    } catch (Throwable) {
+        $reply(503, ['ok' => false, 'message' => 'Не удалось отправить публикацию.']);
+    }
+}
+
 if ($action === 'telegram-check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
 
@@ -296,7 +372,7 @@ if ($isPublicLanding || $isLoginRequest) {
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
     <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=28">
+    <link rel="stylesheet" href="/assets/app.css?v=29">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
@@ -454,7 +530,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=28">
+    <link rel="stylesheet" href="assets/app.css?v=29">
 </head>
 <body>
 <div class="app-shell">
@@ -625,7 +701,18 @@ function active(string $current, string $target): string
                         <article><span>✦</span><strong>Автоматизация</strong><small>Антиспам, запрещённые слова, приветствие и автоудаление</small></article>
                     </div>
                 </section>
-                <section class="group-control-pane" data-group-control-pane="publications"><h3>Публикации</h3><p>Отправка текста, фото, видео, файлов и опросов; предпросмотр, закрепление, тихая отправка и планирование.</p></section>
+                <section class="group-control-pane" data-group-control-pane="publications">
+                    <h3>Новая публикация</h3>
+                    <form class="telegram-publish-form" data-telegram-publish-form enctype="multipart/form-data">
+                        <label><span>Тип публикации</span><select name="kind" data-publish-kind><option value="text">Текст</option><option value="photo">Фото</option><option value="video">Видео</option><option value="document">Файл</option><option value="poll">Опрос</option></select></label>
+                        <label class="full"><span data-publish-text-label>Текст *</span><textarea name="text" rows="6" maxlength="4096" placeholder="Введите текст публикации"></textarea></label>
+                        <label class="full" data-publish-media hidden><span>Файл *</span><input name="media" type="file"><small>Максимальный размер — 49 МБ.</small></label>
+                        <label class="full" data-publish-options hidden><span>Варианты ответа *</span><textarea name="poll_options" rows="5" placeholder="Каждый вариант с новой строки"></textarea></label>
+                        <div class="telegram-publish-options full"><label><input name="silent" type="checkbox"> Без уведомления</label><label><input name="pin" type="checkbox"> Закрепить после отправки</label><label data-publish-anonymous hidden><input name="anonymous" type="checkbox" checked> Анонимный опрос</label></div>
+                        <div class="telegram-publish-result full" data-publish-result hidden></div>
+                        <button class="button primary full" type="submit" data-csrf="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">Отправить в Telegram</button>
+                    </form>
+                </section>
                 <section class="group-control-pane" data-group-control-pane="messages"><h3>Сообщения</h3><p>Последние доступные боту сообщения, поиск, удаление, закрепление, открепление и управление реакциями.</p></section>
                 <section class="group-control-pane" data-group-control-pane="members"><h3>Участники</h3><p>Поиск по Telegram ID, предупреждения, временные ограничения, блокировка, разблокировка и управление администраторами.</p></section>
                 <section class="group-control-pane" data-group-control-pane="invites"><h3>Заявки и приглашения</h3><p>Принятие и отклонение заявок, создание временных и постоянных ссылок, лимиты и отзыв приглашений.</p></section>
@@ -771,6 +858,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=25"></script>
+<script src="assets/app.js?v=26"></script>
 </body>
 </html>
