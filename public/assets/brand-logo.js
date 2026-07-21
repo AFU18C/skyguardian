@@ -1,21 +1,9 @@
 (() => {
-  const applyLogo = () => {
-    document.querySelectorAll('.brand-mark').forEach(mark => {
-      if (mark.querySelector('.brand-logo-image')) return;
-      mark.classList.add('brand-logo-mark');
-      mark.replaceChildren();
-      const image = document.createElement('img');
-      image.className = 'brand-logo-image';
-      image.src = '/assets/skyguardian-logo.jpg?v=1';
-      image.alt = '';
-      image.decoding = 'async';
-      mark.append(image);
-    });
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyLogo, { once: true });
-  } else {
-    applyLogo();
-  }
+  const logo = 'data:image/jpeg;base64,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';
+  const applyLogo = () => document.querySelectorAll('.brand-mark').forEach(mark => {
+    if (mark.querySelector('.brand-logo-image')) return;
+    mark.classList.add('brand-logo-mark');
+    mark.innerHTML = `<img class="brand-logo-image" src="${logo}" alt="">`;
+  });
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', applyLogo, {once:true}) : applyLogo();
 })();
