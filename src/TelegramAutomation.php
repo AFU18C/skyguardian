@@ -11,16 +11,46 @@ final class TelegramAutomation
 
     public function __construct(string $storageDir)
     {
-        $this->storageDir = rtrim($storageDir, '/');
+        $this->storageDir = $this->resolveStorageDir($storageDir);
         $this->configFile = $this->storageDir . '/telegram-automation.json';
         $this->stateFile = $this->storageDir . '/telegram-automation-state.json';
         $this->logFile = $this->storageDir . '/telegram-automation.log';
-        if (!is_dir($this->storageDir) && !mkdir($this->storageDir, 0750, true) && !is_dir($this->storageDir)) {
-            throw new RuntimeException('Не удалось создать каталог storage.');
+    }
+
+    private function resolveStorageDir(string $preferredDir): string
+    {
+        $preferredDir = rtrim($preferredDir, '/');
+        $sessionDir = rtrim((string)session_save_path(), '/');
+        $configuredDir = rtrim((string)getenv('SKYGUARDIAN_STORAGE_DIR'), '/');
+        $candidates = array_values(array_unique(array_filter([
+            $configuredDir,
+            $preferredDir,
+            $sessionDir !== '' ? $sessionDir . '/skyguardian' : '',
+            rtrim(sys_get_temp_dir(), '/') . '/skyguardian',
+        ])));
+
+        foreach ($candidates as $candidate) {
+            if (!is_dir($candidate) && !@mkdir($candidate, 0700, true) && !is_dir($candidate)) {
+                continue;
+            }
+            if (!is_writable($candidate)) {
+                continue;
+            }
+
+            @chmod($candidate, 0700);
+            if ($candidate !== $preferredDir && is_dir($preferredDir) && is_readable($preferredDir)) {
+                foreach (['telegram-automation.json', 'telegram-automation-state.json', 'telegram-automation.log'] as $file) {
+                    $source = $preferredDir . '/' . $file;
+                    $target = $candidate . '/' . $file;
+                    if (is_file($source) && !is_file($target) && @copy($source, $target)) {
+                        @chmod($target, 0600);
+                    }
+                }
+            }
+            return $candidate;
         }
-        if (!is_writable($this->storageDir)) {
-            throw new RuntimeException('Сервер не может записывать настройки: каталог storage недоступен пользователю PHP.');
-        }
+
+        throw new RuntimeException('Сервер не нашёл защищённый каталог для настроек автоматизации.');
     }
 
     public function save(array $input, string $baseUrl): array
