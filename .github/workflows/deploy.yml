@@ -6,6 +6,7 @@ on:
     paths:
       - 'public/**'
       - 'bin/**'
+      - 'deploy/**'
       - 'artisan'
       - 'composer.json'
       - 'composer.lock'
@@ -47,6 +48,7 @@ jobs:
           test -f public/assets/telegram-account.js
           test -f public/assets/data-channel.js
           test -f public/assets/data-channel-runtime.js
+          test -f deploy/skyguardian-data-channels.service
 
       - name: Configure SSH
         env:
@@ -71,7 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$SSH_USER"
-          tar -czf /tmp/skyguardian-release.tar.gz public bin artisan composer.json vendor
+          tar -czf /tmp/skyguardian-release.tar.gz public bin deploy artisan composer.json vendor
           scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" /tmp/skyguardian-release.tar.gz "$SSH_USER@$SSH_HOST:/tmp/skyguardian-release.tar.gz"
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'set -eu
             target=/var/www/SkyGuardianUa
@@ -118,9 +120,6 @@ jobs:
               done
             else
               chmod 777 "$target/storage"
-              install -d -m 777 "$target/storage/backups"
-              install -d -m 777 "$target/storage/telegram-sessions"
-              install -d -m 777 "$target/storage/telegram-news-sessions"
               touch "$target/storage/data-channel-worker.lock"
               chmod 666 "$target/storage/data-channel-worker.lock"
             fi
@@ -132,26 +131,7 @@ jobs:
             find "$target/vendor" -type d -exec chmod 755 {} +
             find "$target/vendor" -type f -exec chmod 644 {} +
 
-            cat > /etc/systemd/system/skyguardian-data-channels.service <<EOF
-[Unit]
-Description=SkyGuardian Telegram data channel monitor
-After=network-online.target php8.3-fpm.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=/var/www/SkyGuardianUa
-ExecStart=/bin/bash -lc "while true; do /usr/bin/php /var/www/SkyGuardianUa/bin/data-channel-worker.php; sleep 1; done"
-Restart=always
-RestartSec=3
-NoNewPrivileges=true
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
+            install -m 644 "$target/deploy/skyguardian-data-channels.service" /etc/systemd/system/skyguardian-data-channels.service
             systemctl daemon-reload
             systemctl enable --now skyguardian-data-channels.service
             systemctl restart skyguardian-data-channels.service
@@ -160,8 +140,6 @@ EOF
             test -f "$target/public/data-channel.php"
             test -f "$target/public/data-channel-status.php"
             test -f "$target/public/data-channel-run.php"
-            test -f "$target/public/assets/data-channel.js"
-            test -f "$target/public/assets/data-channel-runtime.js"
             test -f "$target/bin/data-channel-worker.php"
             test -w "$target/storage/data-channel-worker.lock"
             systemctl is-active --quiet skyguardian-data-channels.service
