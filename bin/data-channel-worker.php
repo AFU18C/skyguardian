@@ -214,6 +214,13 @@ foreach (['news', 'alerts'] as $scope) {
             ));
             usort($messages, static fn (array $a, array $b): int => ((int) $a['id']) <=> ((int) $b['id']));
 
+            $enabledSinceTimestamp = strtotime((string) ($channel['enabled_since'] ?? '')) ?: 0;
+            if ($enabledSinceTimestamp > 0) {
+                $messages = array_values(array_filter($messages, static fn (array $message): bool =>
+                    (int) ($message['date'] ?? 0) >= $enabledSinceTimestamp
+                ));
+            }
+
             if (!$initialized) {
                 $start = (string) ($channel['processing_start'] ?? 'new');
                 if ($start === 'new') {
