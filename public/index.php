@@ -161,7 +161,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=12">
+    <link rel="stylesheet" href="assets/app.css?v=13">
 </head>
 <body>
 <div class="app-shell">
@@ -253,6 +253,30 @@ function active(string $current, string $target): string
             <label class="full"><span>Начало обработки</span><select name="processing_start" required><option value="">Выберите начало обработки</option><option value="new">Только новые сообщения</option><option value="last_5">Последние 5 сообщений</option><option value="last_10">Последние 10 сообщений</option><option value="last_20">Последние 20 сообщений</option></select></label>
             <label class="full"><span>Ключевые слова</span><textarea name="keywords" rows="3" placeholder="Например: тревога, ракета, беспилотник"></textarea><small class="form-hint">Слова и фразы через запятую. Оставьте пустым, чтобы публиковать все сообщения.</small></label>
             <label class="full"><span>Стоп-слова</span><textarea name="stop_words" rows="3" placeholder="Например: реклама, розыгрыш"></textarea><small class="form-hint">Сообщения с этими словами публиковаться не будут.</small></label>
+            <div class="custom-text-setting full">
+                <div class="custom-text-head">
+                    <div><strong>Добавлять собственный текст</strong><small>Ваш текст будет добавлен к каждой публикации</small></div>
+                    <label class="switch" aria-label="Добавлять собственный текст"><input name="custom_text_enabled" type="checkbox" value="1" data-custom-text-toggle><span></span></label>
+                </div>
+                <div class="custom-text-editor" data-custom-text-editor hidden>
+                    <label><span>Размещение текста</span><select name="custom_text_position" data-custom-text-position><option value="after">После сообщения</option><option value="before">Перед сообщением</option></select></label>
+                    <label><span>Ваш текст</span>
+                        <div class="editor-shell">
+                            <div class="editor-toolbar" aria-label="Форматирование текста">
+                                <button type="button" data-editor-wrap="**" title="Жирный"><strong>B</strong></button>
+                                <button type="button" data-editor-wrap="__" title="Курсив"><em>I</em></button>
+                                <button type="button" data-editor-link title="Добавить ссылку">↗</button>
+                            </div>
+                            <textarea name="custom_text" rows="5" maxlength="2000" placeholder="Введите текст, который будет добавляться к публикации" data-custom-text-input></textarea>
+                        </div>
+                    </label>
+                    <button class="button ghost preview-toggle" type="button" data-custom-text-preview-button>Предпросмотр</button>
+                    <div class="telegram-preview" data-custom-text-preview hidden>
+                        <span class="preview-label">ПРЕДПРОСМОТР ПУБЛИКАЦИИ</span>
+                        <div class="telegram-message" data-custom-text-preview-content></div>
+                    </div>
+                </div>
+            </div>
             <div class="form-actions full"><span class="form-hint">Фильтры можно оставить пустыми</span><button class="button primary" type="submit">Добавить</button></div>
         </form>
     </div>
@@ -302,6 +326,6 @@ function active(string $current, string $target): string
 
 <div class="modal" id="deleteModal" aria-hidden="true"><div class="modal-backdrop" data-modal-close></div><div class="modal-card compact"><button class="modal-close" data-modal-close>×</button><div class="warning-icon">!</div><h2>Удалить аккаунт?</h2><p>Это демонстрационное окно подтверждения. На этапе функционала действие будет необратимым.</p><div class="modal-actions"><button class="button ghost" data-modal-close>Отмена</button><button class="button danger" data-delete>Удалить</button></div></div></div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=5"></script>
+<script src="assets/app.js?v=6"></script>
 </body>
 </html>
