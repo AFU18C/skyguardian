@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+// Runtime dependency for Telegram group automation; keep this file in VPS deployments.
 final class TelegramAutomation
 {
     private string $storageDir;
