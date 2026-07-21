@@ -208,31 +208,11 @@ function active(string $current, string $target): string
 
         <div class="content">
             <?php if ($page === 'home'): ?>
-                <section class="hero">
-                    <div><span class="eyebrow">ПАНЕЛЬ УПРАВЛЕНИЯ</span><h1>Добро пожаловать в SkyGuardian</h1><p>Управляйте источниками, подключениями и публикациями из единого защищённого пространства.</p></div>
-                    <div class="hero-shield"><span>✓</span></div>
-                </section>
-
-                <section class="stats-grid">
-                    <article class="stat-card"><span class="stat-icon blue">◉</span><div><small>Источники новостей</small><strong>0</strong><span>Не настроено</span></div></article>
-                    <article class="stat-card"><span class="stat-icon red">⌁</span><div><small>Источники тревог</small><strong>0</strong><span>Не настроено</span></div></article>
-                    <article class="stat-card"><span class="stat-icon violet">♟</span><div><small>Места публикации</small><strong>0</strong><span>Не настроено</span></div></article>
-                    <article class="stat-card"><span class="stat-icon green">✓</span><div><small>Состояние системы</small><strong class="word">Готово</strong><span class="success">Шаблон активен</span></div></article>
-                </section>
-
-                <section class="dashboard-grid">
-                    <article class="panel">
-                        <div class="panel-head"><div><span class="eyebrow">БЫСТРЫЙ СТАРТ</span><h2>Подключите первый раздел</h2></div></div>
-                        <div class="steps">
-                            <a href="?page=news-sources"><span>1</span><div><strong>Добавьте Telegram API</strong><small>API ID и API Hash для подключения</small></div><b>›</b></a>
-                            <a href="?page=news-sources"><span>2</span><div><strong>Подключите технический аккаунт</strong><small>Безопасная авторизация по QR-коду</small></div><b>›</b></a>
-                            <a href="?page=news-settings"><span>3</span><div><strong>Настройте обработку</strong><small>Источники и правила публикации</small></div><b>›</b></a>
-                        </div>
-                    </article>
-                    <article class="panel activity-panel">
-                        <div class="panel-head"><div><span class="eyebrow">АКТИВНОСТЬ</span><h2>Последние события</h2></div><button class="text-button" data-toast="История пока пуста">Все события</button></div>
-                        <div class="empty-state"><div>⌁</div><strong>Событий пока нет</strong><p>Здесь появятся изменения статусов и результаты действий.</p></div>
-                    </article>
+                <section class="page-title">
+                    <div>
+                        <span class="eyebrow">ГЛАВНАЯ</span>
+                        <h1>Страница в разработке</h1>
+                    </div>
                 </section>
 
             <?php elseif ($isSources): ?>
