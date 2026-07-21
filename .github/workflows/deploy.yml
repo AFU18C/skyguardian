@@ -38,12 +38,14 @@ jobs:
           php -l public/telegram-account.php
           php -l public/telegram-account-core.php
           php -l public/data-channel.php
+          php -l public/data-channel-status.php
           php -l bin/data-channel-worker.php
           php -l artisan
           php artisan
           test -f vendor/autoload.php
           test -f public/assets/telegram-account.js
           test -f public/assets/data-channel.js
+          test -f public/assets/data-channel-runtime.js
 
       - name: Configure SSH
         env:
@@ -89,6 +91,11 @@ jobs:
               sed -i "s#</body>#<script src=\"assets/data-channel.js?v=1\"></script></body>#" "$target/public/index.php"
             else
               sed -i -E "s#data-channel.js\?v=[0-9]+#data-channel.js?v=1#g" "$target/public/index.php"
+            fi
+            if ! grep -q "data-channel-runtime.js" "$target/public/index.php"; then
+              sed -i "s#</body>#<script src=\"assets/data-channel-runtime.js?v=1\"></script></body>#" "$target/public/index.php"
+            else
+              sed -i -E "s#data-channel-runtime.js\?v=[0-9]+#data-channel-runtime.js?v=1#g" "$target/public/index.php"
             fi
 
             if getent group www-data >/dev/null 2>&1; then
@@ -151,13 +158,16 @@ EOF
             test -f "$target/public/telegram-account.php"
             test -f "$target/public/telegram-account-core.php"
             test -f "$target/public/data-channel.php"
+            test -f "$target/public/data-channel-status.php"
             test -f "$target/public/assets/telegram-account.js"
             test -f "$target/public/assets/data-channel.js"
+            test -f "$target/public/assets/data-channel-runtime.js"
             test -f "$target/bin/data-channel-worker.php"
             test -f "$target/artisan"
             test -f "$target/vendor/autoload.php"
             grep -q "telegram-account.js?v=3" "$target/public/index.php"
             grep -q "data-channel.js?v=1" "$target/public/index.php"
+            grep -q "data-channel-runtime.js?v=1" "$target/public/index.php"
             test -w "$target/storage/backups"
             test -w "$target/storage/telegram-sessions"
             test -w "$target/storage/telegram-news-sessions"
