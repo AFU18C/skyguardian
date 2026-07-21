@@ -1,0 +1,5 @@
+# Run Telegram cleanup every minute.
+* * * * * www-data /usr/bin/php /var/www/SkyGuardianUa/bin/telegram-maintenance.php >/dev/null 2>&1
+
+# Enable this line only when at least one connection uses polling.
+# * * * * * www-data /usr/bin/php /var/www/SkyGuardianUa/bin/telegram-poll.php >/dev/null 2>&1
