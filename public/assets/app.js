@@ -235,6 +235,7 @@ function openGroupControl(id) {
   document.querySelectorAll('[data-group-control-pane]').forEach((pane, index) => pane.classList.toggle('active', index === 0));
   resetTelegramCheck();
   restoreSavedTelegramCheck(item);
+  renderTelegramJournal();
   openModal(groupControlModal);
 }
 
@@ -417,6 +418,116 @@ telegramCheckButton?.addEventListener('click', async () => {
   }
 });
 
+
+const telegramJournalKey = 'skyguardian:telegram:journal';
+function readTelegramJournal() {
+  try {
+    const value = JSON.parse(localStorage.getItem(telegramJournalKey) || '{}');
+    return value && typeof value === 'object' ? value : {};
+  } catch { return {}; }
+}
+function addTelegramJournal(channelId, action, status, detail) {
+  if (!channelId) return;
+  const journal = readTelegramJournal();
+  const items = Array.isArray(journal[channelId]) ? journal[channelId] : [];
+  items.unshift({ id: String(Date.now()) + Math.random(), at: new Date().toISOString(), action, status, detail: String(detail || '') });
+  journal[channelId] = items.slice(0, 100);
+  try { localStorage.setItem(telegramJournalKey, JSON.stringify(journal)); } catch {}
+  renderTelegramJournal();
+}
+function renderTelegramJournal() {
+  const container = $('[data-telegram-journal]');
+  if (!container) return;
+  const items = readTelegramJournal()[activeGroupControlId] || [];
+  container.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    const title = document.createElement('strong');
+    title.textContent = 'Действий пока нет';
+    empty.append(title);
+    container.append(empty);
+    return;
+  }
+  items.forEach(item => {
+    const row = document.createElement('article');
+    row.className = 'journal-item ' + (item.status === 'success' ? 'success' : 'error');
+    const top = document.createElement('div');
+    const name = document.createElement('strong');
+    name.textContent = item.action;
+    const time = document.createElement('time');
+    time.textContent = formatTelegramCheckDate(item.at);
+    top.append(name, time);
+    const detail = document.createElement('small');
+    detail.textContent = item.detail;
+    row.append(top, detail);
+    container.append(row);
+  });
+}
+$('[data-journal-clear]')?.addEventListener('click', () => {
+  if (!activeGroupControlId || !confirm('Очистить журнал этого чата?')) return;
+  const journal = readTelegramJournal();
+  delete journal[activeGroupControlId];
+  localStorage.setItem(telegramJournalKey, JSON.stringify(journal));
+  renderTelegramJournal();
+});
+
+document.querySelectorAll('[data-telegram-action-form]').forEach(form => {
+  form.addEventListener('click', event => {
+    const button = event.target.closest('[data-command]');
+    if (button) form.dataset.pendingCommand = button.dataset.command || '';
+  });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const item = groupChannels.find(channel => channel.id === activeGroupControlId);
+    const command = form.dataset.pendingCommand || form.querySelector('[name="command"]')?.value || '';
+    const button = form.querySelector('[data-command="' + CSS.escape(command) + '"]');
+    const resultBox = form.querySelector('[data-action-result]');
+    if (!item || !button || button.disabled) return;
+    if (item.connection_status !== 'success') { toast('Сначала успешно проверьте подключение бота'); return; }
+    if (button.dataset.confirm && !confirm(button.dataset.confirm)) return;
+    const body = new FormData(form);
+    body.set('_token', telegramCheckButton?.dataset.csrf || '');
+    body.set('bot_token', item.bot_token || '');
+    body.set('chat_id', item.chat_id || '');
+    body.set('command', command);
+    const valueField = button.dataset.valueField;
+    if (valueField) body.set('value', String(body.get(valueField) || ''));
+    const buttons = [...form.querySelectorAll('button[type="submit"]')];
+    buttons.forEach(item => { item.disabled = true; });
+    const oldText = button.textContent;
+    button.textContent = 'Выполняю…';
+    if (resultBox) resultBox.hidden = true;
+    try {
+      const response = await fetch('/?action=telegram-manage', { method: 'POST', credentials: 'same-origin', body });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.message || 'Telegram отклонил команду');
+      let extra = '';
+      if (command === 'invite-create' && result.result?.invite_link) extra = '\n' + result.result.invite_link;
+      if (command === 'member-info' && result.result) {
+        const user = result.result.user || {};
+        extra = '\n' + [user.first_name, user.last_name, user.username ? '@' + user.username : '', 'Статус: ' + (result.result.status || '—')].filter(Boolean).join(' · ');
+      }
+      if (resultBox) {
+        resultBox.className = 'telegram-action-result full success';
+        resultBox.textContent = '✓ ' + result.message + extra;
+        resultBox.hidden = false;
+      }
+      addTelegramJournal(item.id, oldText, 'success', result.message + extra);
+      toast(result.message);
+    } catch (error) {
+      const message = error.message || 'Команда не выполнена';
+      if (resultBox) { resultBox.className = 'telegram-action-result full error'; resultBox.textContent = '! ' + message; resultBox.hidden = false; }
+      addTelegramJournal(item.id, oldText, 'error', message);
+      toast(message);
+    } finally {
+      buttons.forEach(item => { item.disabled = false; });
+      button.textContent = oldText;
+      form.dataset.pendingCommand = '';
+    }
+  });
+});
+
 const telegramPublishForm = $('[data-telegram-publish-form]');
 const telegramPublishKind = $('[data-publish-kind]');
 function syncTelegramPublishForm() {
@@ -458,9 +569,11 @@ telegramPublishForm?.addEventListener('submit', async event => {
     if (resultBox) { resultBox.className = 'telegram-publish-result full success'; resultBox.textContent = '✓ ' + result.message; resultBox.hidden = false; }
     telegramPublishForm.reset();
     syncTelegramPublishForm();
+    addTelegramJournal(item.id, 'Публикация', 'success', result.message);
     toast('Публикация отправлена');
   } catch (error) {
     if (resultBox) { resultBox.className = 'telegram-publish-result full error'; resultBox.textContent = '! ' + (error.message || 'Ошибка отправки'); resultBox.hidden = false; }
+    addTelegramJournal(item.id, 'Публикация', 'error', error.message || 'Не удалось отправить публикацию');
     toast(error.message || 'Не удалось отправить публикацию');
   } finally {
     submit.disabled = false;
