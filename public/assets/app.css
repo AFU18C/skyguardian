@@ -18,3 +18,30 @@
 /* Compact technical accounts list in settings */
 .technical-accounts-panel{min-height:0;padding:0 24px}.technical-accounts-panel .empty-state{height:190px;min-height:0}
 @media(max-width:760px){.technical-accounts-panel{padding:0 16px}.technical-accounts-panel .empty-state{height:180px}}
+
+
+/* Data channels */
+.data-channels-panel { min-height: 132px; }
+.source-modal-card { width: min(620px, calc(100vw - 32px)); }
+.source-form { margin-top: 24px; }
+.source-form select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  color: var(--text);
+  background: #0c1222;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+}
+.source-form select:focus { border-color: var(--blue); outline: none; }
+.source-form option { background: #0c1222; color: var(--text); }
+@media (max-width: 640px) {
+  .source-modal-card {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+}
