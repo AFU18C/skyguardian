@@ -161,7 +161,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=5">
+    <link rel="stylesheet" href="assets/app.css?v=6">
 </head>
 <body>
 <div class="app-shell">
@@ -216,12 +216,10 @@ function active(string $current, string $target): string
                 </section>
 
             <?php elseif ($isSources): ?>
-                <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Каналы данных</h1><p>Настройте Telegram API и технический аккаунт для чтения источников.</p></div><div class="section-badge <?= $accent ?>"><?= $isAlerts ? '⌁' : '◉' ?></div></section>
+                <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Каналы данных</h1></div><button class="button primary add-connection-button" type="button" data-tooltip="Добавить канал данных" aria-label="Добавить канал данных" data-add-source>Добавить</button></section>
 
-                <div class="notice info"><span>i</span><p><strong>Раздел работает независимо.</strong> Подключения и настройки <?= $isAlerts ? 'воздушных тревог' : 'новостей' ?> не пересекаются с другим разделом.</p></div>
-
-                <article class="panel sources-empty">
-                    <div class="empty-state large"><div>◇</div><strong>Подключений пока нет</strong><p>Telegram API и технический аккаунт добавляются в разделе «Настройка».</p><a class="button primary empty-link" href="?page=<?= $isAlerts ? 'alerts-settings' : 'news-settings' ?>">Перейти к настройке</a></div>
+                <article class="panel data-channels-panel">
+                    <div class="empty-state"><div>◇</div><strong>Каналов данных пока нет</strong></div>
                 </article>
 
             <?php elseif ($isSettings): ?>
@@ -236,6 +234,22 @@ function active(string $current, string $target): string
             <?php endif; ?>
         </div>
     </main>
+</div>
+
+<div class="modal source-modal" id="sourceModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card source-modal-card" role="dialog" aria-modal="true" aria-labelledby="sourceTitle">
+        <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
+        <span class="step-label">ДОБАВЛЕНИЕ КАНАЛА</span>
+        <h2 id="sourceTitle">Канал данных</h2>
+        <p>Укажите источник сообщений и технический аккаунт для его чтения.</p>
+        <form class="form-grid source-form" data-source-form>
+            <label class="full"><span>Название</span><input name="name" placeholder="Например: Новости города" required></label>
+            <label class="full"><span>Канал или группа Telegram</span><input name="source" placeholder="@channel или ссылка" required></label>
+            <label class="full"><span>Технический аккаунт</span><select name="account" required><option value="">Выберите аккаунт</option><option value="demo">Подключённый технический аккаунт</option></select></label>
+            <div class="form-actions full"><span class="form-hint">Все поля обязательны</span><button class="button primary" type="submit">Добавить</button></div>
+        </form>
+    </div>
 </div>
 
 <div class="modal connection-modal" id="connectionModal" aria-hidden="true">
@@ -282,6 +296,6 @@ function active(string $current, string $target): string
 
 <div class="modal" id="deleteModal" aria-hidden="true"><div class="modal-backdrop" data-modal-close></div><div class="modal-card compact"><button class="modal-close" data-modal-close>×</button><div class="warning-icon">!</div><h2>Удалить аккаунт?</h2><p>Это демонстрационное окно подтверждения. На этапе функционала действие будет необратимым.</p><div class="modal-actions"><button class="button ghost" data-modal-close>Отмена</button><button class="button danger" data-delete>Удалить</button></div></div></div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=3"></script>
+<script src="assets/app.js?v=4"></script>
 </body>
 </html>
