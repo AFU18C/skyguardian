@@ -61,6 +61,7 @@ $('[data-account-edit]')?.addEventListener('click', event => {
   $('[data-account-details]', account).classList.toggle('open');
 });
 
+$('[data-add-connection]')?.addEventListener('click', () => openModal($('#connectionModal')));
 $('[data-qr]')?.addEventListener('click', () => openModal($('#qrModal')));
 $('[data-confirm-delete]')?.addEventListener('click', () => openModal($('#deleteModal')));
 $$('[data-modal-close]').forEach(button => button.addEventListener('click', () => closeModal(button.closest('.modal'))));
