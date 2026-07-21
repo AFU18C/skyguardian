@@ -2,7 +2,7 @@
 <?php
 declare(strict_types=1);
 
-require dirname(__DIR__) . '/src/TelegramAutomation.php';
+require dirname(__DIR__) . '/public/TelegramAutomation.php';
 
 try {
     (new TelegramAutomation(dirname(__DIR__) . '/storage'))->runMaintenance();
