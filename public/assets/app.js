@@ -401,7 +401,7 @@ function maskBotToken(token) {
 
 function createGroupChannelCard(item) {
   const card = document.createElement('article');
-  card.className = 'source-card';
+  card.className = 'source-card group-channel-card';
   card.dataset.groupChannelId = item.id;
 
   const icon = document.createElement('div');
@@ -413,10 +413,6 @@ function createGroupChannelCard(item) {
   const name = document.createElement('strong');
   name.textContent = item.name;
   info.append(name);
-
-  const status = document.createElement('span');
-  status.className = 'status-pill on';
-  status.append(document.createElement('i'), document.createTextNode('Добавлен'));
 
   const manage = document.createElement('button');
   manage.className = 'button group-manage-button';
@@ -436,7 +432,7 @@ function createGroupChannelCard(item) {
   actions.className = 'group-card-actions';
   actions.append(manage, edit);
 
-  card.append(icon, info, status, actions);
+  card.append(icon, info, actions);
   return card;
 }
 
