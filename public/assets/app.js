@@ -704,7 +704,18 @@ function createGroupChannelCard(item) {
       body.set('chat_id', item.chat_id || '');
       body.set('enabled', nextEnabled ? '1' : '0');
       const response = await fetch('/?action=telegram-automation', {method:'POST', credentials:'same-origin', body});
-      const result = await response.json();
+      const responseText = await response.text();
+      let result = null;
+      try {
+        result = responseText ? JSON.parse(responseText) : null;
+      } catch {
+        throw new Error('Сервер вернул некорректный ответ. Обновите страницу и повторите.');
+      }
+      if (!result) {
+        throw new Error(response.ok
+          ? 'Сервер не подтвердил изменение режима.'
+          : 'Сервер не ответил на переключение (HTTP ' + response.status + ').');
+      }
       if (!response.ok || !result.ok) throw new Error(result.message || 'Не удалось изменить режим');
       item.group_enabled = nextEnabled;
       writeGroupChannels();
@@ -718,9 +729,12 @@ function createGroupChannelCard(item) {
   });
 
   manage.disabled = !groupEnabled;
+  const actionButtons = document.createElement('div');
+  actionButtons.className = 'group-card-buttons';
+  actionButtons.append(manage, edit);
   const actions = document.createElement('div');
   actions.className = 'group-card-actions';
-  actions.append(toggleLabel, manage, edit);
+  actions.append(toggleLabel, actionButtons);
 
   card.append(icon, info, connectionIndicator, actions);
   return card;
