@@ -23,6 +23,7 @@
   let accounts = [];
   let waitTimer = null;
   let activeQrId = '';
+  let twoFactorModal = null;
 
   const showToast = (message, error = false) => {
     if (typeof window.toast === 'function') {
@@ -60,7 +61,7 @@
     if (!target) return;
     target.classList.remove('open');
     target.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
+    if (!document.querySelector('.modal.open')) document.body.style.overflow = '';
   };
 
   const openModal = target => {
@@ -69,6 +70,102 @@
     target.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
   };
+
+  const ensureTwoFactorModal = () => {
+    if (twoFactorModal) return twoFactorModal;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'modal';
+    wrapper.id = 'telegramTwoFactorModal';
+    wrapper.setAttribute('aria-hidden', 'true');
+    wrapper.innerHTML = `
+      <div class="modal-backdrop" data-2fa-cancel></div>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="telegramTwoFactorTitle">
+        <button class="modal-close" type="button" data-2fa-cancel aria-label="Закрыть">×</button>
+        <span class="step-label">ПОДТВЕРЖДЕНИЕ TELEGRAM</span>
+        <h2 id="telegramTwoFactorTitle">Двухэтапная аутентификация</h2>
+        <p>Введите пароль Telegram, чтобы завершить подключение технического аккаунта.</p>
+        <form class="form-grid" data-2fa-form>
+          <label class="full">
+            <span>Пароль</span>
+            <div class="input-action">
+              <input name="password" type="password" autocomplete="current-password" required placeholder="Введите пароль">
+              <button type="button" data-2fa-password aria-label="Показать или скрыть пароль">◉</button>
+            </div>
+            <small class="form-hint" data-2fa-hint hidden></small>
+            <small class="form-hint" data-2fa-error hidden></small>
+          </label>
+          <div class="modal-actions full">
+            <button class="button ghost" type="button" data-2fa-cancel>Отмена</button>
+            <button class="button primary" type="submit" data-2fa-submit>Подтвердить</button>
+          </div>
+        </form>
+      </div>`;
+    document.body.append(wrapper);
+    twoFactorModal = wrapper;
+    wrapper.querySelectorAll('[data-2fa-cancel]').forEach(button => button.addEventListener('click', () => closeModal(wrapper)));
+    wrapper.querySelector('[data-2fa-password]')?.addEventListener('click', () => {
+      const input = wrapper.querySelector('input[name="password"]');
+      if (!input) return;
+      input.type = input.type === 'password' ? 'text' : 'password';
+    });
+    return wrapper;
+  };
+
+  const askTwoFactorPassword = hint => new Promise(resolve => {
+    const dialog = ensureTwoFactorModal();
+    const form2fa = dialog.querySelector('[data-2fa-form]');
+    const input = dialog.querySelector('input[name="password"]');
+    const hintNode = dialog.querySelector('[data-2fa-hint]');
+    const errorNode = dialog.querySelector('[data-2fa-error]');
+    const submit = dialog.querySelector('[data-2fa-submit]');
+
+    if (hintNode) {
+      hintNode.hidden = !hint;
+      hintNode.textContent = hint ? 'Подсказка Telegram: ' + hint : '';
+    }
+    if (errorNode) {
+      errorNode.hidden = true;
+      errorNode.textContent = '';
+    }
+    if (input) {
+      input.value = '';
+      input.type = 'password';
+    }
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent = 'Подтвердить';
+    }
+
+    const cancelButtons = dialog.querySelectorAll('[data-2fa-cancel]');
+    const cleanup = value => {
+      form2fa?.removeEventListener('submit', onSubmit);
+      cancelButtons.forEach(button => button.removeEventListener('click', onCancel));
+      closeModal(dialog);
+      resolve(value);
+    };
+    const onCancel = event => {
+      event.preventDefault();
+      cleanup(null);
+    };
+    const onSubmit = event => {
+      event.preventDefault();
+      const value = input?.value || '';
+      if (!value) {
+        if (errorNode) {
+          errorNode.hidden = false;
+          errorNode.textContent = 'Введите пароль двухэтапной аутентификации.';
+        }
+        input?.focus();
+        return;
+      }
+      cleanup(value);
+    };
+
+    form2fa?.addEventListener('submit', onSubmit);
+    cancelButtons.forEach(button => button.addEventListener('click', onCancel));
+    openModal(dialog);
+    setTimeout(() => input?.focus(), 50);
+  });
 
   const setApiState = (ready, text = ready ? 'Проверено' : 'Не настроено') => {
     if (!apiStatus) return;
@@ -189,7 +286,7 @@
     }
   };
 
-  const updateQr = result => {
+  const updateQr = async result => {
     if (result.logged_in) {
       if (qrStatusStrong) qrStatusStrong.textContent = 'Telegram подключён';
       if (qrStatusSmall) qrStatusSmall.textContent = 'Сессия сохранена на сервере';
@@ -205,10 +302,15 @@
       return true;
     }
     if (result.needs_2fa) {
-      const password = window.prompt('Введите пароль двухэтапной аутентификации' + (result.hint ? ' (' + result.hint + ')' : '') + ':');
+      const password = await askTwoFactorPassword(result.hint || '');
       if (password === null) return true;
-      request('password', { id: activeQrId, password }).then(updateQr).catch(error => showToast(error.message, true));
-      return true;
+      try {
+        const passwordResult = await request('password', { id: activeQrId, password });
+        return updateQr(passwordResult);
+      } catch (error) {
+        showToast(error.message, true);
+        return updateQr(result);
+      }
     }
     if (result.svg && qrPlaceholder) {
       qrPlaceholder.innerHTML = result.svg;
@@ -222,7 +324,7 @@
     if (!activeQrId || !qrModal?.classList.contains('open')) return;
     try {
       const result = await request('wait', { id: activeQrId });
-      if (!updateQr(result)) waitTimer = setTimeout(waitQr, 300);
+      if (!(await updateQr(result))) waitTimer = setTimeout(waitQr, 300);
     } catch (error) {
       if (qrStatusSmall) qrStatusSmall.textContent = error.message;
       waitTimer = setTimeout(waitQr, 2500);
@@ -253,7 +355,7 @@
       qrStatusDot?.classList.add('pending');
       openModal(qrModal);
       const result = await request('qr', { id: activeQrId });
-      if (!updateQr(result)) waitQr();
+      if (!(await updateQr(result))) waitQr();
     } catch (error) {
       closeModal(qrModal);
       showToast(error.message, true);
