@@ -161,7 +161,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=6">
+    <link rel="stylesheet" href="assets/app.css?v=7">
 </head>
 <body>
 <div class="app-shell">
@@ -242,11 +242,12 @@ function active(string $current, string $target): string
         <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
         <span class="step-label">ДОБАВЛЕНИЕ КАНАЛА</span>
         <h2 id="sourceTitle">Канал данных</h2>
-        <p>Укажите источник сообщений и технический аккаунт для его чтения.</p>
+        <p>Укажите, откуда получать сообщения и куда их публиковать.</p>
         <form class="form-grid source-form" data-source-form>
             <label class="full"><span>Название</span><input name="name" placeholder="Например: Новости города" required></label>
-            <label class="full"><span>Канал или группа Telegram</span><input name="source" placeholder="@channel или ссылка" required></label>
+            <label class="full"><span>Канал или группа — источник сообщений</span><input name="source" placeholder="@source_channel или ссылка" required></label>
             <label class="full"><span>Технический аккаунт</span><select name="account" required><option value="">Выберите аккаунт</option><option value="demo">Подключённый технический аккаунт</option></select></label>
+            <label class="full"><span>Канал или группа для публикации</span><input name="destination" placeholder="@destination_channel или ссылка" required></label>
             <div class="form-actions full"><span class="form-hint">Все поля обязательны</span><button class="button primary" type="submit">Добавить</button></div>
         </form>
     </div>
