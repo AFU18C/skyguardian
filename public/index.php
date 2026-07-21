@@ -37,7 +37,7 @@ if ($action === 'telegram-automation' && $_SERVER['REQUEST_METHOD'] === 'POST') 
     }
     $baseUrl = rtrim((string)(getenv('APP_URL') ?: (($secure ? 'https' : 'http') . '://' . $host)), '/');
     try {
-        require_once dirname(__DIR__) . '/src/TelegramAutomation.php';
+        require_once __DIR__ . '/TelegramAutomation.php';
         $automation = new TelegramAutomation($storageDir);
         $operation = (string)($_POST['operation'] ?? 'save');
         if ($operation === 'status') {
