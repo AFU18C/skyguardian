@@ -266,15 +266,6 @@ function active(string $current, string $target): string
 
             <?php elseif ($isSettings): ?>
                 <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Настройка</h1><p>Будущие правила получения, обработки и публикации сообщений.</p></div><button class="button primary add-connection-button" type="button" data-tooltip="Технический аккаунт и API" aria-label="Добавить технический аккаунт и API" data-toast="Форма добавления технического аккаунта и API будет подключена на этапе функционала">Добавить</button></section>
-                <section class="settings-list">
-                    <?php foreach ([['Источник сообщений','Telegram-канал, откуда будут поступать сообщения'],['Обработка сообщений','Правила для текста, ссылок и медиа'],['Защита от повторов','Проверка сообщений перед публикацией'],['Место публикации','Группа или канал для отправки сообщений']] as $index => $item): ?>
-                        <article class="panel spoiler" data-spoiler>
-                            <button class="spoiler-head" type="button" data-spoiler-button><span class="setting-number">0<?= $index + 1 ?></span><span><strong><?= $item[0] ?></strong><small><?= $item[1] ?></small></span><span class="status-pill off"><i></i>Не настроено</span><b>⌄</b></button>
-                            <div class="spoiler-body"><div class="placeholder-box"><span>✦</span><h3>Функционал добавим после утверждения шаблона</h3><p>Структура блока уже подготовлена для будущих полей и настроек.</p><button class="button secondary" type="button" data-toast="Сейчас согласовываем только внешний вид">Показать пример действия</button></div></div>
-                        </article>
-                    <?php endforeach; ?>
-                </section>
-
             <?php else: ?>
                 <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
                 <article class="panel group-panel"><div class="empty-state large"><div>♟</div><strong>Группа пока не добавлена</strong><p>Форма подключения будет добавлена после утверждения дизайна и логики.</p><button class="button primary" data-toast="Функционал добавления появится на следующем этапе">Добавить группу</button></div></article>
