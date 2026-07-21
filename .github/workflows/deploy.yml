@@ -49,6 +49,8 @@ jobs:
           test -f public/assets/telegram-account.js
           test -f public/assets/data-channel.js
           test -f public/assets/data-channel-runtime.js
+          test -f public/assets/brand-logo.css
+          test -f public/assets/brand-logo.js
           test -f deploy/skyguardian-data-channels.service
 
       - name: Configure SSH
@@ -97,6 +99,17 @@ jobs:
             grep -q "fetch_limit" "$target/public/data-channel.php"
             grep -q "fetch_limit" "$target/bin/data-channel-worker.php"
 
+            if ! grep -q "brand-logo.css" "$target/public/index.php"; then
+              sed -i "s#</head>#<link rel=\"stylesheet\" href=\"/assets/brand-logo.css?v=1\"></head>#g" "$target/public/index.php"
+            else
+              sed -i -E "s#brand-logo.css\?v=[0-9]+#brand-logo.css?v=1#g" "$target/public/index.php"
+            fi
+            if ! grep -q "brand-logo.js" "$target/public/index.php"; then
+              sed -i "s#</body>#<script src=\"/assets/brand-logo.js?v=1\"></script></body>#g" "$target/public/index.php"
+            else
+              sed -i -E "s#brand-logo.js\?v=[0-9]+#brand-logo.js?v=1#g" "$target/public/index.php"
+            fi
+
             if ! grep -q "telegram-account.js" "$target/public/index.php"; then
               sed -i "s#<script src=\"assets/app.js?v=38\"></script>#<script src=\"assets/app.js?v=39\"></script><script src=\"assets/telegram-account.js?v=3\"></script>#" "$target/public/index.php"
             else
@@ -112,6 +125,9 @@ jobs:
             else
               sed -i -E "s#data-channel-runtime.js\?v=[0-9]+#data-channel-runtime.js?v=2#g" "$target/public/index.php"
             fi
+
+            grep -q "brand-logo.css" "$target/public/index.php"
+            grep -q "brand-logo.js" "$target/public/index.php"
 
             if getent group www-data >/dev/null 2>&1; then
               chgrp www-data "$target/storage"
