@@ -336,6 +336,8 @@
 .group-control-pane>p{margin:0;color:var(--muted);font-size:11px;line-height:1.65}
 .control-status-card{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px;border:1px solid #2a3b54;border-radius:13px;background:#101a29}
 .control-status-card>div{display:flex;align-items:center;gap:12px}
+.telegram-status-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.telegram-status-actions .button{margin:0}
 .control-status-card strong,.control-status-card small{display:block}
 .control-status-card strong{font-size:12px}.control-status-card small{margin-top:5px;color:var(--muted);font-size:9px}
 .control-status-dot{width:11px;height:11px;flex:0 0 auto;border-radius:50%;background:#748399;box-shadow:0 0 0 5px rgba(116,131,153,.1)}
@@ -343,11 +345,15 @@
 .control-feature-grid article{padding:16px;border:1px solid #26364e;border-radius:13px;background:linear-gradient(145deg,#101a2a,#0b1320)}
 .control-feature-grid article>span{display:grid;width:35px;height:35px;place-items:center;margin-bottom:12px;border-radius:10px;background:rgba(61,130,246,.12);color:#76aaff}
 .control-feature-grid strong,.control-feature-grid small{display:block}.control-feature-grid strong{font-size:11px}.control-feature-grid small{margin-top:6px;color:var(--muted);font-size:9px;line-height:1.5}
-.source-card{grid-template-columns:42px minmax(0,1fr) auto auto 38px}
+.source-card{grid-template-columns:42px minmax(0,1fr) auto auto}
+.group-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.group-card-actions .group-manage-button,.group-card-actions .source-edit-button{margin:0}
 @media(max-width:640px){
- .source-card{grid-template-columns:38px minmax(0,1fr) 36px}
- .group-manage-button{grid-column:2;justify-self:start;margin-top:4px}
- .source-edit-button{grid-column:3;grid-row:1 / span 3}
+ .source-card{grid-template-columns:38px minmax(0,1fr);align-items:center}
+ .source-card .status-pill{grid-column:2;justify-self:start}
+ .group-card-actions{grid-column:2;justify-self:start;margin-top:2px}
+ .group-card-actions .group-manage-button,.group-card-actions .source-edit-button{min-height:36px}
+ .group-card-actions .source-edit-button{width:36px}
  .group-control-modal{padding:0;align-items:stretch}
  .group-control-card{width:100%;height:100dvh;max-height:100dvh;padding:18px 12px 20px;border:0;border-radius:0}
  .group-control-heading{padding:4px 42px 16px 4px}
@@ -358,6 +364,8 @@
  .group-control-content{padding:12px}
  .control-status-card{align-items:stretch;flex-direction:column}
  .control-status-card .button{width:100%}
+ .telegram-status-actions{width:100%;display:grid;grid-template-columns:1fr}
+ .telegram-status-actions:has([data-group-action="info"]:not([hidden])){grid-template-columns:1fr 1fr}
  .control-feature-grid{grid-template-columns:1fr}
 }
 
