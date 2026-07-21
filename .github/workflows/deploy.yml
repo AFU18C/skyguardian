@@ -121,9 +121,9 @@ jobs:
               sed -i -E "s#data-channel.js\?v=[0-9]+#data-channel.js?v=3#g" "$target/public/index.php"
             fi
             if ! grep -q "data-channel-runtime.js" "$target/public/index.php"; then
-              sed -i "s#</body>#<script src=\"assets/data-channel-runtime.js?v=2\"></script></body>#" "$target/public/index.php"
+              sed -i "s#</body>#<script src=\"assets/data-channel-runtime.js?v=3\"></script></body>#" "$target/public/index.php"
             else
-              sed -i -E "s#data-channel-runtime.js\?v=[0-9]+#data-channel-runtime.js?v=2#g" "$target/public/index.php"
+              sed -i -E "s#data-channel-runtime.js\?v=[0-9]+#data-channel-runtime.js?v=3#g" "$target/public/index.php"
             fi
 
             grep -q "brand-logo.css" "$target/public/index.php"
