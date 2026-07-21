@@ -407,9 +407,11 @@
 /* Telegram status indicator on compact group cards */
 .group-channel-card{position:relative}
 .group-channel-card .source-card-info{padding-right:32px}
-.group-connection-indicator{position:absolute;top:18px;right:18px;width:11px;height:11px;border-radius:50%;background:#748399;box-shadow:0 0 0 5px rgba(116,131,153,.11)}
-.group-connection-indicator.success{background:#35d07f;box-shadow:0 0 0 5px rgba(53,208,127,.14),0 0 14px rgba(53,208,127,.45)}
-.group-connection-indicator.error{background:#ff5d68;box-shadow:0 0 0 5px rgba(255,93,104,.12),0 0 14px rgba(255,93,104,.34)}
+.group-check-date{display:block;margin-top:7px;color:#7f8ca3;font-size:12px;line-height:1.35}
+.group-connection-indicator{position:absolute;top:14px;right:14px;display:grid;place-items:center;width:25px;height:25px;padding:0;border:1px solid rgba(139,155,180,.28);border-radius:50%;background:#748399;color:#0b1424;font:700 14px/1 inherit;cursor:pointer;box-shadow:0 0 0 5px rgba(116,131,153,.11);transition:transform .18s ease,box-shadow .18s ease}
+.group-connection-indicator:hover,.group-connection-indicator:focus-visible{transform:scale(1.08);outline:none}
+.group-connection-indicator.success{background:#35d07f;color:#071b13;box-shadow:0 0 0 5px rgba(53,208,127,.14),0 0 14px rgba(53,208,127,.45)}
+.group-connection-indicator.error{background:#ff5d68;color:#2c080b;box-shadow:0 0 0 5px rgba(255,93,104,.12),0 0 14px rgba(255,93,104,.34)}
 @media(max-width:640px){
-  .group-connection-indicator{top:17px;right:17px}
+  .group-connection-indicator{top:13px;right:13px}
 }
