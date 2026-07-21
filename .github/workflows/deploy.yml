@@ -1,10 +1,11 @@
-name: Deploy SkyGuardian template
+name: Deploy SkyGuardian
 
 on:
   push:
     branches: [main]
     paths:
       - 'public/**'
+      - 'artisan'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
@@ -22,8 +23,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate PHP template
-        run: php -l public/index.php
+      - name: Validate PHP
+        run: |
+          php -l public/index.php
+          php -l artisan
+          php artisan
 
       - name: Configure SSH
         env:
@@ -40,7 +44,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
-      - name: Upload verified public files
+      - name: Upload verified application
         env:
           SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
           SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
@@ -48,17 +52,20 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$SSH_USER"
-          tar -C public -czf /tmp/skyguardian-public.tar.gz .
-          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" /tmp/skyguardian-public.tar.gz "$SSH_USER@$SSH_HOST:/tmp/skyguardian-public.tar.gz"
+          tar -czf /tmp/skyguardian-release.tar.gz public artisan
+          scp -i ~/.ssh/id_ed25519 -P "$SSH_PORT" /tmp/skyguardian-release.tar.gz "$SSH_USER@$SSH_HOST:/tmp/skyguardian-release.tar.gz"
           ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'set -eu
             target=/var/www/SkyGuardianUa
             test "$target" = /var/www/SkyGuardianUa
-            install -d "$target/public"
-            find "$target" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-            install -d "$target/public"
-            tar -xzf /tmp/skyguardian-public.tar.gz -C "$target/public"
-            rm -f /tmp/skyguardian-public.tar.gz
+            install -d -m 750 "$target" "$target/storage"
+            rm -rf "$target/public.next"
+            install -d "$target/public.next"
+            tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
+            chmod 750 "$target/artisan"
+            chmod 700 "$target/storage"
+            find "$target/public" -type d -exec chmod 755 {} +
+            find "$target/public" -type f -exec chmod 644 {} +
+            rm -f /tmp/skyguardian-release.tar.gz
             test -f "$target/public/index.php"
-            test -f "$target/public/assets/app.css"
-            test -f "$target/public/assets/app.js"
+            test -f "$target/artisan"
           '
