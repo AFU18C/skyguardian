@@ -346,12 +346,14 @@
 .control-feature-grid article>span{display:grid;width:35px;height:35px;place-items:center;margin-bottom:12px;border-radius:10px;background:rgba(61,130,246,.12);color:#76aaff}
 .control-feature-grid strong,.control-feature-grid small{display:block}.control-feature-grid strong{font-size:11px}.control-feature-grid small{margin-top:6px;color:var(--muted);font-size:9px;line-height:1.5}
 .source-card{grid-template-columns:42px minmax(0,1fr) auto auto}
+.group-channel-card{grid-template-columns:42px minmax(0,1fr);align-items:center}
 .group-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.group-channel-card .group-card-actions{grid-column:2;justify-self:end;align-self:end;margin-top:8px}
 .group-card-actions .group-manage-button,.group-card-actions .source-edit-button{margin:0}
 @media(max-width:640px){
  .source-card{grid-template-columns:38px minmax(0,1fr);align-items:center}
  .source-card .status-pill{grid-column:2;justify-self:start}
- .group-card-actions{grid-column:2;justify-self:start;margin-top:2px}
+ .group-channel-card .group-card-actions{grid-column:2;justify-self:end;align-self:end;margin-top:8px}
  .group-card-actions .group-manage-button,.group-card-actions .source-edit-button{min-height:36px}
  .group-card-actions .source-edit-button{width:36px}
  .group-control-modal{padding:0;align-items:stretch}
