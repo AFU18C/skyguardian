@@ -376,12 +376,7 @@ function active(string $current, string $target): string
                 </section>
 
                 <article class="panel server-load-panel">
-                    <div class="server-load-head">
-                        <div><span class="step-label">СЕРВЕР</span><h2>Нагрузка сервера</h2><p>Показатели обновляются при открытии страницы.</p></div>
-                        <div class="server-load-actions">
-                            <div class="server-pulse" aria-hidden="true"><span></span><i></i><span></span></div>
-                        </div>
-                    </div>
+
                     <div class="server-metrics">
                         <?php foreach ([
                             ['cpu', 'Процессор', 'Загрузка вычислительных ресурсов', '⌁'],
