@@ -176,6 +176,17 @@ final class TelegramAutomation
         return null;
     }
 
+    public function isGroupEnabled(string $token, string $chatId): bool
+    {
+        $key = hash('sha256', $token . ':' . $chatId);
+        $config = $this->readJson($this->configFile)[$key] ?? null;
+
+        // Existing groups that have never used the master switch keep their
+        // previous behaviour. Once explicitly disabled, every server endpoint
+        // must stop before making any Telegram API request.
+        return !is_array($config) || ($config['group_enabled'] ?? true) !== false;
+    }
+
     public function pollingConfigs(): array
     {
         return array_values(array_filter($this->readJson($this->configFile), static fn($c): bool =>
