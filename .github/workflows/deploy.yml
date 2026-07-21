@@ -58,13 +58,25 @@ jobs:
             target=/var/www/SkyGuardianUa
             test "$target" = /var/www/SkyGuardianUa
             install -d -m 755 "$target"
-            install -d -m 700 "$target/storage"
+            install -d -m 750 "$target/storage"
             rm -rf "$target/public.next"
             install -d "$target/public.next"
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
             chmod 755 "$target"
             chmod 750 "$target/artisan"
-            chmod 700 "$target/storage"
+            if getent group www-data >/dev/null 2>&1; then
+              chgrp www-data "$target/storage"
+              chmod 750 "$target/storage"
+              if test -f "$target/storage/admin.json"; then
+                chgrp www-data "$target/storage/admin.json"
+                chmod 640 "$target/storage/admin.json"
+              fi
+            else
+              chmod 755 "$target/storage"
+              if test -f "$target/storage/admin.json"; then
+                chmod 644 "$target/storage/admin.json"
+              fi
+            fi
             find "$target/public" -type d -exec chmod 755 {} +
             find "$target/public" -type f -exec chmod 644 {} +
             rm -f /tmp/skyguardian-release.tar.gz
