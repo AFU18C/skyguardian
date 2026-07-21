@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isLoginRequest) {
         $loginError = 'Сессия устарела. Обновите страницу и попробуйте снова.';
     } elseif (!is_array($admin) || empty($admin['email']) || empty($admin['password_hash'])) {
         $loginError = 'Администратор ещё не создан. Выполните команду php artisan admin:create.';
-    } elseif (!hash_equals(mb_strtolower((string) $admin['email']), mb_strtolower($email)) || !password_verify($password, (string) $admin['password_hash'])) {
+    } elseif (!hash_equals(strtolower((string) $admin['email']), strtolower($email)) || !password_verify($password, (string) $admin['password_hash'])) {
         usleep(350000);
         $loginError = 'Неверная почта или пароль.';
     } else {
