@@ -184,6 +184,9 @@ final class TelegramAutomation
                 'message_id' => (int)($sent['message_id'] ?? 0),
                 'expires_at' => time() + (int)$config['captcha_timeout'],
                 'name' => $name,
+                'token' => $config['bot_token'],
+                'chat_id' => $config['chat_id'],
+                'user_id' => $userId,
             ];
             $this->writeJson($this->stateFile, $state);
             $this->log('captcha_started', $config, ['user_id' => $userId]);
@@ -291,7 +294,19 @@ final class TelegramAutomation
         }
         $state['delete'] = $remaining;
         foreach ((array)($state['captcha'] ?? []) as $key => $captcha) {
-            if ((int)($captcha['expires_at'] ?? 0) <= time()) unset($state['captcha'][$key]);
+            if ((int)($captcha['expires_at'] ?? 0) <= time()) {
+                $token = (string)($captcha['token'] ?? '');
+                $chatId = (string)($captcha['chat_id'] ?? '');
+                $userId = (string)($captcha['user_id'] ?? '');
+                if ($token !== '' && $chatId !== '' && $userId !== '') {
+                    $this->safeApi($token, 'banChatMember', ['chat_id' => $chatId, 'user_id' => $userId, 'revoke_messages' => 'true']);
+                    $this->safeApi($token, 'unbanChatMember', ['chat_id' => $chatId, 'user_id' => $userId, 'only_if_banned' => 'true']);
+                }
+                if ($token !== '' && $chatId !== '' && (int)($captcha['message_id'] ?? 0) > 0) {
+                    $this->safeApi($token, 'deleteMessage', ['chat_id' => $chatId, 'message_id' => (int)$captcha['message_id']]);
+                }
+                unset($state['captcha'][$key]);
+            }
         }
         $this->writeJson($this->stateFile, $state);
     }
