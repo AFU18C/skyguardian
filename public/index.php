@@ -19,6 +19,144 @@ $requestedPage = $_GET['page'] ?? null;
 $action = $_GET['action'] ?? null;
 $isAuthenticated = ($_SESSION['admin_authenticated'] ?? false) === true;
 
+if ($action === 'telegram-check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+
+    $reply = static function (int $status, array $payload): never {
+        http_response_code($status);
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    };
+
+    if (!$isAuthenticated) {
+        $reply(401, ['ok' => false, 'message' => 'Требуется авторизация.']);
+    }
+
+    $csrfToken = (string) ($_POST['_token'] ?? '');
+    if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), $csrfToken)) {
+        $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
+    }
+
+    $botToken = trim((string) ($_POST['bot_token'] ?? ''));
+    $chatId = trim((string) ($_POST['chat_id'] ?? ''));
+
+    if (!preg_match('/^\\d{6,12}:[A-Za-z0-9_-]{30,}$/', $botToken)) {
+        $reply(422, ['ok' => false, 'message' => 'Токен бота имеет неверный формат.']);
+    }
+    if (!preg_match('/^-?\\d+$/', $chatId)) {
+        $reply(422, ['ok' => false, 'message' => 'Telegram Chat ID имеет неверный формат.']);
+    }
+    if (!function_exists('curl_init')) {
+        $reply(503, ['ok' => false, 'message' => 'На сервере не установлено расширение PHP cURL.']);
+    }
+
+    $telegramRequest = static function (string $method, array $parameters = []) use ($botToken): array {
+        $handle = curl_init('https://api.telegram.org/bot' . $botToken . '/' . $method);
+        curl_setopt_array($handle, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($parameters),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 12,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        ]);
+        $body = curl_exec($handle);
+        $curlError = curl_error($handle);
+        $httpCode = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        curl_close($handle);
+
+        if ($body === false || $curlError !== '') {
+            throw new RuntimeException('Telegram недоступен: проверьте интернет-соединение VPS.');
+        }
+
+        $data = json_decode((string) $body, true);
+        if (!is_array($data)) {
+            throw new RuntimeException('Telegram вернул некорректный ответ.');
+        }
+        if ($httpCode >= 400 || ($data['ok'] ?? false) !== true) {
+            $description = trim((string) ($data['description'] ?? 'Telegram отклонил запрос.'));
+            throw new RuntimeException($description);
+        }
+
+        return is_array($data['result'] ?? null) ? $data['result'] : [];
+    };
+
+    try {
+        $bot = $telegramRequest('getMe');
+        $chat = $telegramRequest('getChat', ['chat_id' => $chatId]);
+        $membership = $telegramRequest('getChatMember', [
+            'chat_id' => $chatId,
+            'user_id' => (string) ($bot['id'] ?? ''),
+        ]);
+
+        $memberCount = null;
+        try {
+            $countResult = $telegramRequest('getChatMemberCount', ['chat_id' => $chatId]);
+            $memberCount = is_int($countResult) ? $countResult : (is_numeric($countResult) ? (int) $countResult : null);
+        } catch (Throwable) {
+            $memberCount = null;
+        }
+
+        $status = (string) ($membership['status'] ?? 'unknown');
+        $isAdministrator = in_array($status, ['administrator', 'creator'], true);
+        $rights = [];
+        foreach ([
+            'can_manage_chat', 'can_delete_messages', 'can_manage_video_chats',
+            'can_restrict_members', 'can_promote_members', 'can_change_info',
+            'can_invite_users', 'can_post_messages', 'can_edit_messages',
+            'can_pin_messages', 'can_manage_topics',
+        ] as $right) {
+            $rights[$right] = $status === 'creator' || (($membership[$right] ?? false) === true);
+        }
+
+        $typeLabels = [
+            'private' => 'Личный чат',
+            'group' => 'Группа',
+            'supergroup' => 'Супергруппа',
+            'channel' => 'Канал',
+        ];
+        $chatType = (string) ($chat['type'] ?? 'unknown');
+        $title = trim((string) ($chat['title'] ?? ''));
+        if ($title === '') {
+            $title = trim((string) (($chat['first_name'] ?? '') . ' ' . ($chat['last_name'] ?? '')));
+        }
+
+        $reply(200, [
+            'ok' => true,
+            'message' => $isAdministrator ? 'Бот подключён и имеет права администратора.' : 'Бот видит чат, но не является администратором.',
+            'bot' => [
+                'id' => (string) ($bot['id'] ?? ''),
+                'username' => (string) ($bot['username'] ?? ''),
+                'name' => trim((string) (($bot['first_name'] ?? '') . ' ' . ($bot['last_name'] ?? ''))),
+            ],
+            'chat' => [
+                'id' => (string) ($chat['id'] ?? $chatId),
+                'title' => $title !== '' ? $title : 'Без названия',
+                'type' => $chatType,
+                'type_label' => $typeLabels[$chatType] ?? $chatType,
+                'username' => (string) ($chat['username'] ?? ''),
+                'member_count' => $memberCount,
+            ],
+            'membership' => [
+                'status' => $status,
+                'is_administrator' => $isAdministrator,
+                'rights' => $rights,
+            ],
+            'checked_at' => (new DateTimeImmutable('now', new DateTimeZone('Europe/Kyiv')))->format('d.m.Y в H:i:s'),
+        ]);
+    } catch (RuntimeException $exception) {
+        $message = $exception->getMessage();
+        if (str_contains(strtolower($message), 'unauthorized')) {
+            $message = 'Токен бота недействителен.';
+        } elseif (str_contains(strtolower($message), 'chat not found')) {
+            $message = 'Чат не найден. Проверьте Chat ID и добавьте бота в чат.';
+        }
+        $reply(422, ['ok' => false, 'message' => $message]);
+    } catch (Throwable) {
+        $reply(503, ['ok' => false, 'message' => 'Не удалось проверить подключение Telegram.']);
+    }
+}
+
 if ($action === 'backup' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
 
@@ -316,7 +454,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=22">
+    <link rel="stylesheet" href="assets/app.css?v=23">
 </head>
 <body>
 <div class="app-shell">
@@ -463,9 +601,17 @@ function active(string $current, string $target): string
             </nav>
             <div class="group-control-content">
                 <section class="group-control-pane active" data-group-control-pane="overview">
-                    <div class="control-status-card">
-                        <div><span class="control-status-dot"></span><div><strong>Подключение не проверено</strong><small>Проверка будет выполняться через защищённый серверный запрос</small></div></div>
-                        <button class="button primary" type="button" data-group-action="check">Проверить подключение</button>
+                    <div class="control-status-card" data-telegram-status>
+                        <div><span class="control-status-dot"></span><div><strong data-telegram-status-title>Подключение не проверено</strong><small data-telegram-status-text>Нажмите кнопку, чтобы проверить бота и его права</small></div></div>
+                        <button class="button primary" type="button" data-group-action="check" data-csrf="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">Проверить подключение</button>
+                    </div>
+                    <div class="telegram-check-details" data-telegram-details hidden>
+                        <article><small>Бот</small><strong data-telegram-bot>—</strong></article>
+                        <article><small>Чат</small><strong data-telegram-chat>—</strong></article>
+                        <article><small>Тип</small><strong data-telegram-type>—</strong></article>
+                        <article><small>Участники</small><strong data-telegram-members>—</strong></article>
+                        <article class="telegram-rights-card"><small>Права бота</small><div data-telegram-rights></div></article>
+                        <small class="telegram-checked-at" data-telegram-checked-at></small>
                     </div>
                     <div class="control-feature-grid">
                         <article><span>✎</span><strong>Публикации</strong><small>Текст, медиа, файлы, опросы, закрепление и тихая отправка</small></article>
