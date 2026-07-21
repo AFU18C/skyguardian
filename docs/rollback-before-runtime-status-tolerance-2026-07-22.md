@@ -1,0 +1,1 @@
+Rollback point before correcting false "worker unresponsive" status for long polling intervals. Restore main to the parent commit of this change if needed.
