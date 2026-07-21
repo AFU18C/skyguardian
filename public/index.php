@@ -372,7 +372,7 @@ if ($isPublicLanding || $isLoginRequest) {
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
     <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=29">
+    <link rel="stylesheet" href="/assets/app.css?v=30">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
@@ -530,7 +530,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=29">
+    <link rel="stylesheet" href="assets/app.css?v=30">
 </head>
 <body>
 <div class="app-shell">
