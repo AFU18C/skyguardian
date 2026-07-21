@@ -121,7 +121,7 @@ $('[data-custom-text-preview-button]')?.addEventListener('click', () => {
 customTextInput?.addEventListener('input', renderCustomTextPreview);
 customTextPosition?.addEventListener('change', renderCustomTextPreview);
 
-$('[data-editor-wrap]').forEach(button => button.addEventListener('click', () => {
+$$('[data-editor-wrap]').forEach(button => button.addEventListener('click', () => {
   if (!customTextInput) return;
   const marker = button.dataset.editorWrap;
   const start = customTextInput.selectionStart;
