@@ -14,8 +14,11 @@ final class TelegramAutomation
         $this->configFile = $this->storageDir . '/telegram-automation.json';
         $this->stateFile = $this->storageDir . '/telegram-automation-state.json';
         $this->logFile = $this->storageDir . '/telegram-automation.log';
-        if (!is_dir($this->storageDir)) {
-            mkdir($this->storageDir, 0750, true);
+        if (!is_dir($this->storageDir) && !mkdir($this->storageDir, 0750, true) && !is_dir($this->storageDir)) {
+            throw new RuntimeException('Не удалось создать каталог storage.');
+        }
+        if (!is_writable($this->storageDir)) {
+            throw new RuntimeException('Сервер не может записывать настройки: каталог storage недоступен пользователю PHP.');
         }
     }
 
