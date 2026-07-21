@@ -65,7 +65,126 @@ $('[data-account-edit]')?.addEventListener('click', event => {
 });
 
 $('[data-add-connection]')?.addEventListener('click', () => openModal($('#connectionModal')));
-$('[data-add-source]')?.addEventListener('click', () => openModal($('#sourceModal')));
+
+const sourceModal = $('#sourceModal');
+const sourceForm = $('[data-source-form]');
+const sourceList = $('[data-source-list]');
+const sourceEmpty = $('[data-source-empty]');
+const sourceDeleteButton = $('[data-source-delete]');
+const sourceSaveButton = $('[data-source-save]');
+const sourceModalLabel = $('[data-source-modal-label]');
+const sourceScope = sourceList?.dataset.sourceScope || 'sources';
+const sourceStorageKey = 'skyguardian:' + sourceScope + ':channels';
+let sources = [];
+
+const publicationFormatLabels = {
+  original: 'Оригинал полностью',
+  text: 'Только текст',
+  text_without_links: 'Только текст без ссылок',
+  media: 'Только медиа',
+  text_and_media: 'Текст и медиа'
+};
+const processingStartLabels = {
+  new: 'Только новые сообщения',
+  last_5: 'Последние 5 сообщений',
+  last_10: 'Последние 10 сообщений',
+  last_20: 'Последние 20 сообщений'
+};
+
+function readSources() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(sourceStorageKey) || '[]');
+    sources = Array.isArray(saved) ? saved : [];
+  } catch {
+    sources = [];
+  }
+}
+
+function writeSources() {
+  try {
+    localStorage.setItem(sourceStorageKey, JSON.stringify(sources));
+  } catch {
+    toast('Не удалось сохранить данные в браузере');
+  }
+}
+
+function createSourceCard(source) {
+  const card = document.createElement('article');
+  card.className = 'source-card';
+  card.dataset.sourceId = source.id;
+
+  const icon = document.createElement('div');
+  icon.className = 'source-card-icon';
+  icon.textContent = '◉';
+
+  const info = document.createElement('div');
+  info.className = 'source-card-info';
+  const name = document.createElement('strong');
+  name.textContent = source.name;
+  const route = document.createElement('span');
+  route.textContent = source.source + ' → ' + source.destination;
+  const details = document.createElement('small');
+  const unit = source.check_frequency_unit === 'hours' ? 'ч.' : 'сек.';
+  details.textContent = (publicationFormatLabels[source.publication_format] || source.publication_format) + ' · ' + source.check_frequency + ' ' + unit + ' · ' + (processingStartLabels[source.processing_start] || source.processing_start);
+  info.append(name, route, details);
+
+  const status = document.createElement('span');
+  status.className = 'status-pill ' + (source.account ? 'on' : 'off');
+  const dot = document.createElement('i');
+  status.append(dot, document.createTextNode(source.account ? 'Работает' : 'Не работает'));
+
+  const edit = document.createElement('button');
+  edit.className = 'source-edit-button';
+  edit.type = 'button';
+  edit.setAttribute('aria-label', 'Редактировать канал ' + source.name);
+  edit.title = 'Редактировать';
+  edit.textContent = '✎';
+  edit.addEventListener('click', () => openSourceEditor(source.id));
+
+  card.append(icon, info, status, edit);
+  return card;
+}
+
+function renderSources() {
+  if (!sourceList) return;
+  sourceList.querySelectorAll('[data-source-id]').forEach(card => card.remove());
+  sourceEmpty.hidden = sources.length > 0;
+  sources.forEach(source => sourceList.append(createSourceCard(source)));
+}
+
+function resetSourceForm() {
+  if (!sourceForm) return;
+  sourceForm.reset();
+  sourceForm.elements.source_id.value = '';
+  sourceDeleteButton.hidden = true;
+  sourceSaveButton.textContent = 'Добавить';
+  sourceModalLabel.textContent = 'ДОБАВЛЕНИЕ КАНАЛА';
+  if (customTextEditor) customTextEditor.hidden = true;
+  if (customTextPreview) customTextPreview.hidden = true;
+  syncFrequencyLimits();
+}
+
+function openSourceEditor(id) {
+  const source = sources.find(item => item.id === id);
+  if (!source || !sourceForm) return;
+  resetSourceForm();
+  Object.entries(source).forEach(([key, value]) => {
+    const field = sourceForm.elements.namedItem(key);
+    if (!field) return;
+    if (field.type === 'checkbox') field.checked = Boolean(value);
+    else field.value = value ?? '';
+  });
+  sourceDeleteButton.hidden = false;
+  sourceSaveButton.textContent = 'Сохранить';
+  sourceModalLabel.textContent = 'РЕДАКТИРОВАНИЕ КАНАЛА';
+  if (customTextToggle) customTextToggle.dispatchEvent(new Event('change'));
+  openModal(sourceModal);
+}
+
+$('[data-add-source]')?.addEventListener('click', () => {
+  resetSourceForm();
+  openModal(sourceModal);
+});
 
 const frequencyValue = $('[data-frequency-value]');
 const frequencyUnit = $('[data-frequency-unit]');
@@ -142,22 +261,58 @@ $('[data-editor-link]')?.addEventListener('click', () => {
   customTextInput.dispatchEvent(new Event('input'));
 });
 
-const sourceForm = $('[data-source-form]');
 sourceForm?.addEventListener('submit', event => {
   event.preventDefault();
-  const values = Object.fromEntries(new FormData(sourceForm));
-  if (!values.name?.trim() || !values.source?.trim() || !values.account?.trim()) {
-    toast('Заполните все поля канала данных');
+  if (!sourceForm.checkValidity()) {
+    sourceForm.reportValidity();
+    toast('Заполните обязательные поля');
     return;
   }
+  const values = Object.fromEntries(new FormData(sourceForm));
   if (customTextToggle?.checked && !values.custom_text?.trim()) {
     toast('Введите собственный текст');
     customTextInput?.focus();
     return;
   }
-  closeModal($('#sourceModal'));
-  toast('Макет канала данных сохранён');
+
+  const source = {
+    id: values.source_id || (globalThis.crypto?.randomUUID?.() || String(Date.now())),
+    name: values.name.trim(),
+    source: values.source.trim(),
+    account: values.account || '',
+    destination: values.destination.trim(),
+    publication_format: values.publication_format,
+    check_frequency: values.check_frequency,
+    check_frequency_unit: values.check_frequency_unit,
+    processing_start: values.processing_start,
+    keywords: values.keywords?.trim() || '',
+    stop_words: values.stop_words?.trim() || '',
+    custom_text_enabled: customTextToggle?.checked || false,
+    custom_text_position: values.custom_text_position || 'after',
+    custom_text: values.custom_text?.trim() || ''
+  };
+
+  const index = sources.findIndex(item => item.id === source.id);
+  if (index >= 0) sources[index] = source;
+  else sources.push(source);
+  writeSources();
+  renderSources();
+  closeModal(sourceModal);
+  toast('Сохранено');
 });
+
+sourceDeleteButton?.addEventListener('click', () => {
+  const id = sourceForm?.elements.source_id.value;
+  if (!id) return;
+  sources = sources.filter(item => item.id !== id);
+  writeSources();
+  renderSources();
+  closeModal(sourceModal);
+  toast('Удалено');
+});
+
+readSources();
+renderSources();
 $('[data-qr]')?.addEventListener('click', () => openModal($('#qrModal')));
 $('[data-confirm-delete]')?.addEventListener('click', () => openModal($('#deleteModal')));
 $$('[data-modal-close]').forEach(button => button.addEventListener('click', () => closeModal(button.closest('.modal'))));
