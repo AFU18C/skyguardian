@@ -201,11 +201,20 @@ final class TelegramAutomation
         if (!is_array($config)) {
             return ['configured' => false];
         }
+        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret']);
+        if (($config['group_enabled'] ?? true) === false) {
+            return array_merge(['configured' => true], $this->publicConfig($config, $webhookUrl), [
+                'stopped' => true,
+                'telegram' => [
+                    'url' => '',
+                    'pending_update_count' => 0,
+                    'last_error_message' => '',
+                ],
+            ]);
+        }
+
         $info = $this->api($token, 'getWebhookInfo');
-        return array_merge(['configured' => true], $this->publicConfig(
-            $config,
-            rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret'])
-        ), ['telegram' => [
+        return array_merge(['configured' => true], $this->publicConfig($config, $webhookUrl), ['telegram' => [
             'url' => (string)($info['url'] ?? ''),
             'pending_update_count' => (int)($info['pending_update_count'] ?? 0),
             'last_error_message' => (string)($info['last_error_message'] ?? ''),
