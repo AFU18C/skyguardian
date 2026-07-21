@@ -234,6 +234,7 @@ function openGroupControl(id) {
   document.querySelectorAll('[data-group-control-tab]').forEach((button, index) => button.classList.toggle('active', index === 0));
   document.querySelectorAll('[data-group-control-pane]').forEach((pane, index) => pane.classList.toggle('active', index === 0));
   resetTelegramCheck();
+  restoreSavedTelegramCheck(item);
   openModal(groupControlModal);
 }
 
@@ -272,6 +273,39 @@ function resetTelegramCheck() {
     telegramCheckButton.disabled = false;
     telegramCheckButton.textContent = 'Проверить подключение';
   }
+}
+
+function restoreSavedTelegramCheck(item) {
+  if (!item?.connection_checked_at) return;
+
+  const isSuccess = item.connection_status === 'success';
+  setTelegramCheckState(
+    isSuccess ? 'success' : 'error',
+    isSuccess ? 'Бот подключён' : 'Ошибка подключения',
+    item.connection_message || (isSuccess ? 'Доступ администратора подтверждён' : 'Проверка завершилась ошибкой')
+  );
+
+  const snapshot = item.connection_details;
+  if (snapshot) {
+    const setText = (selector, value) => {
+      const element = $(selector);
+      if (element) element.textContent = value || '—';
+    };
+    setText('[data-telegram-bot]', snapshot.bot || '—');
+    setText('[data-telegram-chat]', snapshot.chat || '—');
+    setText('[data-telegram-type]', snapshot.type || '—');
+    setText('[data-telegram-members]', snapshot.members || 'Недоступно');
+    setText('[data-telegram-checked-at]', 'Проверено: ' + formatTelegramCheckDate(item.connection_checked_at));
+    renderTelegramRights(snapshot.rights || {});
+    if (telegramInfoButton) {
+      telegramInfoButton.hidden = false;
+      telegramInfoButton.textContent = 'Информация';
+    }
+  } else if (telegramInfoButton) {
+    telegramInfoButton.hidden = true;
+  }
+
+  if (telegramCheckButton) telegramCheckButton.textContent = 'Проверить снова';
 }
 
 function renderTelegramRights(rights) {
@@ -332,8 +366,7 @@ telegramCheckButton?.addEventListener('click', async () => {
     const isAdmin = Boolean(result.membership?.is_administrator);
     item.connection_status = isAdmin ? 'success' : 'error';
     item.connection_checked_at = result.checked_at || new Date().toISOString();
-    writeGroupChannels();
-    renderGroupChannels();
+    item.connection_message = result.message || (isAdmin ? 'Доступ администратора подтверждён' : 'Недостаточно прав администратора');
     setTelegramCheckState(
       isAdmin ? 'success' : 'warning',
       isAdmin ? 'Бот подключён' : 'Недостаточно прав',
@@ -350,8 +383,17 @@ telegramCheckButton?.addEventListener('click', async () => {
     setText('[data-telegram-chat]', (result.chat?.title || 'Без названия') + chatUsername);
     setText('[data-telegram-type]', result.chat?.type_label || result.chat?.type);
     setText('[data-telegram-members]', result.chat?.member_count == null ? 'Недоступно' : String(result.chat.member_count));
-    setText('[data-telegram-checked-at]', 'Проверено: ' + (result.checked_at || 'только что'));
+    setText('[data-telegram-checked-at]', 'Проверено: ' + formatTelegramCheckDate(item.connection_checked_at));
     renderTelegramRights(result.membership?.rights || {});
+    item.connection_details = {
+      bot: (botUsername || 'Без username') + ' · ID ' + (result.bot?.id || '—'),
+      chat: (result.chat?.title || 'Без названия') + chatUsername,
+      type: result.chat?.type_label || result.chat?.type || '—',
+      members: result.chat?.member_count == null ? 'Недоступно' : String(result.chat.member_count),
+      rights: result.membership?.rights || {}
+    };
+    writeGroupChannels();
+    renderGroupChannels();
     if (telegramDetails) telegramDetails.hidden = true;
     if (telegramInfoButton) {
       telegramInfoButton.hidden = false;
@@ -361,6 +403,8 @@ telegramCheckButton?.addEventListener('click', async () => {
   } catch (error) {
     item.connection_status = 'error';
     item.connection_checked_at = new Date().toISOString();
+    item.connection_message = error.message || 'Не удалось проверить Telegram';
+    item.connection_details = null;
     writeGroupChannels();
     renderGroupChannels();
     if (telegramInfoButton) telegramInfoButton.hidden = true;
@@ -400,6 +444,19 @@ function writeGroupChannels() {
   }
 }
 
+function formatTelegramCheckDate(value) {
+  if (!value) return 'не проверялся';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+}
+
 function maskBotToken(token) {
   const value = String(token || '');
   if (!value) return 'Не указан';
@@ -422,13 +479,23 @@ function createGroupChannelCard(item) {
   name.textContent = item.name;
   info.append(name);
 
-  const connectionIndicator = document.createElement('span');
   const connectionStatus = ['success', 'error'].includes(item.connection_status) ? item.connection_status : 'unverified';
+  const checkedAt = document.createElement('small');
+  checkedAt.className = 'group-check-date';
+  checkedAt.textContent = item.connection_checked_at
+    ? 'Последняя проверка: ' + formatTelegramCheckDate(item.connection_checked_at)
+    : 'Подключение ещё не проверялось';
+  info.append(checkedAt);
+
+  const connectionIndicator = document.createElement('button');
+  connectionIndicator.type = 'button';
   connectionIndicator.className = 'group-connection-indicator ' + connectionStatus;
+  connectionIndicator.textContent = connectionStatus === 'success' ? '✓' : (connectionStatus === 'error' ? '!' : '?');
   connectionIndicator.title = connectionStatus === 'success'
-    ? 'Бот проверен — доступ есть'
-    : (connectionStatus === 'error' ? 'Нет доступа к боту' : 'Бот ещё не проверен');
+    ? 'Бот проверен — нажмите для подробностей'
+    : (connectionStatus === 'error' ? 'Проверка завершилась ошибкой — нажмите для подробностей' : 'Бот ещё не проверен');
   connectionIndicator.setAttribute('aria-label', connectionIndicator.title);
+  connectionIndicator.addEventListener('click', () => openGroupControl(item.id));
 
   const manage = document.createElement('button');
   manage.className = 'button group-manage-button';
@@ -531,7 +598,9 @@ groupChannelForm?.addEventListener('submit', event => {
     bot_token: token,
     admin_id: values.admin_id.trim(),
     connection_status: connectionChanged ? 'unverified' : (existing?.connection_status || 'unverified'),
-    connection_checked_at: connectionChanged ? null : (existing?.connection_checked_at || null)
+    connection_checked_at: connectionChanged ? null : (existing?.connection_checked_at || null),
+    connection_message: connectionChanged ? '' : (existing?.connection_message || ''),
+    connection_details: connectionChanged ? null : (existing?.connection_details || null)
   };
 
   const index = groupChannels.findIndex(channel => channel.id === item.id);
