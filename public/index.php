@@ -240,6 +240,25 @@ function active(string $current, string $target): string
 
                 <div class="notice info"><span>i</span><p><strong>Раздел работает независимо.</strong> Подключения и настройки <?= $isAlerts ? 'воздушных тревог' : 'новостей' ?> не пересекаются с другим разделом.</p></div>
 
+                <article class="panel sources-empty">
+                    <div class="empty-state large"><div>◇</div><strong>Подключений пока нет</strong><p>Telegram API и технический аккаунт добавляются в разделе «Настройка».</p><a class="button primary empty-link" href="?page=<?= $isAlerts ? 'alerts-settings' : 'news-settings' ?>">Перейти к настройке</a></div>
+                </article>
+
+            <?php elseif ($isSettings): ?>
+                <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Настройка</h1><p>Будущие правила получения, обработки и публикации сообщений.</p></div><button class="button primary add-connection-button" type="button" data-tooltip="Технический аккаунт и API" aria-label="Добавить технический аккаунт и API" data-add-connection>Добавить</button></section>
+            <?php else: ?>
+                <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
+                <article class="panel group-panel"><div class="empty-state large"><div>♟</div><strong>Группа пока не добавлена</strong><p>Форма подключения будет добавлена после утверждения дизайна и логики.</p><button class="button primary" data-toast="Функционал добавления появится на следующем этапе">Добавить группу</button></div></article>
+            <?php endif; ?>
+        </div>
+    </main>
+</div>
+
+<div class="modal connection-modal" id="connectionModal" aria-hidden="true">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-card connection-modal-card" role="dialog" aria-modal="true" aria-labelledby="connectionTitle">
+        <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
+        <div class="connection-modal-heading"><span class="step-label">ДОБАВЛЕНИЕ ПОДКЛЮЧЕНИЯ</span><h2 id="connectionTitle">Технический аккаунт и API</h2><p>Сначала сохраните данные Telegram API, затем подключите технический аккаунт.</p></div>
                 <section class="workspace-grid">
                     <article class="panel api-panel">
                         <div class="panel-head"><div><span class="step-label">ШАГ 1</span><h2>Telegram API</h2><p>Данные приложения из my.telegram.org</p></div><span class="status-pill off"><i></i>Не настроено</span></div>
@@ -263,15 +282,7 @@ function active(string $current, string $target): string
                         </div>
                     </article>
                 </section>
-
-            <?php elseif ($isSettings): ?>
-                <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Настройка</h1><p>Будущие правила получения, обработки и публикации сообщений.</p></div><button class="button primary add-connection-button" type="button" data-tooltip="Технический аккаунт и API" aria-label="Добавить технический аккаунт и API" data-toast="Форма добавления технического аккаунта и API будет подключена на этапе функционала">Добавить</button></section>
-            <?php else: ?>
-                <section class="page-title"><div><span class="eyebrow">ОБЩИЕ НАСТРОЙКИ</span><h1>Управление группой</h1><p>Настройка основной группы или канала для публикаций.</p></div><div class="section-badge violet">♟</div></section>
-                <article class="panel group-panel"><div class="empty-state large"><div>♟</div><strong>Группа пока не добавлена</strong><p>Форма подключения будет добавлена после утверждения дизайна и логики.</p><button class="button primary" data-toast="Функционал добавления появится на следующем этапе">Добавить группу</button></div></article>
-            <?php endif; ?>
-        </div>
-    </main>
+    </div>
 </div>
 
 <div class="modal" id="qrModal" aria-hidden="true">
