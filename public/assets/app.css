@@ -334,6 +334,8 @@
 .group-control-pane.active{display:block}
 .group-control-pane h3{margin:0 0 8px;font-size:18px}
 .group-control-pane>p{margin:0;color:var(--muted);font-size:11px;line-height:1.65}
+.telegram-publish-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.telegram-publish-form .full{grid-column:1/-1}.telegram-publish-form label>span{display:block;margin-bottom:7px;color:#9aa7bd;font-size:12px;font-weight:700}.telegram-publish-form textarea,.telegram-publish-form select,.telegram-publish-form input[type=file]{width:100%;box-sizing:border-box}.telegram-publish-form textarea{resize:vertical}.telegram-publish-options{display:flex;flex-wrap:wrap;gap:14px;padding:12px 14px;border:1px solid rgba(142,160,196,.16);border-radius:12px}.telegram-publish-options label{display:flex;align-items:center;gap:8px;color:#cbd5e8;font-size:12px}.telegram-publish-result{padding:12px 14px;border-radius:12px;font-size:13px}.telegram-publish-result.success{color:#50e3a4;background:rgba(38,181,126,.1);border:1px solid rgba(38,181,126,.35)}.telegram-publish-result.error{color:#ff7f8f;background:rgba(224,72,91,.1);border:1px solid rgba(224,72,91,.35)}
+@media(max-width:640px){.telegram-publish-form{grid-template-columns:1fr}.telegram-publish-form .full{grid-column:auto}}
 .control-status-card{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px;border:1px solid #2a3b54;border-radius:13px;background:#101a29}
 .control-status-card>div{display:flex;align-items:center;gap:12px}
 .telegram-status-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
