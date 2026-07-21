@@ -113,9 +113,25 @@ function createTechnicalAccountCard(item) {
   info.append(name, api, note);
 
   const status = document.createElement('span');
-  status.className = 'status-pill ' + (item.connected ? 'on' : 'off');
+  status.className = 'status-pill ' + (item.enabled ? 'on' : 'off');
   const dot = document.createElement('i');
-  status.append(dot, document.createTextNode(item.connected ? 'Работает' : 'Не работает'));
+  status.append(dot, document.createTextNode(item.enabled ? 'Включён' : 'Выключен'));
+
+  const toggleLabel = document.createElement('label');
+  toggleLabel.className = 'switch technical-account-toggle';
+  toggleLabel.title = item.enabled ? 'Выключить' : 'Включить';
+  toggleLabel.setAttribute('aria-label', (item.enabled ? 'Выключить ' : 'Включить ') + item.name);
+  const toggle = document.createElement('input');
+  toggle.type = 'checkbox';
+  toggle.checked = Boolean(item.enabled);
+  const toggleTrack = document.createElement('span');
+  toggle.addEventListener('change', () => {
+    item.enabled = toggle.checked;
+    writeTechnicalAccounts();
+    renderTechnicalAccounts();
+    toast(item.enabled ? 'Технический аккаунт включён' : 'Технический аккаунт выключен');
+  });
+  toggleLabel.append(toggle, toggleTrack);
 
   const edit = document.createElement('button');
   edit.className = 'technical-account-edit';
@@ -125,7 +141,7 @@ function createTechnicalAccountCard(item) {
   edit.textContent = '✎';
   edit.addEventListener('click', () => openTechnicalAccountEditor(item.id));
 
-  card.append(icon, info, status, edit);
+  card.append(icon, info, status, toggleLabel, edit);
   return card;
 }
 
@@ -187,7 +203,8 @@ techSaveButton?.addEventListener('click', () => {
     name: values.name.trim(),
     api_id: values.api_id.trim(),
     api_hash: values.api_hash.trim(),
-    connected: oldItem?.connected || false
+    connected: oldItem?.connected || false,
+    enabled: oldItem ? Boolean(oldItem.enabled) : true
   };
   const index = technicalAccounts.findIndex(accountItem => accountItem.id === id);
   if (index >= 0) technicalAccounts[index] = item;
