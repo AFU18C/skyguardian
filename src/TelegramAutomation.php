@@ -39,6 +39,7 @@ final class TelegramAutomation
             'bot_token' => $token,
             'chat_id' => $chatId,
             'enabled' => isset($input['enabled']),
+            'group_enabled' => ($existing['group_enabled'] ?? true) !== false,
             'mode' => $mode,
             'anti_spam' => isset($input['anti_spam']),
             'spam_limit' => max(2, min(20, (int)($input['spam_limit'] ?? 5))),
@@ -101,12 +102,12 @@ final class TelegramAutomation
             'welcome_delete_after' => 0,
             'violation_delete' => true,
         ];
-        $config['enabled'] = $enabled;
+        $config['group_enabled'] = $enabled;
         $config['updated_at'] = date(DATE_ATOM);
         $configs[$key] = $config;
         $this->writeJson($this->configFile, $configs);
         $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret']);
-        if ($enabled && ($config['mode'] ?? 'webhook') === 'webhook') {
+        if ($enabled && ($config['enabled'] ?? false) === true && ($config['mode'] ?? 'webhook') === 'webhook') {
             $this->api($token, 'setWebhook', ['url' => $webhookUrl, 'secret_token' => $config['secret'], 'allowed_updates' => json_encode(['message', 'callback_query', 'chat_member'], JSON_UNESCAPED_SLASHES), 'drop_pending_updates' => 'false']);
         } else {
             $this->api($token, 'deleteWebhook', ['drop_pending_updates' => 'false']);
@@ -134,7 +135,7 @@ final class TelegramAutomation
     public function pollingConfigs(): array
     {
         return array_values(array_filter($this->readJson($this->configFile), static fn($c): bool =>
-            is_array($c) && ($c['enabled'] ?? false) === true && ($c['mode'] ?? '') === 'polling'
+            is_array($c) && ($c['enabled'] ?? false) === true && ($c['group_enabled'] ?? true) !== false && ($c['mode'] ?? '') === 'polling'
         ));
     }
 
@@ -158,7 +159,7 @@ final class TelegramAutomation
 
     public function process(array $config, array $update): void
     {
-        if (($config['enabled'] ?? false) !== true) {
+        if (($config['enabled'] ?? false) !== true || ($config['group_enabled'] ?? true) === false) {
             return;
         }
         if (isset($update['callback_query'])) {
@@ -381,6 +382,7 @@ final class TelegramAutomation
     {
         return [
             'enabled' => (bool)$config['enabled'],
+            'group_enabled' => ($config['group_enabled'] ?? true) !== false,
             'mode' => $config['mode'],
             'webhook_url' => preg_replace('/key=[^&]+/', 'key=••••••', $webhookUrl),
             'updated_at' => $config['updated_at'],
