@@ -36,9 +36,9 @@ if ($action === 'telegram-automation' && $_SERVER['REQUEST_METHOD'] === 'POST') 
         $reply(400, ['ok' => false, 'message' => 'Некорректный адрес сервера.']);
     }
     $baseUrl = rtrim((string)(getenv('APP_URL') ?: (($secure ? 'https' : 'http') . '://' . $host)), '/');
-    require_once dirname(__DIR__) . '/src/TelegramAutomation.php';
-    $automation = new TelegramAutomation($storageDir);
     try {
+        require_once dirname(__DIR__) . '/src/TelegramAutomation.php';
+        $automation = new TelegramAutomation($storageDir);
         $operation = (string)($_POST['operation'] ?? 'save');
         if ($operation === 'status') {
             $result = $automation->status(trim((string)($_POST['bot_token'] ?? '')), trim((string)($_POST['chat_id'] ?? '')), $baseUrl);
@@ -563,7 +563,7 @@ if ($isPublicLanding || $isLoginRequest) {
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
     <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=36">
+    <link rel="stylesheet" href="/assets/app.css?v=37">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
@@ -1124,6 +1124,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=36"></script>
+<script src="assets/app.js?v=37"></script>
 </body>
 </html>
