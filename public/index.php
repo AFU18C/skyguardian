@@ -316,7 +316,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=20">
+    <link rel="stylesheet" href="assets/app.css?v=21">
 </head>
 <body>
 <div class="app-shell">
@@ -443,11 +443,23 @@ function active(string $current, string $target): string
 
 <div class="modal group-channel-modal" id="groupChannelModal" aria-hidden="true">
     <div class="modal-backdrop" data-modal-close></div>
-    <div class="modal-card compact" role="dialog" aria-modal="true" aria-labelledby="groupChannelTitle">
+    <div class="modal-card source-modal-card" role="dialog" aria-modal="true" aria-labelledby="groupChannelTitle">
         <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
-        <span class="step-label">ДОБАВЛЕНИЕ КАНАЛА</span>
-        <h2 id="groupChannelTitle">Канал управления группой</h2>
-        <p>Поля этой формы настроим на следующем шаге.</p>
+        <span class="step-label" data-group-channel-modal-label>ДОБАВЛЕНИЕ КАНАЛА</span>
+        <h2 id="groupChannelTitle">Канал или группа Telegram</h2>
+        <p>Укажите данные бота и Telegram ID канала или группы.</p>
+        <form class="form-grid source-form" data-group-channel-form>
+            <input type="hidden" name="group_channel_id" value="">
+            <label class="full"><span>Название канала *</span><input name="name" placeholder="Например: Основной канал" required></label>
+            <label class="full"><span>Ссылка *</span><input name="link" type="url" inputmode="url" placeholder="https://t.me/channel_name" required></label>
+            <label class="full"><span>Telegram Chat ID *</span><input name="chat_id" inputmode="text" placeholder="-1001234567890" required></label>
+            <label class="full"><span>Токен бота *</span><div class="input-action"><input name="bot_token" type="password" autocomplete="new-password" placeholder="123456789:AA..." required><button type="button" data-password aria-label="Показать или скрыть токен">◉</button></div><small class="form-hint" data-group-token-hint>Токен хранится скрыто и отображается в списке только частично.</small></label>
+            <label class="full"><span>ID администратора *</span><input name="admin_id" inputmode="numeric" placeholder="123456789" required></label>
+            <div class="form-actions source-form-actions full">
+                <button class="button danger" type="button" data-group-channel-delete hidden>Удалить</button>
+                <button class="button primary" type="submit" data-group-channel-save>Добавить</button>
+            </div>
+        </form>
     </div>
 </div>
 
