@@ -227,6 +227,7 @@ let activeGroupControlId = null;
 
 function openGroupControl(id) {
   const item = groupChannels.find(channel => channel.id === id);
+  if (item?.group_enabled === false) { toast('Управление группой выключено'); return; }
   if (!item) return;
   activeGroupControlId = id;
   if (groupControlTitle) groupControlTitle.textContent = item.name;
@@ -552,6 +553,10 @@ telegramPublishForm?.addEventListener('submit', async event => {
   const submit = telegramPublishForm.querySelector('button[type="submit"]');
   const resultBox = $('[data-publish-result]');
   if (!item || !submit || submit.disabled) return;
+  if (item.group_enabled === false) {
+    toast('Сначала включите управление группой');
+    return;
+  }
   if (item.connection_status !== 'success') {
     toast('Сначала успешно проверьте подключение бота');
     return;
@@ -631,8 +636,10 @@ function maskBotToken(token) {
 
 function createGroupChannelCard(item) {
   const card = document.createElement('article');
-  card.className = 'source-card group-channel-card';
+  const groupEnabled = item.group_enabled !== false;
+  card.className = 'source-card group-channel-card' + (groupEnabled ? '' : ' group-disabled');
   card.dataset.groupChannelId = item.id;
+  card.dataset.groupEnabled = groupEnabled ? 'true' : 'false';
 
   const icon = document.createElement('div');
   icon.className = 'source-card-icon';
@@ -676,9 +683,44 @@ function createGroupChannelCard(item) {
   edit.textContent = '✎';
   edit.addEventListener('click', () => openGroupChannelEditor(item.id));
 
+  const toggleLabel = document.createElement('label');
+  toggleLabel.className = 'group-master-switch';
+  toggleLabel.title = groupEnabled ? 'Остановить управление группой' : 'Включить управление группой';
+  const toggle = document.createElement('input');
+  toggle.type = 'checkbox';
+  toggle.checked = groupEnabled;
+  toggle.setAttribute('aria-label', toggleLabel.title);
+  const toggleTrack = document.createElement('span');
+  toggleTrack.setAttribute('aria-hidden', 'true');
+  toggleLabel.append(toggle, toggleTrack);
+  toggle.addEventListener('change', async () => {
+    const nextEnabled = toggle.checked;
+    toggle.disabled = true;
+    try {
+      const body = new FormData();
+      body.set('_token', document.querySelector('[data-group-action="check"]')?.dataset.csrf || '');
+      body.set('operation', 'group-toggle');
+      body.set('bot_token', item.bot_token || '');
+      body.set('chat_id', item.chat_id || '');
+      body.set('enabled', nextEnabled ? '1' : '0');
+      const response = await fetch('/?action=telegram-automation', {method:'POST', credentials:'same-origin', body});
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.message || 'Не удалось изменить режим');
+      item.group_enabled = nextEnabled;
+      writeGroupChannels();
+      renderGroupChannels();
+      toast(result.message);
+    } catch (error) {
+      toggle.checked = !nextEnabled;
+      toggle.disabled = false;
+      toast(error.message || 'Не удалось изменить режим группы');
+    }
+  });
+
+  manage.disabled = !groupEnabled;
   const actions = document.createElement('div');
   actions.className = 'group-card-actions';
-  actions.append(manage, edit);
+  actions.append(toggleLabel, manage, edit);
 
   card.append(icon, info, connectionIndicator, actions);
   return card;
