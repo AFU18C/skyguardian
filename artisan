@@ -42,6 +42,17 @@ function characterLength(string $value): int {
     return $count === false ? strlen($value) : $count;
 }
 
+function applyWebReadablePermissions(string $directory, string $file): bool {
+    $groupApplied = @chgrp($directory, 'www-data') && @chgrp($file, 'www-data');
+
+    if ($groupApplied) {
+        return @chmod($directory, 0750) && @chmod($file, 0640);
+    }
+
+    // Safe fallback for hosts where PHP-FPM does not use the www-data group.
+    return @chmod($directory, 0755) && @chmod($file, 0644);
+}
+
 $email = prompt('Введите почту администратора: ');
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     fwrite(STDERR, "Ошибка: введите корректную почту.\n");
@@ -61,7 +72,7 @@ if ($passwordLength < 6 || $passwordLength > 20) {
 }
 
 $storageDir = __DIR__ . '/storage';
-if (!is_dir($storageDir) && !mkdir($storageDir, 0700, true) && !is_dir($storageDir)) {
+if (!is_dir($storageDir) && !mkdir($storageDir, 0750, true) && !is_dir($storageDir)) {
     fwrite(STDERR, "Ошибка: не удалось создать каталог хранения.\n");
     exit(1);
 }
@@ -77,11 +88,13 @@ if (file_put_contents($temp, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAP
     fwrite(STDERR, "Ошибка: не удалось сохранить администратора.\n");
     exit(1);
 }
-chmod($temp, 0600);
 if (!rename($temp, $file)) {
     @unlink($temp);
     fwrite(STDERR, "Ошибка: не удалось завершить сохранение.\n");
     exit(1);
 }
-chmod($file, 0600);
+if (!applyWebReadablePermissions($storageDir, $file)) {
+    fwrite(STDERR, "Ошибка: администратор создан, но не удалось настроить права доступа для сайта.\n");
+    exit(1);
+}
 fwrite(STDOUT, "Администратор успешно создан.\n");
