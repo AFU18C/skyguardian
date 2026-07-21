@@ -63,7 +63,7 @@ jobs:
             install -d "$target/public.next"
             tar -xzf /tmp/skyguardian-release.tar.gz -C "$target"
             chmod 755 "$target"
-            chmod 750 "$target/artisan"
+            chmod 755 "$target/artisan"
             if getent group www-data >/dev/null 2>&1; then
               chgrp www-data "$target/storage"
               chmod 2770 "$target/storage"
