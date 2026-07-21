@@ -1,12 +1,75 @@
 <?php
+declare(strict_types=1);
 
+$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+session_name('skyguardian_admin');
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => '/',
+    'secure' => $secure,
+    'httponly' => true,
+    'samesite' => 'Strict',
+]);
+session_start();
+
+$storageDir = dirname(__DIR__) . '/storage';
+$adminFile = $storageDir . '/admin.json';
 $requestPath = rtrim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/', '/');
 $requestedPage = $_GET['page'] ?? null;
-$isAdminLogin = $requestedPage === 'login' || in_array($requestPath, ['/admin', '/admin/login'], true);
-$isPublicLanding = $requestedPage === null && !$isAdminLogin;
+$action = $_GET['action'] ?? null;
+$isAuthenticated = ($_SESSION['admin_authenticated'] ?? false) === true;
 
-if ($isPublicLanding || $isAdminLogin) {
-    $standaloneTitle = $isAdminLogin ? 'Вход для администратора' : 'Ведутся работы';
+if ($action === 'logout') {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'] ?? '', (bool) $params['secure'], (bool) $params['httponly']);
+    }
+    session_destroy();
+    header('Location: /?page=login');
+    exit;
+}
+
+$isLoginRequest = $requestedPage === 'login' || in_array($requestPath, ['/admin', '/admin/login'], true);
+$loginError = null;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isLoginRequest) {
+    $token = (string) ($_POST['_token'] ?? '');
+    $email = trim((string) ($_POST['email'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
+    $admin = is_file($adminFile) ? json_decode((string) file_get_contents($adminFile), true) : null;
+
+    if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), $token)) {
+        $loginError = 'Сессия устарела. Обновите страницу и попробуйте снова.';
+    } elseif (!is_array($admin) || empty($admin['email']) || empty($admin['password_hash'])) {
+        $loginError = 'Администратор ещё не создан. Выполните команду php artisan admin:create.';
+    } elseif (!hash_equals(mb_strtolower((string) $admin['email']), mb_strtolower($email)) || !password_verify($password, (string) $admin['password_hash'])) {
+        usleep(350000);
+        $loginError = 'Неверная почта или пароль.';
+    } else {
+        session_regenerate_id(true);
+        $_SESSION['admin_authenticated'] = true;
+        $_SESSION['admin_email'] = (string) $admin['email'];
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        header('Location: /?page=home');
+        exit;
+    }
+}
+
+if (!$isAuthenticated && !$isLoginRequest && $requestedPage !== null) {
+    header('Location: /?page=login');
+    exit;
+}
+
+$isPublicLanding = $requestedPage === null && !$isLoginRequest;
+if ($isAuthenticated && $isLoginRequest && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: /?page=home');
+    exit;
+}
+
+if ($isPublicLanding || $isLoginRequest) {
+    $_SESSION['csrf_token'] ??= bin2hex(random_bytes(32));
+    $standaloneTitle = $isLoginRequest ? 'Вход для администратора' : 'Ведутся работы';
     ?>
 <!doctype html>
 <html lang="ru">
@@ -15,8 +78,8 @@ if ($isPublicLanding || $isAdminLogin) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#070b15">
     <meta name="robots" content="noindex, nofollow">
-    <title><?= htmlspecialchars($standaloneTitle) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="/assets/app.css?v=2">
+    <title><?= htmlspecialchars($standaloneTitle, ENT_QUOTES, 'UTF-8') ?> — SkyGuardian</title>
+    <link rel="stylesheet" href="/assets/app.css?v=3">
 </head>
 <body class="standalone-page">
     <main class="standalone-shell">
@@ -25,13 +88,15 @@ if ($isPublicLanding || $isAdminLogin) {
             <span><strong>SkyGuardian</strong><small>CONTROL CENTER</small></span>
         </a>
 
-        <?php if ($isAdminLogin): ?>
+        <?php if ($isLoginRequest): ?>
             <section class="login-card">
                 <span class="standalone-kicker">ЗАЩИЩЁННЫЙ ДОСТУП</span>
                 <h1>Вход в панель</h1>
-                <p>Введите данные администратора для продолжения.</p>
-                <form class="login-form" method="post" action="/?page=home">
-                    <label><span>Логин</span><input name="login" autocomplete="username" placeholder="Введите логин" required></label>
+                <p>Введите почту и пароль администратора.</p>
+                <?php if ($loginError): ?><div class="login-error" role="alert"><?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
+                <form class="login-form" method="post" action="/?page=login">
+                    <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                    <label><span>Почта</span><input name="email" type="email" autocomplete="username" placeholder="admin@example.com" required autofocus></label>
                     <label><span>Пароль</span><input name="password" type="password" autocomplete="current-password" placeholder="Введите пароль" required></label>
                     <button class="button primary login-submit" type="submit">Войти</button>
                 </form>
@@ -51,6 +116,11 @@ if ($isPublicLanding || $isAdminLogin) {
 </body>
 </html>
     <?php
+    exit;
+}
+
+if (!$isAuthenticated) {
+    header('Location: /?page=login');
     exit;
 }
 
@@ -118,7 +188,7 @@ function active(string $current, string $target): string
 
             <div class="nav-heading">ОБЩИЕ НАСТРОЙКИ</div>
             <a class="nav-link<?= active($page, 'group') ?>" href="?page=group"><span class="nav-icon">♟</span><span>Управление группой</span></a>
-            <a class="nav-link logout" href="/?page=login"><span class="nav-icon">↪</span><span>Выйти</span></a>
+            <a class="nav-link logout" href="/?action=logout"><span class="nav-icon">↪</span><span>Выйти</span></a>
         </nav>
 
         <div class="sidebar-footer"><span class="status-dot online"></span><div><strong>Система доступна</strong><small>Макет интерфейса</small></div></div>
