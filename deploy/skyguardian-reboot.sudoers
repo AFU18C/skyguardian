@@ -1,0 +1,6 @@
+# SkyGuardian: allow the PHP web user to run only the non-blocking reboot command.
+# Install with:
+#   sudo install -o root -g root -m 0440 deploy/skyguardian-reboot.sudoers /etc/sudoers.d/skyguardian-reboot
+# Validate with:
+#   sudo visudo -cf /etc/sudoers.d/skyguardian-reboot
+www-data ALL=(root) NOPASSWD: /usr/bin/systemctl reboot --no-block
