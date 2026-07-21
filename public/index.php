@@ -20,6 +20,44 @@ $action = $_GET['action'] ?? null;
 $isAuthenticated = ($_SESSION['admin_authenticated'] ?? false) === true;
 
 
+if ($action === 'telegram-automation' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json; charset=utf-8');
+    $reply = static function (int $status, array $payload): never {
+        http_response_code($status);
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    };
+    if (!$isAuthenticated) $reply(401, ['ok' => false, 'message' => 'Требуется авторизация.']);
+    if (!hash_equals((string)($_SESSION['csrf_token'] ?? ''), (string)($_POST['_token'] ?? ''))) {
+        $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
+    }
+    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+    if (!preg_match('/^[A-Za-z0-9.-]+(?::\d+)?$/', $host)) {
+        $reply(400, ['ok' => false, 'message' => 'Некорректный адрес сервера.']);
+    }
+    $baseUrl = rtrim((string)(getenv('APP_URL') ?: (($secure ? 'https' : 'http') . '://' . $host)), '/');
+    require_once dirname(__DIR__) . '/src/TelegramAutomation.php';
+    $automation = new TelegramAutomation($storageDir);
+    try {
+        $operation = (string)($_POST['operation'] ?? 'save');
+        if ($operation === 'status') {
+            $result = $automation->status(trim((string)($_POST['bot_token'] ?? '')), trim((string)($_POST['chat_id'] ?? '')), $baseUrl);
+            $reply(200, ['ok' => true, 'message' => 'Статус автоматизации получен.', 'result' => $result]);
+        }
+        $result = $automation->save($_POST, $baseUrl);
+        $reply(200, ['ok' => true, 'message' => ($result['enabled'] ?? false) ? 'Автоматизация включена.' : 'Автоматизация сохранена и выключена.', 'result' => $result]);
+    } catch (InvalidArgumentException $exception) {
+        $reply(422, ['ok' => false, 'message' => $exception->getMessage()]);
+    } catch (RuntimeException $exception) {
+        $message = $exception->getMessage();
+        if (str_contains(strtolower($message), 'bad webhook')) $message = 'Telegram не принял webhook. Проверьте HTTPS и публичный адрес сайта.';
+        $reply(422, ['ok' => false, 'message' => $message]);
+    } catch (Throwable) {
+        $reply(503, ['ok' => false, 'message' => 'Не удалось сохранить автоматизацию.']);
+    }
+}
+
+
 if ($action === 'telegram-manage' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=utf-8');
     $reply = static function (int $status, array $payload): never {
@@ -913,8 +951,30 @@ function active(string $current, string $target): string
                 </section>
                 <section class="group-control-pane" data-group-control-pane="automation">
                     <h3>Автоматизация и защита</h3>
-                    <div class="automation-status"><strong>Требуется приём обновлений Telegram</strong><p>Антиспам, капча, приветствие, фильтры и автоудаление работают только через webhook или постоянный серверный polling. В текущем безопасном режиме они не включаются фиктивно.</p></div>
-                    <div class="control-feature-grid compact"><article><span>⌁</span><strong>Антиспам</strong><small>Массовые сообщения и флуд</small></article><article><span>⊘</span><strong>Фильтр</strong><small>Ссылки и запрещённые слова</small></article><article><span>✓</span><strong>Капча</strong><small>Проверка новых участников</small></article><article><span>✦</span><strong>Приветствие</strong><small>Сообщение новым участникам</small></article></div>
+                    <form class="telegram-action-form automation-form" data-telegram-automation-form>
+                        <input type="hidden" name="operation" value="save">
+                        <div class="automation-status full" data-automation-status><strong>Автоматизация не настроена</strong><p>Выберите функции и сохраните настройки. Для постоянной работы рекомендуется webhook.</p></div>
+                        <label class="control-check"><input name="enabled" type="checkbox"> Автоматизация включена</label>
+                        <label><span>Режим приёма</span><select name="mode"><option value="webhook">Webhook — рекомендуется</option><option value="polling">Polling — резервный</option></select></label>
+                        <fieldset class="automation-section full"><legend>Антиспам и фильтры</legend>
+                            <label class="control-check"><input name="anti_spam" type="checkbox" checked> Включить антиспам</label>
+                            <div class="automation-inline"><label><span>Сообщений</span><input name="spam_limit" type="number" min="2" max="20" value="5"></label><label><span>За секунд</span><input name="spam_window" type="number" min="3" max="120" value="10"></label><label><span>Ограничить на, сек.</span><input name="spam_mute" type="number" min="60" max="604800" value="3600"></label></div>
+                            <label class="control-check"><input name="filter_links" type="checkbox"> Удалять ссылки обычных участников</label>
+                            <label class="full"><span>Запрещённые слова — через запятую или с новой строки</span><textarea name="forbidden_words" rows="3" placeholder="спам, реклама"></textarea></label>
+                            <label class="control-check"><input name="violation_delete" type="checkbox" checked> Удалять сообщения-нарушения</label>
+                        </fieldset>
+                        <fieldset class="automation-section full"><legend>Капча</legend>
+                            <label class="control-check"><input name="captcha" type="checkbox"> Проверять новых участников кнопкой</label>
+                            <label><span>Время на проверку, сек.</span><input name="captcha_timeout" type="number" min="30" max="3600" value="180"></label>
+                        </fieldset>
+                        <fieldset class="automation-section full"><legend>Приветствие и автоудаление</legend>
+                            <label class="control-check"><input name="welcome" type="checkbox"> Отправлять приветствие</label>
+                            <label class="full"><span>Текст приветствия; {name} — имя участника</span><textarea name="welcome_text" rows="4" maxlength="3500">Добро пожаловать, {name}!</textarea></label>
+                            <label><span>Удалить приветствие через, сек. (0 — не удалять)</span><input name="welcome_delete_after" type="number" min="0" max="86400" value="60"></label>
+                        </fieldset>
+                        <div class="control-action-buttons full"><button class="button primary" type="submit">Сохранить и применить</button><button class="button secondary" type="button" data-automation-check>Проверить статус</button></div>
+                        <div class="telegram-action-result full" data-automation-result hidden></div>
+                    </form>
                 </section>
                 <section class="group-control-pane" data-group-control-pane="journal">
                     <div class="journal-heading"><h3>Журнал действий</h3><button class="button secondary" type="button" data-journal-clear>Очистить</button></div>
@@ -1059,6 +1119,6 @@ function active(string $current, string $target): string
     </div>
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=31"></script>
+<script src="assets/app.js?v=32"></script>
 </body>
 </html>
