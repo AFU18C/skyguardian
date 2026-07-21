@@ -246,6 +246,7 @@ document.querySelectorAll('[data-group-control-tab]').forEach(button => {
 });
 
 const telegramCheckButton = $('[data-group-action="check"]');
+const telegramInfoButton = $('[data-group-action="info"]');
 const telegramStatusCard = $('[data-telegram-status]');
 const telegramStatusTitle = $('[data-telegram-status-title]');
 const telegramStatusText = $('[data-telegram-status-text]');
@@ -263,6 +264,10 @@ function setTelegramCheckState(state, title, text) {
 function resetTelegramCheck() {
   setTelegramCheckState('', 'Подключение не проверено', 'Нажмите кнопку, чтобы проверить бота и его права');
   if (telegramDetails) telegramDetails.hidden = true;
+  if (telegramInfoButton) {
+    telegramInfoButton.hidden = true;
+    telegramInfoButton.textContent = 'Информация';
+  }
   if (telegramCheckButton) {
     telegramCheckButton.disabled = false;
     telegramCheckButton.textContent = 'Проверить подключение';
@@ -293,6 +298,12 @@ function renderTelegramRights(rights) {
     container.append(badge);
   });
 }
+
+telegramInfoButton?.addEventListener('click', () => {
+  if (!telegramDetails || telegramInfoButton.hidden) return;
+  telegramDetails.hidden = !telegramDetails.hidden;
+  telegramInfoButton.textContent = telegramDetails.hidden ? 'Информация' : 'Скрыть информацию';
+});
 
 telegramCheckButton?.addEventListener('click', async () => {
   const item = groupChannels.find(channel => channel.id === activeGroupControlId);
@@ -337,9 +348,15 @@ telegramCheckButton?.addEventListener('click', async () => {
     setText('[data-telegram-members]', result.chat?.member_count == null ? 'Недоступно' : String(result.chat.member_count));
     setText('[data-telegram-checked-at]', 'Проверено: ' + (result.checked_at || 'только что'));
     renderTelegramRights(result.membership?.rights || {});
-    if (telegramDetails) telegramDetails.hidden = false;
+    if (telegramDetails) telegramDetails.hidden = true;
+    if (telegramInfoButton) {
+      telegramInfoButton.hidden = false;
+      telegramInfoButton.textContent = 'Информация';
+    }
     toast(isAdmin ? 'Telegram подключён' : 'Боту нужны права администратора');
   } catch (error) {
+    if (telegramInfoButton) telegramInfoButton.hidden = true;
+    if (telegramDetails) telegramDetails.hidden = true;
     setTelegramCheckState('error', 'Ошибка подключения', error.message || 'Не удалось проверить Telegram');
     toast(error.message || 'Не удалось проверить подключение');
   } finally {
