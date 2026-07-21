@@ -161,7 +161,7 @@ function active(string $current, string $target): string
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
-    <link rel="stylesheet" href="assets/app.css?v=13">
+    <link rel="stylesheet" href="assets/app.css?v=14">
 </head>
 <body>
 <div class="app-shell">
@@ -218,8 +218,8 @@ function active(string $current, string $target): string
             <?php elseif ($isSources): ?>
                 <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Каналы данных</h1></div><button class="button primary add-connection-button" type="button" data-tooltip="Добавить канал данных" aria-label="Добавить канал данных" data-add-source>Добавить</button></section>
 
-                <article class="panel data-channels-panel">
-                    <div class="empty-state"><div>◇</div><strong>Каналов данных пока нет</strong></div>
+                <article class="panel data-channels-panel" data-source-list data-source-scope="<?= htmlspecialchars($page, ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="empty-state" data-source-empty><div>◇</div><strong>Каналов данных пока нет</strong></div>
                 </article>
 
             <?php elseif ($isSettings): ?>
@@ -240,10 +240,11 @@ function active(string $current, string $target): string
     <div class="modal-backdrop" data-modal-close></div>
     <div class="modal-card source-modal-card" role="dialog" aria-modal="true" aria-labelledby="sourceTitle">
         <button class="modal-close" type="button" data-modal-close aria-label="Закрыть">×</button>
-        <span class="step-label">ДОБАВЛЕНИЕ КАНАЛА</span>
+        <span class="step-label" data-source-modal-label>ДОБАВЛЕНИЕ КАНАЛА</span>
         <h2 id="sourceTitle">Канал данных</h2>
         <p>Укажите, откуда получать сообщения и куда их публиковать.</p>
         <form class="form-grid source-form" data-source-form>
+            <input type="hidden" name="source_id" value="">
             <label class="full"><span>Название *</span><input name="name" placeholder="Например: Новости города" required></label>
             <label class="full"><span>Канал или группа — источник сообщений *</span><input name="source" placeholder="@source_channel или ссылка" required></label>
             <label class="full"><span>Технический аккаунт</span><select name="account"><option value="">Выберите аккаунт</option><option value="demo">Подключённый технический аккаунт</option></select></label>
@@ -277,7 +278,10 @@ function active(string $current, string $target): string
                     </div>
                 </div>
             </div>
-            <div class="form-actions full"><span class="form-hint">Фильтры можно оставить пустыми</span><button class="button primary" type="submit">Добавить</button></div>
+            <div class="form-actions source-form-actions full">
+                <button class="button danger" type="button" data-source-delete hidden>Удалить</button>
+                <button class="button primary" type="submit" data-source-save>Добавить</button>
+            </div>
         </form>
     </div>
 </div>
@@ -326,6 +330,6 @@ function active(string $current, string $target): string
 
 <div class="modal" id="deleteModal" aria-hidden="true"><div class="modal-backdrop" data-modal-close></div><div class="modal-card compact"><button class="modal-close" data-modal-close>×</button><div class="warning-icon">!</div><h2>Удалить аккаунт?</h2><p>Это демонстрационное окно подтверждения. На этапе функционала действие будет необратимым.</p><div class="modal-actions"><button class="button ghost" data-modal-close>Отмена</button><button class="button danger" data-delete>Удалить</button></div></div></div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
-<script src="assets/app.js?v=7"></script>
+<script src="assets/app.js?v=8"></script>
 </body>
 </html>
