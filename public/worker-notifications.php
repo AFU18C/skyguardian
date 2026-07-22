@@ -15,7 +15,12 @@ session_set_cookie_params([
 session_start();
 
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, private');
+header('Cache-Control: no-store, private, max-age=0');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: no-referrer');
+header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
 
 $reply = static function (int $status, array $payload): never {
     http_response_code($status);
@@ -82,6 +87,7 @@ if ($method === 'GET') {
 }
 
 if ($method !== 'POST') {
+    header('Allow: GET, POST');
     $reply(405, ['ok' => false, 'message' => 'Метод не поддерживается.']);
 }
 
@@ -91,7 +97,7 @@ if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), (string) ($_POST['_to
 
 $operation = trim((string) ($_POST['operation'] ?? 'save'));
 $tokenInput = trim((string) ($_POST['bot_token'] ?? ''));
-$chatId = trim((string) ($_POST['chat_id'] ?? ($config['chat_id'] ?? '')));
+$chatId = trim((string) ($_POST['chat_id'] ?? ($config['chat_id'] ?? ''));
 $token = $tokenInput !== '' ? $tokenInput : trim((string) ($config['bot_token'] ?? ''));
 
 if ($operation === 'save' || $operation === 'test') {
