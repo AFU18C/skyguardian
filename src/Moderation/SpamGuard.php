@@ -13,11 +13,14 @@ final class SpamGuard
     {
         $now = time();
         $key = $chatId . ':' . $userId;
-        $data = $this->store->read('anti_spam');
-        $hits = array_values(array_filter($data[$key] ?? [], static fn ($time) => (int) $time > $now - $windowSeconds));
-        $hits[] = $now;
-        $data[$key] = $hits;
-        $this->store->write('anti_spam', $data);
-        return count($hits) > $limit;
+        $spam = false;
+        $this->store->update('anti_spam', static function (array $data) use ($now, $key, $limit, $windowSeconds, &$spam): array {
+            $hits = array_values(array_filter((array) ($data[$key] ?? []), static fn($time): bool => (int) $time > $now - $windowSeconds));
+            $hits[] = $now;
+            $data[$key] = $hits;
+            $spam = count($hits) > $limit;
+            return $data;
+        });
+        return $spam;
     }
 }
