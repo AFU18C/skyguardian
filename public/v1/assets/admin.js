@@ -3,6 +3,7 @@ const qs=(s,r=document)=>r.querySelector(s);
 const qsa=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const card=(title,value,state='ok')=>`<article class="card"><h3>${esc(title)}</h3><div class="value ${state}">${esc(value)}</div></article>`;
+let qrTimer=null;
 
 async function api(action,options={}){
   const response=await fetch(`/v1/admin/api.php?action=${encodeURIComponent(action)}`,{
@@ -62,7 +63,33 @@ async function renderModeration(){
 async function renderAccounts(){
   const root=qs('[data-module="accounts"]'),items=await api('accounts');
   root.innerHTML=`<form class="inline-form" data-save="account-save"><input name="id" placeholder="ID аккаунта" required><input name="api_id" type="number" placeholder="API ID" required><input name="api_hash" type="password" placeholder="API Hash" required><button>Добавить</button></form>
-  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Пользователь</th><th>Статус</th><th></th></tr></thead><tbody>${items.map(a=>`<tr><td>${esc(a.id)}</td><td>${esc(a.connected_user?.username||a.connected_user?.first_name||'—')}</td><td><span class="badge ${a.enabled?'ok':'warn'}">${a.enabled?'Включён':'Выключен'}</span></td><td><button class="danger" data-delete-account="${esc(a.id)}">Удалить</button></td></tr>`).join('')||'<tr><td colspan="4">Нет аккаунтов</td></tr>'}</tbody></table></div>`;
+  <div id="qr-login"></div>
+  <div class="table-wrap"><table><thead><tr><th>ID</th><th>Пользователь</th><th>Статус</th><th>Действия</th></tr></thead><tbody>${items.map(a=>`<tr><td>${esc(a.id)}</td><td>${esc(a.connected_user?.username||a.connected_user?.first_name||'—')}</td><td><span class="badge ${a.enabled?'ok':'warn'}">${a.enabled?'Подключён':'Не подключён'}</span></td><td class="actions"><button data-qr-account="${esc(a.id)}">${a.enabled?'Переподключить':'Войти по QR'}</button><button class="danger" data-delete-account="${esc(a.id)}">Удалить</button></td></tr>`).join('')||'<tr><td colspan="4">Нет аккаунтов</td></tr>'}</tbody></table></div>`;
+}
+
+function showQr(accountId,data){
+  const root=qs('#qr-login');if(!root)return;
+  if(data.logged_in){
+    root.innerHTML=`<div class="qr-box success"><strong>Аккаунт подключён</strong><span>${esc(data.user?.username||data.user?.first_name||accountId)}</span></div>`;
+    clearTimeout(qrTimer);notify('Telegram-аккаунт подключён');setTimeout(loadAll,700);return;
+  }
+  if(data.needs_2fa){
+    root.innerHTML=`<form class="qr-box stack" data-save="account-2fa"><input type="hidden" name="id" value="${esc(accountId)}"><strong>Требуется пароль 2FA</strong><input name="password" type="password" autocomplete="current-password" required placeholder="Пароль Telegram"><button>Завершить вход</button></form>`;
+    clearTimeout(qrTimer);return;
+  }
+  root.innerHTML=`<div class="qr-box"><strong>Сканируйте в Telegram</strong><div class="qr-svg">${data.svg||''}</div><small>Настройки → Устройства → Подключить устройство. Код действует ещё ${esc(data.expires_in||0)} сек.</small><button type="button" data-close-qr>Закрыть</button></div>`;
+  clearTimeout(qrTimer);qrTimer=setTimeout(()=>pollQr(accountId),1200);
+}
+
+async function startQr(accountId){
+  clearTimeout(qrTimer);qs('#qr-login').innerHTML='<div class="qr-box">Генерация QR-кода…</div>';
+  try{showQr(accountId,await api('account-qr',{method:'POST',body:JSON.stringify({id:accountId,wait:false})}));}
+  catch(error){notify(error.message,'error');qs('#qr-login').innerHTML='';}
+}
+
+async function pollQr(accountId){
+  try{showQr(accountId,await api('account-qr',{method:'POST',body:JSON.stringify({id:accountId,wait:true})}));}
+  catch(error){notify(error.message,'error');clearTimeout(qrTimer);}
 }
 
 async function renderChannels(){
@@ -92,12 +119,16 @@ document.addEventListener('submit',async event=>{
   try{
     const action=form.dataset.save,data=formData(form);
     if(action==='moderation')data.forbidden_words=String(data.forbidden_words||'').split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
-    await api(action,{method:'POST',body:JSON.stringify(data)});notify('Сохранено');await loadAll();
+    const result=await api(action,{method:'POST',body:JSON.stringify(data)});
+    if(action==='account-2fa'){showQr(data.id,result);return;}
+    notify('Сохранено');await loadAll();
   }catch(error){notify(error.message,'error');}
 });
 
 document.addEventListener('click',async event=>{
-  const account=event.target.dataset.deleteAccount,channel=event.target.dataset.deleteChannel;
+  const qr=event.target.dataset.qrAccount,account=event.target.dataset.deleteAccount,channel=event.target.dataset.deleteChannel;
+  if(event.target.dataset.closeQr!==undefined){clearTimeout(qrTimer);qs('#qr-login').innerHTML='';return;}
+  if(qr){startQr(qr);return;}
   if(!account&&!channel)return;
   if(!confirm('Подтвердить удаление?'))return;
   try{await api(account?'account-delete':'channel-delete',{method:'POST',body:JSON.stringify({id:account||channel})});notify('Удалено');await loadAll();}catch(error){notify(error.message,'error');}
