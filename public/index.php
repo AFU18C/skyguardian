@@ -748,6 +748,7 @@ function active(string $current, string $target): string
     <meta name="theme-color" content="#0b1020">
     <title><?= htmlspecialchars($title) ?> — SkyGuardian</title>
     <link rel="stylesheet" href="assets/app.css?v=38">
+    <link rel="stylesheet" href="assets/worker-monitor.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -842,6 +843,17 @@ function active(string $current, string $target): string
                         </button>
                     </div>
                 </article>
+
+                <section class="page-title worker-monitor-title">
+                    <div>
+                        <span class="eyebrow">TELEGRAM WORKERS</span>
+                        <h2>Обработка каналов</h2>
+                        <p>Статус обновляется автоматически каждые 15 секунд.</p>
+                    </div>
+                </section>
+                <div class="worker-monitor" data-worker-monitor>
+                    <div class="worker-monitor-message">Загрузка состояния worker’ов…</div>
+                </div>
 
             <?php elseif ($isSources): ?>
                 <section class="page-title"><div><span class="eyebrow <?= $accent ?>"><?= $isAlerts ? 'ВОЗДУШНАЯ ТРЕВОГА' : 'НОВОСТИ' ?></span><h1>Каналы данных</h1></div><button class="button primary add-connection-button" type="button" data-tooltip="Добавить канал данных" aria-label="Добавить канал данных" data-add-source>Добавить</button></section>
@@ -1151,5 +1163,6 @@ function active(string $current, string $target): string
 </div>
 <div class="toast-stack" id="toasts" aria-live="polite"></div>
 <script src="assets/app.js?v=38"></script>
+<script src="assets/worker-monitor.js?v=1" defer></script>
 </body>
 </html>
