@@ -53,5 +53,8 @@ jobs:
       - name: Readiness tests
         run: php tests/readiness.php
 
+      - name: Observability tests
+        run: php tests/observability.php
+
       - name: HTTP integration tests
         run: bash tests/http-integration.sh
