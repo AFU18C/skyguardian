@@ -22,14 +22,16 @@ if ($contentLength > 2 * 1024 * 1024) {
 }
 
 $headerSecret = trim((string) ($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? ''));
-// Query-string lookup remains as a compatibility fallback for webhooks that
-// were registered by older SkyGuardian versions. New registrations use only
-// Telegram's secret-token header so the secret is not written to access logs.
-$lookupSecret = $headerSecret !== '' ? $headerSecret : trim((string) ($_GET['key'] ?? ''));
-$automation = new TelegramAutomation(dirname(__DIR__) . '/storage');
-$config = $lookupSecret !== '' ? $automation->findBySecret($lookupSecret) : null;
+if ($headerSecret === '') {
+    http_response_code(403);
+    echo '{"ok":false}';
+    exit;
+}
 
-if (!is_array($config) || $headerSecret === '' || !hash_equals((string) ($config['secret'] ?? ''), $headerSecret)) {
+$automation = new TelegramAutomation(dirname(__DIR__) . '/storage');
+$config = $automation->findBySecret($headerSecret);
+
+if (!is_array($config) || !hash_equals((string) ($config['secret'] ?? ''), $headerSecret)) {
     http_response_code(403);
     echo '{"ok":false}';
     exit;
