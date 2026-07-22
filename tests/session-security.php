@@ -92,9 +92,15 @@ try {
 
     $login = $request('GET', $baseUrl . '/?page=login', [], $cookieJar);
     if (!preg_match('/name="_token" value="([a-f0-9]{64})"/', $login['body'], $match)) $fail('login CSRF token missing');
-    if (!preg_match('/Set-Cookie:\s*skyguardian_admin=.*HttpOnly.*SameSite=Strict/im', $login['headers'])) {
+
+    if (!preg_match('/^Set-Cookie:\s*skyguardian_admin=[^\r\n]*/mi', $login['headers'], $cookieHeaderMatch)) {
+        $fail('session cookie header missing');
+    }
+    $cookieHeader = strtolower($cookieHeaderMatch[0]);
+    if (!str_contains($cookieHeader, 'httponly') || !str_contains($cookieHeader, 'samesite=strict')) {
         $fail('session cookie is missing HttpOnly or SameSite=Strict');
     }
+
     $anonymousSessionId = $sessionId($cookieJar);
     if ($anonymousSessionId === null || $anonymousSessionId === '') $fail('anonymous session cookie missing');
 
