@@ -1,0 +1,57 @@
+name: Worker resilience checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bin/data-channel-worker.php'
+      - 'src/Worker/**'
+      - 'tests/worker-*.php'
+      - 'composer.json'
+      - 'composer.lock'
+      - '.github/workflows/worker-resilience.yml'
+  pull_request:
+    paths:
+      - 'bin/data-channel-worker.php'
+      - 'src/Worker/**'
+      - 'tests/worker-*.php'
+      - 'composer.json'
+      - 'composer.lock'
+      - '.github/workflows/worker-resilience.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-resilience-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, fileinfo, zlib, gmp, gd, iconv
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer configuration
+        run: composer validate --no-check-publish
+
+      - name: Install dependencies and rebuild autoload
+        run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
+
+      - name: PHP syntax
+        run: php -l bin/data-channel-worker.php && find src/Worker tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Retry and metrics tests
+        run: php tests/worker-resilience.php
+
+      - name: Worker integration tests
+        run: php tests/worker-integration.php
