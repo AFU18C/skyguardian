@@ -1,0 +1,47 @@
+name: SkyGuardian News Debug
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/server-news-debug.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SKYGUARDIAN_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Inspect news worker
+        env:
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+          SSH_USER: ${{ secrets.SKYGUARDIAN_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          target=/var/www/SkyGuardianUa
+          echo '=== NEWS SERVICE ==='
+          systemctl is-active skyguardian-data-news.service || true
+          echo '=== NEWS JOURNAL ==='
+          journalctl -u skyguardian-data-news.service --since '-15 minutes' --no-pager -n 80 || true
+          echo '=== NEWS STATE ==='
+          php -r '$f=$argv[1]; $d=is_file($f)?json_decode(file_get_contents($f),true):null; echo json_encode($d, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), PHP_EOL;' "$target/storage/telegram-news-channel-state.json"
+          echo '=== NEWS CHANNELS ==='
+          php -r '$f=$argv[1]; $d=is_file($f)?json_decode(file_get_contents($f),true):null; if(is_array($d)){foreach($d as $c){echo json_encode(["id"=>$c["id"]??null,"source"=>$c["source"]??null,"destination"=>$c["destination"]??null,"account"=>$c["account"]??null,"enabled"=>$c["enabled"]??null], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES),PHP_EOL;}}' "$target/storage/telegram-news-channels.json"
+          REMOTE
