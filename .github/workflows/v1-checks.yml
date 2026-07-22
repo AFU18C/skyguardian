@@ -46,3 +46,6 @@ jobs:
 
       - name: Smoke tests
         run: php tests/smoke.php
+
+      - name: Regression tests
+        run: php tests/regression.php
