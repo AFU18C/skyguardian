@@ -134,9 +134,17 @@ $intervalSeconds = static function (array $channel): int {
 $sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia): void {
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
     if ($includeMedia && $hasMedia) {
-        $parameters = ['peer' => $destination, 'media' => $message['media'], 'message' => $text];
-        if ($entities !== []) $parameters['entities'] = $entities;
-        $api->messages->sendMedia(...$parameters);
+        if (mb_strlen($text) <= 1024) {
+            $parameters = ['peer' => $destination, 'media' => $message['media'], 'message' => $text];
+            if ($entities !== []) $parameters['entities'] = $entities;
+            $api->messages->sendMedia(...$parameters);
+            return;
+        }
+
+        $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '');
+        if ($text !== '') {
+            $api->messages->sendMessage(peer: $destination, message: $text);
+        }
         return;
     }
     if ($text !== '') {
