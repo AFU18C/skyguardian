@@ -15,8 +15,12 @@ session_set_cookie_params([
 session_start();
 
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, max-age=0');
+header('Cache-Control: no-store, private, max-age=0');
+header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: no-referrer');
+header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
 
 $reply = static function (int $status, array $payload): never {
     http_response_code($status);
