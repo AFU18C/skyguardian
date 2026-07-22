@@ -50,5 +50,8 @@ jobs:
       - name: Regression tests
         run: php tests/regression.php
 
+      - name: Readiness tests
+        run: php tests/readiness.php
+
       - name: HTTP integration tests
         run: bash tests/http-integration.sh
