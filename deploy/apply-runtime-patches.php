@@ -21,6 +21,7 @@ $replaceOnce = static function (string $file, string $search, string $replace, s
 $index = $target . '/public/index.php';
 $dataChannel = $target . '/public/data-channel.php';
 $dataChannelJs = $target . '/public/assets/data-channel.js';
+$worker = $target . '/bin/data-channel-worker.php';
 
 $indexContent = file_get_contents($index);
 if ($indexContent === false) throw new RuntimeException('Cannot read index.php');
@@ -87,6 +88,13 @@ $replaceOnce(
     "        channel.check_frequency + ' ' + unit + ' · ' +",
     "        channel.check_frequency + ' ' + unit + ' · до ' + (channel.fetch_limit || 10) + ' сообщ. · ' +",
     'data-channel js card fetch limit'
+);
+
+$replaceOnce(
+    $worker,
+    "            limit: 50,",
+    "            limit: max(1, min(50, (int) (\$channel['fetch_limit'] ?? 10))),",
+    'worker configurable fetch limit'
 );
 
 echo "Runtime patches applied\n";
