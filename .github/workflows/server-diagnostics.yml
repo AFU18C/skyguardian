@@ -1,0 +1,102 @@
+name: SkyGuardian Server Diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/server-diagnostics.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SKYGUARDIAN_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_HOST"
+          test -n "$SSH_PORT"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Inspect SkyGuardian server
+        env:
+          SSH_HOST: ${{ secrets.SKYGUARDIAN_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SKYGUARDIAN_SSH_PORT }}
+          SSH_USER: ${{ secrets.SKYGUARDIAN_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -u
+          target=/var/www/SkyGuardianUa
+
+          echo '=== HOST ==='
+          hostname
+          date -Is
+          echo
+
+          echo '=== SERVICES ==='
+          systemctl is-active skyguardian-data-news.service 2>&1 || true
+          systemctl is-active skyguardian-data-alerts.service 2>&1 || true
+          systemctl --no-pager --full status skyguardian-data-news.service 2>&1 | tail -30 || true
+          systemctl --no-pager --full status skyguardian-data-alerts.service 2>&1 | tail -30 || true
+          echo
+
+          echo '=== CURRENT STORAGE FILES ==='
+          for f in \
+            telegram-accounts.json \
+            telegram-news-accounts.json \
+            telegram-news-channels.json \
+            telegram-alerts-channels.json \
+            telegram-news-channel-state.json \
+            telegram-alerts-channel-state.json
+          do
+            p="$target/storage/$f"
+            if test -f "$p"; then
+              bytes=$(wc -c < "$p" | tr -d " ")
+              sha=$(sha256sum "$p" | awk "{print \$1}")
+              if php -r '$d=json_decode(file_get_contents($argv[1]), true); exit(json_last_error()===JSON_ERROR_NONE ? 0 : 1);' "$p"; then
+                kind=valid-json
+                count=$(php -r '$d=json_decode(file_get_contents($argv[1]), true); echo is_array($d)?count($d):0;' "$p")
+              else
+                kind=invalid-json
+                count='?'
+              fi
+              printf '%s bytes=%s count=%s type=%s sha256=%s\n' "$p" "$bytes" "$count" "$kind" "$sha"
+            else
+              echo "$p MISSING"
+            fi
+          done
+          echo
+
+          echo '=== BACKUP CANDIDATES ==='
+          find "$target/storage" /var/backups /root /tmp \
+            -type f \
+            \( -name 'telegram-accounts.json*' \
+               -o -name 'telegram-news-accounts.json*' \
+               -o -name 'telegram-news-channels.json*' \
+               -o -name 'telegram-alerts-channels.json*' \
+               -o -name 'telegram-news-channel-state.json*' \
+               -o -name 'telegram-alerts-channel-state.json*' \) \
+            -printf '%TY-%Tm-%TdT%TH:%TM:%TS %s %p\n' 2>/dev/null \
+            | sort -r | head -200 || true
+          echo
+
+          echo '=== NEWS JOURNAL ==='
+          journalctl -u skyguardian-data-news.service --no-pager -n 100 2>&1 || true
+          echo
+
+          echo '=== ALERTS JOURNAL ==='
+          journalctl -u skyguardian-data-alerts.service --no-pager -n 60 2>&1 || true
+          REMOTE
