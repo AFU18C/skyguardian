@@ -1,0 +1,51 @@
+name: Install worker monitor UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bin/install-worker-monitor-ui.php'
+      - 'public/assets/worker-monitor.js'
+      - 'public/assets/worker-monitor.css'
+      - '.github/workflows/install-worker-monitor-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: install-worker-monitor-ui-main
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Install dashboard in admin template
+        run: php bin/install-worker-monitor-ui.php
+
+      - name: Validate generated template
+        run: php -l public/index.php
+
+      - name: Commit generated template
+        run: |
+          if git diff --quiet -- public/index.php; then
+            echo 'Worker monitor UI is already installed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/index.php
+          git commit -m 'Connect worker monitoring dashboard'
+          git push origin HEAD:main
