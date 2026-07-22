@@ -26,7 +26,7 @@ foreach ([
 }
 
 $fixture = sys_get_temp_dir() . '/skyguardian-backup-' . bin2hex(random_bytes(8));
-$archive = $fixture . '/result.tar.gz';
+$archive = sys_get_temp_dir() . '/skyguardian-backup-result-' . bin2hex(random_bytes(8)) . '.tar.gz';
 
 try {
     foreach ([
@@ -85,5 +85,8 @@ try {
 } finally {
     if (is_dir($fixture)) {
         exec('rm -rf -- ' . escapeshellarg($fixture));
+    }
+    if (is_file($archive)) {
+        @unlink($archive);
     }
 }
