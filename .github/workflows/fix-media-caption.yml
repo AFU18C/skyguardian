@@ -29,20 +29,6 @@ jobs:
           old = '''$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia): void {
               $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
               if ($includeMedia && $hasMedia) {
-                  $parameters = ['peer' => $destination, 'media' => $message['media'], 'message' => $text];
-                  if ($entities !== []) $parameters['entities'] = $entities;
-                  $api->messages->sendMedia(...$parameters);
-                  return;
-              }
-              if ($text !== '') {
-                  $parameters = ['peer' => $destination, 'message' => $text];
-                  if ($entities !== []) $parameters['entities'] = $entities;
-                  $api->messages->sendMessage(...$parameters);
-              }
-          };'''
-          new = '''$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia): void {
-              $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
-              if ($includeMedia && $hasMedia) {
                   if (mb_strlen($text) <= 1024) {
                       $parameters = ['peer' => $destination, 'media' => $message['media'], 'message' => $text];
                       if ($entities !== []) $parameters['entities'] = $entities;
@@ -62,10 +48,27 @@ jobs:
                   $api->messages->sendMessage(...$parameters);
               }
           };'''
+          new = '''$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia): void {
+              $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
+              if ($includeMedia && $hasMedia) {
+                  $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '');
+                  if ($text !== '') {
+                      $parameters = ['peer' => $destination, 'message' => $text];
+                      if ($entities !== []) $parameters['entities'] = $entities;
+                      $api->messages->sendMessage(...$parameters);
+                  }
+                  return;
+              }
+              if ($text !== '') {
+                  $parameters = ['peer' => $destination, 'message' => $text];
+                  if ($entities !== []) $parameters['entities'] = $entities;
+                  $api->messages->sendMessage(...$parameters);
+              }
+          };'''
           if old not in text:
-              raise SystemExit('Expected sendTextOrMedia block not found; refusing unsafe patch')
+              raise SystemExit('Expected current sendTextOrMedia block not found; refusing unsafe patch')
           if text.count(old) != 1:
-              raise SystemExit('Expected exactly one sendTextOrMedia block; refusing unsafe patch')
+              raise SystemExit('Expected exactly one current sendTextOrMedia block; refusing unsafe patch')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
           php -l bin/data-channel-worker.php
@@ -76,5 +79,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add bin/data-channel-worker.php
-          git commit -m 'Handle Telegram media captions over 1024 characters'
+          git commit -m 'Send Telegram media and text separately'
           git push origin HEAD:main
