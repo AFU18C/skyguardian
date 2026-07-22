@@ -5,7 +5,9 @@ require dirname(__DIR__) . '/bootstrap.php';
 use SkyGuardian\DataChannel\ChannelRepository;
 use SkyGuardian\DataChannel\ChannelValidator;
 use SkyGuardian\Http\Csrf;
+use SkyGuardian\Http\RequestContext;
 use SkyGuardian\Http\SessionAuth;
+use SkyGuardian\Logging\ErrorLogger;
 use SkyGuardian\Moderation\ModerationSettingsRepository;
 use SkyGuardian\Telegram\AccountRepository;
 use SkyGuardian\Telegram\BotApiClient;
@@ -20,6 +22,7 @@ $bot = new BotConfigRepository($store);
 $moderation = new ModerationSettingsRepository($store);
 $channels = new ChannelRepository($store);
 $accounts = new AccountRepository($store);
+$input = [];
 
 $redactAccount = static function (array $item): array {
     unset($item['api_hash']);
@@ -59,7 +62,7 @@ try {
                 'workers' => $store->read('channel_states'),
             ],
         };
-        echo json_encode(['ok' => true, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        echo json_encode(['ok' => true, 'data' => $data, 'request_id' => RequestContext::id()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         exit;
     }
 
@@ -109,13 +112,13 @@ try {
             $account = $findAccount(trim((string) ($input['id'] ?? '')));
             $result = (new QrLoginService(dirname(__DIR__, 3)))->qr($account, (bool) ($input['wait'] ?? false));
             if (($result['logged_in'] ?? false) && is_array($result['user'] ?? null)) $saveConnected($account, $result['user']);
-            echo json_encode(['ok' => true, 'data' => $result], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            echo json_encode(['ok' => true, 'data' => $result, 'request_id' => RequestContext::id()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             exit;
         case 'account-2fa':
             $account = $findAccount(trim((string) ($input['id'] ?? '')));
             $result = (new QrLoginService(dirname(__DIR__, 3)))->complete2fa($account, (string) ($input['password'] ?? ''));
             if (is_array($result['user'] ?? null)) $saveConnected($account, $result['user']);
-            echo json_encode(['ok' => true, 'data' => $result], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            echo json_encode(['ok' => true, 'data' => $result, 'request_id' => RequestContext::id()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             exit;
         case 'account-delete':
             $id = (string) ($input['id'] ?? '');
@@ -135,13 +138,24 @@ try {
             if ($botToken === '') throw new RuntimeException('Telegram bot token is not configured.');
             $telegramAction = trim((string) ($input['telegram_action'] ?? ''));
             $result = (new TelegramAdminService(new BotApiClient($botToken)))->execute($telegramAction, $input);
-            echo json_encode(['ok' => true, 'data' => $result], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            echo json_encode(['ok' => true, 'data' => $result, 'request_id' => RequestContext::id()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             exit;
         default:
             throw new InvalidArgumentException('Unknown action');
     }
-    echo json_encode(['ok' => true], JSON_THROW_ON_ERROR);
+    echo json_encode(['ok' => true, 'request_id' => RequestContext::id()], JSON_THROW_ON_ERROR);
 } catch (Throwable $e) {
-    if (http_response_code() < 400) http_response_code($e instanceof InvalidArgumentException ? 422 : 500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $status = http_response_code();
+    if ($status < 400) {
+        $status = $e instanceof InvalidArgumentException ? 422 : 500;
+        http_response_code($status);
+    }
+
+    (new ErrorLogger($paths->storage()))->log($e, ['action' => $action, 'input' => $input]);
+    $message = $status >= 500 ? 'Внутренняя ошибка сервера.' : $e->getMessage();
+    echo json_encode([
+        'ok' => false,
+        'error' => $message,
+        'request_id' => RequestContext::id(),
+    ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 }
