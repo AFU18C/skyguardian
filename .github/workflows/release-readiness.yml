@@ -27,6 +27,8 @@ jobs:
           tools: composer:v2
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
+      - name: Audit Composer dependencies
+        run: composer audit --locked --no-interaction
       - name: Validate PHP syntax
         run: find public bin src tests deploy -type f -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Run release smoke test
