@@ -21,27 +21,34 @@ final class WelcomeService
         $result = $this->telegram->call('sendMessage', ['chat_id' => $chatId, 'text' => $text]);
         $messageId = (int) ($result['result']['message_id'] ?? 0);
         if ($deleteAfterSeconds > 0 && $messageId > 0) {
-            $queue = $this->store->read('deletion_queue');
-            $queue[] = ['chat_id' => $chatId, 'message_id' => $messageId, 'delete_at' => time() + $deleteAfterSeconds];
-            $this->store->write('deletion_queue', $queue);
+            $this->store->update('deletion_queue', static function (array $queue) use ($chatId, $messageId, $deleteAfterSeconds): array {
+                $queue[] = ['chat_id' => $chatId, 'message_id' => $messageId, 'delete_at' => time() + $deleteAfterSeconds];
+                return $queue;
+            });
         }
         return $messageId;
     }
 
     public function processDeletionQueue(): int
     {
-        $queue = $this->store->read('deletion_queue');
-        $pending = [];
-        $deleted = 0;
-        foreach ($queue as $item) {
-            if ((int) ($item['delete_at'] ?? 0) > time()) {
-                $pending[] = $item;
-                continue;
+        $due = [];
+        $this->store->update('deletion_queue', static function (array $queue) use (&$due): array {
+            $pending = [];
+            foreach ($queue as $item) {
+                if ((int) ($item['delete_at'] ?? 0) > time()) $pending[] = $item;
+                else $due[] = $item;
             }
-            $this->telegram->call('deleteMessage', ['chat_id' => $item['chat_id'], 'message_id' => $item['message_id']]);
-            $deleted++;
+            return $pending;
+        });
+        $deleted = 0;
+        foreach ($due as $item) {
+            try {
+                $this->telegram->call('deleteMessage', ['chat_id' => $item['chat_id'], 'message_id' => $item['message_id']]);
+                $deleted++;
+            } catch (\Throwable) {
+                // Already deleted or unavailable; do not poison the queue.
+            }
         }
-        $this->store->write('deletion_queue', $pending);
         return $deleted;
     }
 }
