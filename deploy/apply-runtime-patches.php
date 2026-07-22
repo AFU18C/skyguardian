@@ -21,7 +21,6 @@ $replaceOnce = static function (string $file, string $search, string $replace, s
 $index = $target . '/public/index.php';
 $dataChannel = $target . '/public/data-channel.php';
 $dataChannelJs = $target . '/public/assets/data-channel.js';
-$worker = $target . '/bin/data-channel-worker.php';
 
 $indexContent = file_get_contents($index);
 if ($indexContent === false) throw new RuntimeException('Cannot read index.php');
@@ -89,69 +88,5 @@ $replaceOnce(
     "        channel.check_frequency + ' ' + unit + ' · до ' + (channel.fetch_limit || 10) + ' сообщ. · ' +",
     'data-channel js card fetch limit'
 );
-
-$replaceOnce(
-    $worker,
-    "            limit: 50,",
-    "            limit: max(1, min(50, (int) (\$channel['fetch_limit'] ?? 10))),",
-    'worker configurable fetch limit'
-);
-
-$oldWorkerBlock = <<<'PHP'
-        $enabledSinceTimestamp = strtotime((string) ($channel['enabled_since'] ?? '')) ?: 0;
-        if ($enabledSinceTimestamp > 0) {
-            $messages = array_values(array_filter($messages, static fn (array $message): bool =>
-                (int) ($message['date'] ?? 0) >= $enabledSinceTimestamp
-            ));
-        }
-
-        if (!$initialized) {
-            $start = (string) ($channel['processing_start'] ?? 'new');
-            if ($start === 'new') {
-                $baseline = (string) ($state['resume_from_now_at'] ?? $channel['created_at'] ?? '');
-                $baselineTimestamp = strtotime($baseline) ?: time();
-                $messages = array_values(array_filter($messages, static fn (array $message): bool =>
-                    (int) ($message['date'] ?? 0) >= $baselineTimestamp
-                ));
-            } else {
-                $take = match ($start) { 'last_5' => 5, 'last_10' => 10, 'last_20' => 20, default => 0 };
-                if ($take > 0 && count($messages) > $take) $messages = array_slice($messages, -$take);
-            }
-            $states[$id] = array_merge($states[$id], ['initialized' => true, 'last_message_id' => 0]);
-            unset($states[$id]['resume_from_now_at']);
-            $writeJson($stateFile, $states);
-        }
-PHP;
-
-$newWorkerBlock = <<<'PHP'
-        if (!$initialized) {
-            $start = (string) ($channel['processing_start'] ?? 'new');
-            if ($start === 'new') {
-                $baselineId = 0;
-                foreach ($messages as $existingMessage) {
-                    $baselineId = max($baselineId, (int) ($existingMessage['id'] ?? 0));
-                }
-                $states[$id] = array_merge($states[$id], [
-                    'initialized' => true,
-                    'last_message_id' => $baselineId,
-                    'status' => 'active',
-                    'last_check_at' => gmdate(DATE_ATOM),
-                    'worker_seen_at' => gmdate(DATE_ATOM),
-                    'last_error' => null,
-                ]);
-                unset($states[$id]['resume_from_now_at']);
-                $writeJson($stateFile, $states);
-                continue;
-            }
-
-            $take = match ($start) { 'last_5' => 5, 'last_10' => 10, 'last_20' => 20, default => 0 };
-            if ($take > 0 && count($messages) > $take) $messages = array_slice($messages, -$take);
-            $states[$id] = array_merge($states[$id], ['initialized' => true, 'last_message_id' => 0]);
-            unset($states[$id]['resume_from_now_at']);
-            $writeJson($stateFile, $states);
-        }
-PHP;
-
-$replaceOnce($worker, $oldWorkerBlock, $newWorkerBlock, 'worker reliable new-message baseline');
 
 echo "Runtime patches applied\n";
