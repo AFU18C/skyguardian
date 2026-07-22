@@ -43,6 +43,19 @@ require_once $autoload;
 $configFile = $storageDir . '/worker-notifications.json';
 $journalFile = $storageDir . '/worker-notification-journal.json';
 
+if (!is_dir($storageDir) && !mkdir($storageDir, 0770, true) && !is_dir($storageDir)) {
+    $reply(503, ['ok' => false, 'message' => 'Хранилище недоступно.']);
+}
+$lockHandle = @fopen($storageDir . '/worker-notifications.lock', 'c+');
+if ($lockHandle === false || !flock($lockHandle, LOCK_EX)) {
+    if (is_resource($lockHandle)) fclose($lockHandle);
+    $reply(503, ['ok' => false, 'message' => 'Настройки временно заняты.']);
+}
+register_shutdown_function(static function () use ($lockHandle): void {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+});
+
 $readJson = static function (string $path): array {
     if (!is_file($path)) return [];
     $raw = @file_get_contents($path);
@@ -52,9 +65,6 @@ $readJson = static function (string $path): array {
 };
 
 $writeJson = static function (string $path, array $data) use ($storageDir): void {
-    if (!is_dir($storageDir) && !mkdir($storageDir, 0770, true) && !is_dir($storageDir)) {
-        throw new RuntimeException('Не удалось создать каталог хранения.');
-    }
     $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     $temp = tempnam($storageDir, '.worker-notifications-');
     if ($temp === false) throw new RuntimeException('Не удалось создать временный файл.');
