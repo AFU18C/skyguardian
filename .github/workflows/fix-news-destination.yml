@@ -36,7 +36,10 @@ jobs:
           PY
           php -l bin/data-channel-worker.php
           grep -Fq '$destinationPeer = $destinationRaw;' bin/data-channel-worker.php
-          ! grep -Fq "$destinationPeer = $destinationInfo['InputPeer'] ?? $destinationRaw;" bin/data-channel-worker.php
+          if grep -Fq '$destinationPeer = $destinationInfo['"'"'InputPeer'"'"'] ?? $destinationRaw;' bin/data-channel-worker.php; then
+            echo 'Old destination peer line is still present' >&2
+            exit 1
+          fi
 
       - name: Commit fix
         run: |
