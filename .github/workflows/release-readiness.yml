@@ -1,0 +1,42 @@
+name: Release readiness
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, fileinfo, zlib, gmp, gd, iconv, curl
+          coverage: none
+          tools: composer:v2
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
+      - name: Validate PHP syntax
+        run: find public bin src tests deploy -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Run release smoke test
+        run: php tests/release-smoke.php
+      - name: Run worker test suite
+        run: |
+          php tests/worker-resilience.php
+          php tests/worker-integration.php
+          php tests/worker-status.php
+          php tests/worker-monitor-ui.php
+          php tests/worker-notifications.php
+          php tests/worker-notification-api.php
+          php tests/worker-notifications-ui.php
