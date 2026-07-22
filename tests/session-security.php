@@ -85,7 +85,7 @@ try {
     for ($attempt = 0; $attempt < 40; $attempt++) {
         usleep(100000);
         try {
-            if ($request('GET', $baseUrl . '/?page=login', [], $cookieJar)['status'] === 200) { $ready = true; break; }
+            if ($request('GET', $baseUrl . '/?page=login')['status'] === 200) { $ready = true; break; }
         } catch (Throwable) {}
     }
     if (!$ready) $fail('PHP development server did not become ready');
