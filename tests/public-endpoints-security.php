@@ -47,6 +47,21 @@ $request = static function (string $method, string $url, array $fields = [], ?st
     return ['status' => $status, 'headers' => substr((string) $response, 0, $headerSize), 'body' => substr((string) $response, $headerSize)];
 };
 
+$assertSecurityHeaders = static function (string $endpoint, string $headers) use ($fail): void {
+    $headers = strtolower($headers);
+    foreach ([
+        'cache-control: no-store',
+        'x-content-type-options: nosniff',
+        'x-frame-options: deny',
+        'referrer-policy: no-referrer',
+        "content-security-policy: default-src 'none'",
+    ] as $expected) {
+        if (!str_contains($headers, $expected)) {
+            $fail($endpoint . ' is missing security header: ' . $expected);
+        }
+    }
+};
+
 try {
     if (!is_dir($storageDir) && !mkdir($storageDir, 0770, true) && !is_dir($storageDir)) $fail('could not create storage directory');
     $password = 'Endpoint-' . bin2hex(random_bytes(12));
@@ -75,7 +90,7 @@ try {
     foreach (['/worker-status.php', '/worker-notifications.php'] as $endpoint) {
         $response = $request('GET', $baseUrl . $endpoint);
         if ($response['status'] !== 401) $fail($endpoint . ' is accessible without authentication');
-        if (!str_contains(strtolower($response['headers']), 'cache-control: no-store')) $fail($endpoint . ' does not disable caching');
+        $assertSecurityHeaders($endpoint, $response['headers']);
     }
 
     $login = $request('GET', $baseUrl . '/?page=login', [], $cookieJar);
@@ -90,11 +105,13 @@ try {
 
     $statusGet = $request('GET', $baseUrl . '/worker-status.php', [], $cookieJar);
     if ($statusGet['status'] !== 200) $fail('authenticated worker status GET failed');
+    $assertSecurityHeaders('/worker-status.php', $statusGet['headers']);
     $statusPost = $request('POST', $baseUrl . '/worker-status.php', ['_token' => $csrfMatch[1]], $cookieJar);
     if ($statusPost['status'] !== 405) $fail('worker status endpoint does not reject POST');
 
     $notificationsGet = $request('GET', $baseUrl . '/worker-notifications.php', [], $cookieJar);
     if ($notificationsGet['status'] !== 200) $fail('authenticated worker notifications GET failed');
+    $assertSecurityHeaders('/worker-notifications.php', $notificationsGet['headers']);
     $notificationsNoCsrf = $request('POST', $baseUrl . '/worker-notifications.php', ['operation' => 'save'], $cookieJar);
     if ($notificationsNoCsrf['status'] !== 419) $fail('worker notifications POST accepts missing CSRF token');
     $notificationsPut = $request('PUT', $baseUrl . '/worker-notifications.php', [], $cookieJar);
