@@ -8,26 +8,32 @@ on:
       - 'bin/worker-notification-watch.php'
       - 'bin/install-worker-monitor-ui.php'
       - 'public/worker-status.php'
+      - 'public/worker-notifications.php'
       - 'public/assets/worker-monitor.*'
+      - 'deploy/skyguardian-worker-notifications.*'
       - 'src/Worker/**'
       - 'src/Notification/**'
       - 'tests/worker-*.php'
       - 'composer.json'
       - 'composer.lock'
       - '.github/workflows/worker-resilience.yml'
+      - '.github/workflows/deploy-worker-notifications.yml'
   pull_request:
     paths:
       - 'bin/data-channel-worker.php'
       - 'bin/worker-notification-watch.php'
       - 'bin/install-worker-monitor-ui.php'
       - 'public/worker-status.php'
+      - 'public/worker-notifications.php'
       - 'public/assets/worker-monitor.*'
+      - 'deploy/skyguardian-worker-notifications.*'
       - 'src/Worker/**'
       - 'src/Notification/**'
       - 'tests/worker-*.php'
       - 'composer.json'
       - 'composer.lock'
       - '.github/workflows/worker-resilience.yml'
+      - '.github/workflows/deploy-worker-notifications.yml'
   workflow_dispatch:
 
 permissions:
@@ -58,7 +64,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
 
       - name: PHP syntax
-        run: php -l bin/data-channel-worker.php && php -l bin/worker-notification-watch.php && php -l bin/install-worker-monitor-ui.php && php -l public/worker-status.php && find src/Worker src/Notification tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: php -l bin/data-channel-worker.php && php -l bin/worker-notification-watch.php && php -l bin/install-worker-monitor-ui.php && php -l public/worker-status.php && php -l public/worker-notifications.php && find src/Worker src/Notification tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Retry and metrics tests
         run: php tests/worker-resilience.php
@@ -74,3 +80,6 @@ jobs:
 
       - name: Worker notification tests
         run: php tests/worker-notifications.php
+
+      - name: Notification API and timer tests
+        run: php tests/worker-notification-api.php
