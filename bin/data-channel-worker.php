@@ -210,15 +210,23 @@ try {
         if ($id === '') continue;
 
         $state = is_array($states[$id] ?? null) ? $states[$id] : [];
-        $lastCheckTimestamp = isset($state['last_check_at']) ? strtotime((string) $state['last_check_at']) : false;
-        if ($lastCheckTimestamp !== false && time() - $lastCheckTimestamp < $intervalSeconds($channel)) continue;
+        $lastWorkerCheckTimestamp = isset($state['worker_last_check_at']) ? strtotime((string) $state['worker_last_check_at']) : false;
+        if ($lastWorkerCheckTimestamp !== false && time() - $lastWorkerCheckTimestamp < $intervalSeconds($channel)) continue;
 
-        $states[$id] = array_merge($state, ['status' => 'checking', 'worker_seen_at' => gmdate(DATE_ATOM), 'last_error' => null]);
+        $states[$id] = array_merge($state, [
+            'worker_status' => 'checking',
+            'worker_seen_at' => gmdate(DATE_ATOM),
+            'worker_last_error' => null,
+        ]);
         $writeJson($stateFile, $states);
 
         $account = $accountsById[(string) ($channel['account'] ?? '')] ?? null;
         if (!is_array($account) || !(bool) ($account['connected'] ?? false) || !(bool) ($account['enabled'] ?? true)) {
-            $states[$id] = array_merge($states[$id], ['status' => 'paused', 'last_check_at' => gmdate(DATE_ATOM), 'last_error' => 'Технический аккаунт недоступен или выключен.']);
+            $states[$id] = array_merge($states[$id], [
+                'worker_status' => 'paused',
+                'worker_last_check_at' => gmdate(DATE_ATOM),
+                'worker_last_error' => 'Технический аккаунт недоступен или выключен.',
+            ]);
             $writeJson($stateFile, $states);
             continue;
         }
@@ -292,19 +300,19 @@ try {
 
             $states[$id] = array_merge($states[$id], [
                 'initialized' => true,
-                'status' => 'active',
-                'last_check_at' => gmdate(DATE_ATOM),
+                'worker_status' => 'active',
+                'worker_last_check_at' => gmdate(DATE_ATOM),
                 'worker_seen_at' => gmdate(DATE_ATOM),
-                'last_error' => null,
+                'worker_last_error' => null,
             ]);
             $writeJson($stateFile, $states);
         } catch (Throwable $exception) {
             $metrics->failed($exception);
             $states[$id] = array_merge($states[$id] ?? $state, [
-                'status' => 'error',
-                'last_check_at' => gmdate(DATE_ATOM),
+                'worker_status' => 'error',
+                'worker_last_check_at' => gmdate(DATE_ATOM),
                 'worker_seen_at' => gmdate(DATE_ATOM),
-                'last_error' => mb_substr($exception::class . ': ' . $exception->getMessage(), 0, 500),
+                'worker_last_error' => 'Автоматическая проверка завершилась ошибкой.',
             ]);
             $writeJson($stateFile, $states);
             error_log('Data channel worker [' . $scope . '/' . $id . ']: ' . $exception::class . ': ' . $exception->getMessage());
