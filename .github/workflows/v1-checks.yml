@@ -49,3 +49,6 @@ jobs:
 
       - name: Regression tests
         run: php tests/regression.php
+
+      - name: HTTP integration tests
+        run: bash tests/http-integration.sh
