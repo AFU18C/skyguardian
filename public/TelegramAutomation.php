@@ -95,7 +95,7 @@ final class TelegramAutomation
         $configs[$key] = $config;
         $this->writeJson($this->configFile, $configs);
 
-        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode($secret);
+        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php';
         if ($config['enabled'] && $mode === 'webhook') {
             $this->api($token, 'setWebhook', [
                 'url' => $webhookUrl,
@@ -140,7 +140,7 @@ final class TelegramAutomation
         $config['updated_at'] = date(DATE_ATOM);
         $configs[$key] = $config;
         $this->writeJson($this->configFile, $configs);
-        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret']);
+        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php';
         // Persist the master switch first. Webhook synchronisation must never
         // roll the UI state back when Telegram is temporarily unavailable.
         if ($enabled && ($config['enabled'] ?? false) === true && ($config['mode'] ?? 'webhook') === 'webhook') {
@@ -201,7 +201,7 @@ final class TelegramAutomation
         if (!is_array($config)) {
             return ['configured' => false];
         }
-        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret']);
+        $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php';
         if (($config['group_enabled'] ?? true) === false) {
             return array_merge(['configured' => true], $this->publicConfig($config, $webhookUrl), [
                 'stopped' => true,
@@ -448,7 +448,7 @@ final class TelegramAutomation
             'enabled' => ($config['enabled'] ?? false) === true,
             'group_enabled' => ($config['group_enabled'] ?? true) !== false,
             'mode' => (string)($config['mode'] ?? 'webhook'),
-            'webhook_url' => preg_replace('/key=[^&]+/', 'key=••••••', $webhookUrl),
+            'webhook_url' => $webhookUrl,
             'updated_at' => (string)($config['updated_at'] ?? date(DATE_ATOM)),
         ];
     }
