@@ -6,6 +6,8 @@ use danog\MadelineProto\API;
 use danog\MadelineProto\Logger;
 use danog\MadelineProto\Settings;
 use danog\MadelineProto\Settings\AppInfo;
+use SkyGuardian\Worker\RetryPolicy;
+use SkyGuardian\Worker\WorkerRunMetrics;
 
 $projectDir = dirname(__DIR__);
 $storageDir = $projectDir . '/storage';
@@ -65,6 +67,25 @@ $writeJson = static function (string $file, array $data) use ($storageDir): void
     } finally {
         if (is_file($temp)) @unlink($temp);
     }
+};
+
+$metrics = new WorkerRunMetrics('data-channel-worker', $scope);
+$metricsFile = $storageDir . '/data-channel-worker-' . $scope . '-metrics.json';
+$retryPolicy = new RetryPolicy(maxAttempts: 4, baseDelayMilliseconds: 500, maxDelayMilliseconds: 30_000);
+$telegram = static function (callable $operation) use ($retryPolicy, $metrics): mixed {
+    return $retryPolicy->run(
+        static fn (int $attempt): mixed => $operation($attempt),
+        static function (int $attempt, Throwable $exception, int $delay) use ($metrics): void {
+            $metrics->retried();
+            error_log(sprintf(
+                'Telegram retry attempt %d after %d ms: %s: %s',
+                $attempt,
+                $delay,
+                $exception::class,
+                $exception->getMessage()
+            ));
+        }
+    );
 };
 
 $buildSettings = static function (array $account, string $logFile): Settings {
@@ -131,40 +152,42 @@ $intervalSeconds = static function (array $channel): int {
     };
 };
 
-$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia): void {
+$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia, callable $telegram): void {
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
     if ($includeMedia && $hasMedia) {
-        $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '');
+        $telegram(static fn (): mixed => $api->messages->sendMedia(peer: $destination, media: $message['media'], message: ''));
         if ($text !== '') {
             $parameters = ['peer' => $destination, 'message' => $text];
             if ($entities !== []) $parameters['entities'] = $entities;
-            $api->messages->sendMessage(...$parameters);
+            $telegram(static fn (): mixed => $api->messages->sendMessage(...$parameters));
         }
         return;
     }
     if ($text !== '') {
         $parameters = ['peer' => $destination, 'message' => $text];
         if ($entities !== []) $parameters['entities'] = $entities;
-        $api->messages->sendMessage(...$parameters);
+        $telegram(static fn (): mixed => $api->messages->sendMessage(...$parameters));
     }
 };
 
-$publish = static function (API $api, mixed $destination, array $channel, array $message) use ($sanitizeText, $customizeText, $sendTextOrMedia): void {
+$publish = static function (API $api, mixed $destination, array $channel, array $message, callable $telegram) use ($sanitizeText, $customizeText, $sendTextOrMedia): void {
     $format = (string) ($channel['publication_format'] ?? 'original');
     if ($format === 'text_without_links') $format = 'text';
     [$text, $entities] = $sanitizeText($message);
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
     if ($format === 'media') {
-        if ($hasMedia) $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '');
+        if ($hasMedia) {
+            $telegram(static fn (): mixed => $api->messages->sendMedia(peer: $destination, media: $message['media'], message: ''));
+        }
         return;
     }
     $customizedText = $customizeText($text, $channel);
     if ($customizedText !== $text) $entities = [];
     if ($format === 'text') {
-        $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, false);
+        $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, false, $telegram);
         return;
     }
-    $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, true);
+    $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, true, $telegram);
 };
 
 $channelsFile = $storageDir . '/telegram-' . $scope . '-channels.json';
@@ -180,109 +203,119 @@ foreach ($accounts as $account) {
     if (is_array($account)) $accountsById[(string) ($account['id'] ?? '')] = $account;
 }
 
-foreach ($channels as $channel) {
-    if (!is_array($channel) || !(bool) ($channel['enabled'] ?? true)) continue;
-    $id = (string) ($channel['id'] ?? '');
-    if ($id === '') continue;
+try {
+    foreach ($channels as $channel) {
+        if (!is_array($channel) || !(bool) ($channel['enabled'] ?? true)) continue;
+        $id = (string) ($channel['id'] ?? '');
+        if ($id === '') continue;
 
-    $state = is_array($states[$id] ?? null) ? $states[$id] : [];
-    $lastCheckTimestamp = isset($state['last_check_at']) ? strtotime((string) $state['last_check_at']) : false;
-    if ($lastCheckTimestamp !== false && time() - $lastCheckTimestamp < $intervalSeconds($channel)) continue;
+        $state = is_array($states[$id] ?? null) ? $states[$id] : [];
+        $lastCheckTimestamp = isset($state['last_check_at']) ? strtotime((string) $state['last_check_at']) : false;
+        if ($lastCheckTimestamp !== false && time() - $lastCheckTimestamp < $intervalSeconds($channel)) continue;
 
-    $states[$id] = array_merge($state, ['status' => 'checking', 'worker_seen_at' => gmdate(DATE_ATOM), 'last_error' => null]);
-    $writeJson($stateFile, $states);
-
-    $account = $accountsById[(string) ($channel['account'] ?? '')] ?? null;
-    if (!is_array($account) || !(bool) ($account['connected'] ?? false) || !(bool) ($account['enabled'] ?? true)) {
-        $states[$id] = array_merge($states[$id], ['status' => 'paused', 'last_check_at' => gmdate(DATE_ATOM), 'last_error' => 'Технический аккаунт недоступен или выключен.']);
+        $states[$id] = array_merge($state, ['status' => 'checking', 'worker_seen_at' => gmdate(DATE_ATOM), 'last_error' => null]);
         $writeJson($stateFile, $states);
-        continue;
-    }
 
-    try {
-        if (!is_dir($sessionsDir) && !mkdir($sessionsDir, 0770, true) && !is_dir($sessionsDir)) {
-            throw new RuntimeException('Не удалось создать каталог Telegram-сессии.');
+        $account = $accountsById[(string) ($channel['account'] ?? '')] ?? null;
+        if (!is_array($account) || !(bool) ($account['connected'] ?? false) || !(bool) ($account['enabled'] ?? true)) {
+            $states[$id] = array_merge($states[$id], ['status' => 'paused', 'last_check_at' => gmdate(DATE_ATOM), 'last_error' => 'Технический аккаунт недоступен или выключен.']);
+            $writeJson($stateFile, $states);
+            continue;
         }
-        chdir($sessionsDir);
-        $api = new API($sessionsDir . '/' . $account['id'] . '.madeline', $buildSettings($account, $sessionsDir . '/DataChannelWorker-' . $scope . '.log'));
 
-        $sourceRaw = trim((string) ($channel['source'] ?? ''));
-        $destinationRaw = trim((string) ($channel['destination'] ?? ''));
-        if ($sourceRaw === '' || $destinationRaw === '') throw new RuntimeException('Не указан источник или канал назначения.');
+        try {
+            if (!is_dir($sessionsDir) && !mkdir($sessionsDir, 0770, true) && !is_dir($sessionsDir)) {
+                throw new RuntimeException('Не удалось создать каталог Telegram-сессии.');
+            }
+            chdir($sessionsDir);
+            $api = new API($sessionsDir . '/' . $account['id'] . '.madeline', $buildSettings($account, $sessionsDir . '/DataChannelWorker-' . $scope . '.log'));
 
-        $sourceInfo = $api->getInfo($sourceRaw);
-        $destinationInfo = $api->getInfo($destinationRaw);
-        $sourcePeer = $sourceInfo['InputPeer'] ?? $sourceRaw;
-        $destinationPeer = $destinationRaw;
+            $sourceRaw = trim((string) ($channel['source'] ?? ''));
+            $destinationRaw = trim((string) ($channel['destination'] ?? ''));
+            if ($sourceRaw === '' || $destinationRaw === '') throw new RuntimeException('Не указан источник или канал назначения.');
 
-        $limit = max(1, min(50, (int) ($channel['fetch_limit'] ?? 10)));
-        $history = (array) $api->messages->getHistory(peer: $sourcePeer, offset_id: 0, offset_date: 0, add_offset: 0, limit: max(20, $limit), max_id: 0, min_id: 0, hash: 0);
-        $messages = array_values(array_filter((array) ($history['messages'] ?? []), static fn ($message): bool =>
-            is_array($message) && ($message['_'] ?? '') === 'message' && (int) ($message['id'] ?? 0) > 0
-        ));
-        usort($messages, static fn (array $a, array $b): int => ((int) $a['id']) <=> ((int) $b['id']));
+            $sourceInfo = $telegram(static fn (): mixed => $api->getInfo($sourceRaw));
+            $destinationInfo = $telegram(static fn (): mixed => $api->getInfo($destinationRaw));
+            $sourcePeer = $sourceInfo['InputPeer'] ?? $sourceRaw;
+            $destinationPeer = $destinationRaw;
 
-        $latestSourceId = $messages === [] ? 0 : (int) end($messages)['id'];
-        $states[$id] = array_merge($states[$id], [
-            'source_peer_id' => (int) ($sourceInfo['bot_api_id'] ?? 0),
-            'destination_peer_id' => (int) ($destinationInfo['bot_api_id'] ?? 0),
-            'history_count' => count($messages),
-            'latest_source_message_id' => $latestSourceId,
-        ]);
+            $limit = max(1, min(50, (int) ($channel['fetch_limit'] ?? 10)));
+            $history = (array) $telegram(static fn (): mixed => $api->messages->getHistory(peer: $sourcePeer, offset_id: 0, offset_date: 0, add_offset: 0, limit: max(20, $limit), max_id: 0, min_id: 0, hash: 0));
+            $messages = array_values(array_filter((array) ($history['messages'] ?? []), static fn ($message): bool =>
+                is_array($message) && ($message['_'] ?? '') === 'message' && (int) ($message['id'] ?? 0) > 0
+            ));
+            usort($messages, static fn (array $a, array $b): int => ((int) $a['id']) <=> ((int) $b['id']));
 
-        $initialized = (bool) ($state['initialized'] ?? false);
-        $lastId = max(0, (int) ($state['last_message_id'] ?? 0));
-        if (!$initialized) {
-            $start = (string) ($channel['processing_start'] ?? 'new');
-            if ($start === 'new') {
-                $states[$id]['last_message_id'] = $latestSourceId;
-                $messages = [];
+            $latestSourceId = $messages === [] ? 0 : (int) end($messages)['id'];
+            $states[$id] = array_merge($states[$id], [
+                'source_peer_id' => (int) ($sourceInfo['bot_api_id'] ?? 0),
+                'destination_peer_id' => (int) ($destinationInfo['bot_api_id'] ?? 0),
+                'history_count' => count($messages),
+                'latest_source_message_id' => $latestSourceId,
+            ]);
+
+            $initialized = (bool) ($state['initialized'] ?? false);
+            $lastId = max(0, (int) ($state['last_message_id'] ?? 0));
+            if (!$initialized) {
+                $start = (string) ($channel['processing_start'] ?? 'new');
+                if ($start === 'new') {
+                    $states[$id]['last_message_id'] = $latestSourceId;
+                    $messages = [];
+                } else {
+                    $take = match ($start) { 'last_5' => 5, 'last_10' => 10, 'last_20' => 20, default => $limit };
+                    if (count($messages) > $take) $messages = array_slice($messages, -$take);
+                }
+                $states[$id]['initialized'] = true;
+                unset($states[$id]['resume_from_now_at']);
+                $writeJson($stateFile, $states);
             } else {
-                $take = match ($start) { 'last_5' => 5, 'last_10' => 10, 'last_20' => 20, default => $limit };
-                if (count($messages) > $take) $messages = array_slice($messages, -$take);
+                $messages = array_values(array_filter($messages, static fn (array $message): bool => (int) $message['id'] > $lastId));
             }
-            $states[$id]['initialized'] = true;
-            unset($states[$id]['resume_from_now_at']);
-            $writeJson($stateFile, $states);
-        } else {
-            $messages = array_values(array_filter($messages, static fn (array $message): bool => (int) $message['id'] > $lastId));
-        }
 
-        foreach ($messages as $message) {
-            $messageId = (int) $message['id'];
-            $text = trim((string) ($message['message'] ?? ''));
-            $keywords = is_array($channel['keywords'] ?? null) ? $channel['keywords'] : [];
-            $stopWords = is_array($channel['stop_words'] ?? null) ? $channel['stop_words'] : [];
-            $shouldPublish = (!$keywords || $containsAny($text, $keywords)) && !$containsAny($text, $stopWords);
+            foreach ($messages as $message) {
+                $messageId = (int) $message['id'];
+                $metrics->processed();
+                $text = trim((string) ($message['message'] ?? ''));
+                $keywords = is_array($channel['keywords'] ?? null) ? $channel['keywords'] : [];
+                $stopWords = is_array($channel['stop_words'] ?? null) ? $channel['stop_words'] : [];
+                $shouldPublish = (!$keywords || $containsAny($text, $keywords)) && !$containsAny($text, $stopWords);
 
-            if ($shouldPublish) {
-                $publish($api, $destinationPeer, $channel, $message);
-                $states[$id]['last_publish_at'] = gmdate(DATE_ATOM);
-                $states[$id]['published_count'] = (int) ($states[$id]['published_count'] ?? 0) + 1;
+                if ($shouldPublish) {
+                    $publish($api, $destinationPeer, $channel, $message, $telegram);
+                    $metrics->published();
+                    $states[$id]['last_publish_at'] = gmdate(DATE_ATOM);
+                    $states[$id]['published_count'] = (int) ($states[$id]['published_count'] ?? 0) + 1;
+                }
+                $states[$id]['last_message_id'] = $messageId;
+                $writeJson($stateFile, $states);
             }
-            $states[$id]['last_message_id'] = $messageId;
-            $writeJson($stateFile, $states);
-        }
 
-        $states[$id] = array_merge($states[$id], [
-            'initialized' => true,
-            'status' => 'active',
-            'last_check_at' => gmdate(DATE_ATOM),
-            'worker_seen_at' => gmdate(DATE_ATOM),
-            'last_error' => null,
-        ]);
-        $writeJson($stateFile, $states);
-    } catch (Throwable $exception) {
-        $states[$id] = array_merge($states[$id] ?? $state, [
-            'status' => 'error',
-            'last_check_at' => gmdate(DATE_ATOM),
-            'worker_seen_at' => gmdate(DATE_ATOM),
-            'last_error' => mb_substr($exception::class . ': ' . $exception->getMessage(), 0, 500),
-        ]);
-        $writeJson($stateFile, $states);
-        error_log('Data channel worker [' . $scope . '/' . $id . ']: ' . $exception::class . ': ' . $exception->getMessage());
+            $states[$id] = array_merge($states[$id], [
+                'initialized' => true,
+                'status' => 'active',
+                'last_check_at' => gmdate(DATE_ATOM),
+                'worker_seen_at' => gmdate(DATE_ATOM),
+                'last_error' => null,
+            ]);
+            $writeJson($stateFile, $states);
+        } catch (Throwable $exception) {
+            $metrics->failed($exception);
+            $states[$id] = array_merge($states[$id] ?? $state, [
+                'status' => 'error',
+                'last_check_at' => gmdate(DATE_ATOM),
+                'worker_seen_at' => gmdate(DATE_ATOM),
+                'last_error' => mb_substr($exception::class . ': ' . $exception->getMessage(), 0, 500),
+            ]);
+            $writeJson($stateFile, $states);
+            error_log('Data channel worker [' . $scope . '/' . $id . ']: ' . $exception::class . ': ' . $exception->getMessage());
+        }
     }
+} finally {
+    try {
+        $writeJson($metricsFile, $metrics->snapshot());
+    } catch (Throwable $metricsException) {
+        error_log('Data channel worker [' . $scope . ']: cannot persist metrics: ' . $metricsException->getMessage());
+    }
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
 }
-
-flock($lockHandle, LOCK_UN);
-fclose($lockHandle);
