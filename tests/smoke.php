@@ -20,11 +20,14 @@ try {
     }
 
     $inspector = new MessageInspector();
-    if (!$inspector->containsLink('visit https://example.com')) {
+    if ($inspector->inspect('visit https://example.com', ['link_filter' => true]) !== 'link') {
         $failures[] = 'Link detection failed';
     }
-    if (!$inspector->containsForbiddenWord('это запрещенное слово', ['запрещенное'])) {
+    if ($inspector->inspect('это запрещенное слово', ['forbidden_words' => ['запрещенное']]) !== 'forbidden_word') {
         $failures[] = 'Forbidden-word detection failed';
+    }
+    if ($inspector->inspect('обычное сообщение', ['link_filter' => true, 'forbidden_words' => ['запрещенное']]) !== null) {
+        $failures[] = 'Clean message was rejected';
     }
 
     $guard = new SpamGuard($store);
