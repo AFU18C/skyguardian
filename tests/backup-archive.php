@@ -15,8 +15,8 @@ if (!is_file($indexFile)) {
 
 $index = (string) file_get_contents($indexFile);
 foreach ([
-    "--exclude='" . './storage/backups',
-    "--exclude='" . './.git',
+    "' --exclude=' . escapeshellarg('./storage/backups')",
+    "' --exclude=' . escapeshellarg('./.git')",
     'escapeshellarg($backupPath)',
     'escapeshellarg($projectRoot)',
 ] as $needle) {
