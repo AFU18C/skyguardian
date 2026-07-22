@@ -8,8 +8,9 @@ use SkyGuardian\Http\Csrf;
 use SkyGuardian\Http\SessionAuth;
 use SkyGuardian\Moderation\ModerationSettingsRepository;
 use SkyGuardian\Telegram\AccountRepository;
+use SkyGuardian\Telegram\BotApiClient;
 use SkyGuardian\Telegram\BotConfigRepository;
-use SkyGuardian\Worker\WorkerStatusRepository;
+use SkyGuardian\Telegram\TelegramAdminService;
 
 SessionAuth::requireLogin();
 header('Content-Type: application/json; charset=utf-8');
@@ -18,21 +19,31 @@ $bot = new BotConfigRepository($store);
 $moderation = new ModerationSettingsRepository($store);
 $channels = new ChannelRepository($store);
 $accounts = new AccountRepository($store);
-$workers = new WorkerStatusRepository($store);
+
+$redactAccount = static function (array $item): array {
+    unset($item['api_hash']);
+    $item['session_configured'] = trim((string) ($item['session_path'] ?? '')) !== '';
+    unset($item['session_path']);
+    return $item;
+};
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $config = $bot->get();
+        $safeBot = $config;
+        $safeBot['token'] = trim((string) ($config['token'] ?? '')) !== '' ? 'configured' : '';
+        $safeBot['webhook_secret'] = trim((string) ($config['webhook_secret'] ?? '')) !== '' ? 'configured' : '';
         $data = match ($action) {
-            'bot' => array_replace($bot->get(), ['token' => $bot->get()['token'] !== '' ? 'configured' : '']),
+            'bot' => $safeBot,
             'moderation' => $moderation->get(),
-            'accounts' => array_map(static function (array $item): array { unset($item['api_hash'], $item['session_path']); return $item; }, $accounts->all()),
+            'accounts' => array_map($redactAccount, $accounts->all()),
             'channels' => ['news' => $channels->all('news'), 'alerts' => $channels->all('alerts')],
-            'workers' => ['news' => $workers->get('news'), 'alerts' => $workers->get('alerts')],
+            'workers' => ['channels' => $store->read('channel_states')],
             default => [
-                'bot' => ['enabled' => (bool) ($bot->get()['enabled'] ?? false), 'mode' => $bot->get()['mode'] ?? 'webhook'],
+                'bot' => ['enabled' => (bool) ($config['enabled'] ?? false), 'mode' => $config['mode'] ?? 'webhook'],
                 'accounts' => count($accounts->all()),
                 'channels' => count($channels->all('news')) + count($channels->all('alerts')),
-                'workers' => ['news' => $workers->get('news'), 'alerts' => $workers->get('alerts')],
+                'workers' => $store->read('channel_states'),
             ],
         };
         echo json_encode(['ok' => true, 'data' => $data], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
@@ -48,7 +59,8 @@ try {
     switch ($action) {
         case 'bot':
             $current = $bot->get();
-            if (($input['token'] ?? '') === '' || ($input['token'] ?? '') === 'configured') $input['token'] = $current['token'];
+            if (($input['token'] ?? '') === '' || ($input['token'] ?? '') === 'configured') $input['token'] = $current['token'] ?? '';
+            if (($input['webhook_secret'] ?? '') === '' || ($input['webhook_secret'] ?? '') === 'configured') $input['webhook_secret'] = $current['webhook_secret'] ?? '';
             $bot->save($input);
             break;
         case 'moderation':
@@ -61,11 +73,45 @@ try {
             $channels->delete((string) ($input['id'] ?? ''));
             break;
         case 'account-save':
-            $accounts->save($input);
+            $id = trim((string) ($input['id'] ?? ''));
+            $apiId = (int) ($input['api_id'] ?? 0);
+            $apiHash = trim((string) ($input['api_hash'] ?? ''));
+            if ($id === '' || !preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $id) || $apiId <= 0 || $apiHash === '') {
+                throw new InvalidArgumentException('Invalid Telegram account configuration.');
+            }
+            $existing = null;
+            foreach ($accounts->all() as $candidate) if (($candidate['id'] ?? null) === $id) $existing = $candidate;
+            $sessionPath = 'storage/v1/telegram-sessions/' . $id . '.madeline';
+            $accounts->save([
+                'id' => $id,
+                'api_id' => $apiId,
+                'api_hash' => $apiHash === 'configured' && is_array($existing) ? (string) ($existing['api_hash'] ?? '') : $apiHash,
+                'session_path' => $sessionPath,
+                'enabled' => (bool) ($input['enabled'] ?? ($existing['enabled'] ?? false)),
+                'connected_user' => $existing['connected_user'] ?? null,
+                'updated_at' => gmdate(DATE_ATOM),
+            ]);
             break;
         case 'account-delete':
-            $accounts->delete((string) ($input['id'] ?? ''));
+            $id = (string) ($input['id'] ?? '');
+            foreach ($accounts->all() as $candidate) {
+                if (($candidate['id'] ?? null) !== $id) continue;
+                $path = (string) ($candidate['session_path'] ?? '');
+                if ($path !== '') {
+                    $absolute = str_starts_with($path, '/') ? $path : dirname(__DIR__, 3) . '/' . ltrim($path, '/');
+                    foreach (glob($absolute . '*') ?: [] as $file) if (is_file($file)) @unlink($file);
+                }
+            }
+            $accounts->delete($id);
             break;
+        case 'telegram-action':
+            $config = $bot->get();
+            $botToken = trim((string) ($config['token'] ?? ''));
+            if ($botToken === '') throw new RuntimeException('Telegram bot token is not configured.');
+            $telegramAction = trim((string) ($input['telegram_action'] ?? ''));
+            $result = (new TelegramAdminService(new BotApiClient($botToken)))->execute($telegramAction, $input);
+            echo json_encode(['ok' => true, 'data' => $result], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            exit;
         default:
             throw new InvalidArgumentException('Unknown action');
     }
