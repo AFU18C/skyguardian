@@ -54,7 +54,11 @@ $request = static function (string $method, string $url, array $fields = [], ?st
 $sessionId = static function (string $cookieFile): ?string {
     if (!is_file($cookieFile)) return null;
     foreach (file($cookieFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
-        if ($line[0] === '#') continue;
+        if (str_starts_with($line, '#HttpOnly_')) {
+            $line = substr($line, strlen('#HttpOnly_'));
+        } elseif (str_starts_with($line, '#')) {
+            continue;
+        }
         $parts = explode("\t", $line);
         if (count($parts) >= 7 && $parts[5] === 'skyguardian_admin') return $parts[6];
     }
