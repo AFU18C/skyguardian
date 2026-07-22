@@ -7,11 +7,14 @@ Wants=network-online.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/SkyGuardianUa
-ExecStart=/bin/bash -lc "while true; do /usr/bin/timeout --signal=TERM --kill-after=10s 90s /usr/bin/php /var/www/SkyGuardianUa/bin/data-channel-worker.php; code=$?; if [ $code -eq 124 ] || [ $code -eq 137 ]; then echo 'SkyGuardian worker watchdog: timed out, restarting' >&2; fi; sleep 1; done"
+WorkingDirectory=/var/www/SkyGuardianUa/storage/telegram-sessions
+ExecStart=/usr/bin/php /var/www/SkyGuardianUa/bin/data-channel-worker.php
 Restart=always
-RestartSec=3
-TimeoutStopSec=20
+RestartSec=5
+RuntimeMaxSec=90
+TimeoutStopSec=15
+KillMode=control-group
+SendSIGKILL=yes
 NoNewPrivileges=true
 PrivateTmp=true
 
