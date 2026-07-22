@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'bin/data-channel-worker.php'
+      - 'public/worker-status.php'
       - 'src/Worker/**'
       - 'tests/worker-*.php'
       - 'composer.json'
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'bin/data-channel-worker.php'
+      - 'public/worker-status.php'
       - 'src/Worker/**'
       - 'tests/worker-*.php'
       - 'composer.json'
@@ -48,10 +50,13 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
 
       - name: PHP syntax
-        run: php -l bin/data-channel-worker.php && find src/Worker tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: php -l bin/data-channel-worker.php && php -l public/worker-status.php && find src/Worker tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Retry and metrics tests
         run: php tests/worker-resilience.php
 
       - name: Worker integration tests
         run: php tests/worker-integration.php
+
+      - name: Worker status tests
+        run: php tests/worker-status.php
