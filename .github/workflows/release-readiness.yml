@@ -41,6 +41,8 @@ jobs:
         run: php tests/public-endpoints-security.php
       - name: Run admin action security smoke test
         run: php tests/admin-actions-security.php
+      - name: Run backup archive integrity test
+        run: php tests/backup-archive.php
       - name: Verify production command contract
         run: php tests/production-verification.php
       - name: Run worker test suite
