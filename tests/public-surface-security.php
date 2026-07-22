@@ -77,8 +77,12 @@ try {
     foreach ($sensitiveUrls as $path) {
         $response = $request($baseUrl . $path);
         if ($response['status'] === 200) $fail('sensitive URL is publicly readable: ' . $path);
+
+        // PHP's development server includes the requested path in its default 404
+        // response. Do not treat a filename such as "autoload.php" as leaked file
+        // contents; rely on the non-200 status and scan only for actual secrets.
         $body = strtolower($response['body']);
-        foreach (['password_hash', 'bot_token', 'api_hash', 'autoload', 'skyguardian\\worker'] as $secretMarker) {
+        foreach (['password_hash', 'bot_token', 'api_hash', 'skyguardian\\worker'] as $secretMarker) {
             if (str_contains($body, strtolower($secretMarker))) $fail('sensitive content leaked through ' . $path);
         }
     }
