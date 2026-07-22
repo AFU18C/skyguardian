@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'bin/data-channel-worker.php'
+      - 'bin/install-worker-monitor-ui.php'
       - 'public/worker-status.php'
+      - 'public/assets/worker-monitor.*'
       - 'src/Worker/**'
       - 'tests/worker-*.php'
       - 'composer.json'
@@ -14,7 +16,9 @@ on:
   pull_request:
     paths:
       - 'bin/data-channel-worker.php'
+      - 'bin/install-worker-monitor-ui.php'
       - 'public/worker-status.php'
+      - 'public/assets/worker-monitor.*'
       - 'src/Worker/**'
       - 'tests/worker-*.php'
       - 'composer.json'
@@ -50,7 +54,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
 
       - name: PHP syntax
-        run: php -l bin/data-channel-worker.php && php -l public/worker-status.php && find src/Worker tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: php -l bin/data-channel-worker.php && php -l bin/install-worker-monitor-ui.php && php -l public/worker-status.php && find src/Worker tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Retry and metrics tests
         run: php tests/worker-resilience.php
@@ -60,3 +64,6 @@ jobs:
 
       - name: Worker status tests
         run: php tests/worker-status.php
+
+      - name: Worker monitoring UI tests
+        run: php tests/worker-monitor-ui.php
