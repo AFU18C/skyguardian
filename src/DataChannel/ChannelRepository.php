@@ -14,32 +14,28 @@ final class ChannelRepository
 
     public function all(string $scope): array
     {
-        return array_values(array_filter(
-            $this->store->read(self::STORE),
-            static fn(array $item): bool => ($item['scope'] ?? null) === $scope
-        ));
+        if (!in_array($scope, ['news', 'alerts'], true)) throw new \InvalidArgumentException('Invalid scope.');
+        return array_values(array_filter($this->store->read(self::STORE), static fn(array $item): bool => ($item['scope'] ?? null) === $scope));
     }
 
     public function save(array $channel): void
     {
         $id = (string) ($channel['id'] ?? '');
         $scope = (string) ($channel['scope'] ?? '');
-        if ($id === '' || !in_array($scope, ['news', 'alerts'], true)) {
-            throw new \InvalidArgumentException('Invalid data channel.');
-        }
-
-        $items = $this->store->read(self::STORE);
-        if (!isset($items[$id]) && count($items) >= self::LIMIT) {
-            throw new \RuntimeException('Data channel limit reached.');
-        }
-        $items[$id] = $channel;
-        $this->store->write(self::STORE, $items);
+        if ($id === '' || !in_array($scope, ['news', 'alerts'], true)) throw new \InvalidArgumentException('Invalid data channel.');
+        $this->store->update(self::STORE, static function (array $items) use ($id, $scope, $channel): array {
+            $scopeCount = count(array_filter($items, static fn(array $item): bool => ($item['scope'] ?? null) === $scope));
+            if (!isset($items[$id]) && $scopeCount >= self::LIMIT) throw new \RuntimeException('Data channel limit reached.');
+            $items[$id] = $channel;
+            return $items;
+        });
     }
 
     public function delete(string $id): void
     {
-        $items = $this->store->read(self::STORE);
-        unset($items[$id]);
-        $this->store->write(self::STORE, $items);
+        $this->store->update(self::STORE, static function (array $items) use ($id): array {
+            unset($items[$id]);
+            return $items;
+        });
     }
 }
