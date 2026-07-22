@@ -1,0 +1,48 @@
+name: Fix Telegram Destination Peer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-news-destination.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch worker safely
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('bin/data-channel-worker.php')
+          text = path.read_text(encoding='utf-8')
+          old = "$destinationPeer = $destinationInfo['InputPeer'] ?? $destinationRaw;"
+          new = "$destinationPeer = $destinationRaw;"
+          if old not in text:
+              raise SystemExit('Expected destination peer line not found; refusing unsafe patch')
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one destination peer line; refusing unsafe patch')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          php -l bin/data-channel-worker.php
+          grep -Fq '$destinationPeer = $destinationRaw;' bin/data-channel-worker.php
+          ! grep -Fq "$destinationPeer = $destinationInfo['InputPeer'] ?? $destinationRaw;" bin/data-channel-worker.php
+
+      - name: Commit fix
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bin/data-channel-worker.php
+          git commit -m 'Fix Telegram destination peer resolution'
+          git push origin HEAD:main
