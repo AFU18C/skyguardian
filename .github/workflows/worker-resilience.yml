@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - 'bin/data-channel-worker.php'
+      - 'bin/worker-notification-watch.php'
       - 'bin/install-worker-monitor-ui.php'
       - 'public/worker-status.php'
       - 'public/assets/worker-monitor.*'
       - 'src/Worker/**'
+      - 'src/Notification/**'
       - 'tests/worker-*.php'
       - 'composer.json'
       - 'composer.lock'
@@ -16,10 +18,12 @@ on:
   pull_request:
     paths:
       - 'bin/data-channel-worker.php'
+      - 'bin/worker-notification-watch.php'
       - 'bin/install-worker-monitor-ui.php'
       - 'public/worker-status.php'
       - 'public/assets/worker-monitor.*'
       - 'src/Worker/**'
+      - 'src/Notification/**'
       - 'tests/worker-*.php'
       - 'composer.json'
       - 'composer.lock'
@@ -43,7 +47,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, fileinfo, zlib, gmp, gd, iconv
+          extensions: mbstring, fileinfo, zlib, gmp, gd, iconv, curl
           coverage: none
           tools: composer:v2
 
@@ -54,7 +58,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
 
       - name: PHP syntax
-        run: php -l bin/data-channel-worker.php && php -l bin/install-worker-monitor-ui.php && php -l public/worker-status.php && find src/Worker tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: php -l bin/data-channel-worker.php && php -l bin/worker-notification-watch.php && php -l bin/install-worker-monitor-ui.php && php -l public/worker-status.php && find src/Worker src/Notification tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Retry and metrics tests
         run: php tests/worker-resilience.php
@@ -67,3 +71,6 @@ jobs:
 
       - name: Worker monitoring UI tests
         run: php tests/worker-monitor-ui.php
+
+      - name: Worker notification tests
+        run: php tests/worker-notifications.php
