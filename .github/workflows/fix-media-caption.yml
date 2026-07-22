@@ -1,0 +1,80 @@
+name: Fix Media Caption Overflow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-media-caption.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch worker and validate
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('bin/data-channel-worker.php')
+          text = path.read_text(encoding='utf-8')
+          old = '''$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia): void {
+              $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
+              if ($includeMedia && $hasMedia) {
+                  $parameters = ['peer' => $destination, 'media' => $message['media'], 'message' => $text];
+                  if ($entities !== []) $parameters['entities'] = $entities;
+                  $api->messages->sendMedia(...$parameters);
+                  return;
+              }
+              if ($text !== '') {
+                  $parameters = ['peer' => $destination, 'message' => $text];
+                  if ($entities !== []) $parameters['entities'] = $entities;
+                  $api->messages->sendMessage(...$parameters);
+              }
+          };'''
+          new = '''$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia): void {
+              $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
+              if ($includeMedia && $hasMedia) {
+                  if (mb_strlen($text) <= 1024) {
+                      $parameters = ['peer' => $destination, 'media' => $message['media'], 'message' => $text];
+                      if ($entities !== []) $parameters['entities'] = $entities;
+                      $api->messages->sendMedia(...$parameters);
+                      return;
+                  }
+
+                  $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '');
+                  if ($text !== '') {
+                      $api->messages->sendMessage(peer: $destination, message: $text);
+                  }
+                  return;
+              }
+              if ($text !== '') {
+                  $parameters = ['peer' => $destination, 'message' => $text];
+                  if ($entities !== []) $parameters['entities'] = $entities;
+                  $api->messages->sendMessage(...$parameters);
+              }
+          };'''
+          if old not in text:
+              raise SystemExit('Expected sendTextOrMedia block not found; refusing unsafe patch')
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one sendTextOrMedia block; refusing unsafe patch')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          php -l bin/data-channel-worker.php
+
+      - name: Commit fix
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bin/data-channel-worker.php
+          git commit -m 'Handle Telegram media captions over 1024 characters'
+          git push origin HEAD:main
