@@ -21,7 +21,6 @@ $replaceOnce = static function (string $file, string $search, string $replace, s
 $index = $target . '/public/index.php';
 $dataChannel = $target . '/public/data-channel.php';
 $dataChannelJs = $target . '/public/assets/data-channel.js';
-$worker = $target . '/bin/data-channel-worker.php';
 
 $indexContent = file_get_contents($index);
 if ($indexContent === false) throw new RuntimeException('Cannot read index.php');
@@ -32,7 +31,11 @@ if (!str_contains($indexContent, 'site-theme.css')) {
     $indexContent = preg_replace('~site-theme\.css\?v=\d+~', 'site-theme.css?v=3', $indexContent) ?? $indexContent;
 }
 if (!str_contains($indexContent, 'site-theme.js')) {
-    $indexContent = str_replace('</body>', '<script src="/assets/site-theme.js?v=2"></script></body>', $indexContent);
+    $position = strripos($indexContent, '</body>');
+    if ($position === false) throw new RuntimeException('Final body tag not found');
+    $indexContent = substr($indexContent, 0, $position)
+        . '<script src="/assets/site-theme.js?v=2"></script>'
+        . substr($indexContent, $position);
 } else {
     $indexContent = preg_replace('~site-theme\.js\?v=\d+~', 'site-theme.js?v=2', $indexContent) ?? $indexContent;
 }
@@ -84,13 +87,6 @@ $replaceOnce(
     "        channel.check_frequency + ' ' + unit + ' · ' +",
     "        channel.check_frequency + ' ' + unit + ' · до ' + (channel.fetch_limit || 10) + ' сообщ. · ' +",
     'data-channel js card fetch limit'
-);
-
-$replaceOnce(
-    $worker,
-    "                limit: 50,",
-    "                limit: max(1, min(50, (int) (\$channel['fetch_limit'] ?? 10))),",
-    'worker configurable fetch limit'
 );
 
 echo "Runtime patches applied\n";
