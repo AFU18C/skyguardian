@@ -1,15 +1,14 @@
+#!/usr/bin/env php
 <?php
 declare(strict_types=1);
 
-require dirname(__DIR__) . '/vendor/autoload.php';
-
-use SkyGuardian\Config\Paths;
-use SkyGuardian\DataChannel\ChannelRepository;
-use SkyGuardian\Storage\JsonStore;
-use SkyGuardian\Worker\DataChannelWorker;
-use SkyGuardian\Worker\WorkerStatusRepository;
-
-$paths = new Paths(dirname(__DIR__));
-$store = new JsonStore($paths->storage());
-$worker = new DataChannelWorker(new ChannelRepository($store), new WorkerStatusRepository($store));
-$worker->run('news', static fn(array $channel): array => ['published' => false]);
+$worker = dirname(__DIR__) . '/bin/data-channel-worker.php';
+if (!is_file($worker)) {
+    fwrite(STDERR, "data-channel-worker.php missing\n");
+    exit(1);
+}
+while (true) {
+    passthru(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($worker) . ' news', $code);
+    if ($code !== 0) error_log('News worker pass failed with code ' . $code);
+    sleep(5);
+}
