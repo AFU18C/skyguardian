@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require dirname(__DIR__) . '/vendor/autoload.php';
+
 $workerFile = dirname(__DIR__) . '/bin/data-channel-worker.php';
 $source = file_get_contents($workerFile);
 if (!is_string($source)) {
