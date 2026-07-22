@@ -1,0 +1,17 @@
+[Unit]
+Description=SkyGuardian v1 news worker
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/skyguardian
+ExecStart=/usr/bin/php /var/www/skyguardian/bin/news-worker.php
+Restart=always
+RestartSec=5
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
