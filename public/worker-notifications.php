@@ -42,12 +42,14 @@ require_once $autoload;
 
 $configFile = $storageDir . '/worker-notifications.json';
 $journalFile = $storageDir . '/worker-notification-journal.json';
+$method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
 if (!is_dir($storageDir) && !mkdir($storageDir, 0770, true) && !is_dir($storageDir)) {
     $reply(503, ['ok' => false, 'message' => 'Хранилище недоступно.']);
 }
 $lockHandle = @fopen($storageDir . '/worker-notifications.lock', 'c+');
-if ($lockHandle === false || !flock($lockHandle, LOCK_EX)) {
+$lockMode = $method === 'GET' ? LOCK_SH : LOCK_EX;
+if ($lockHandle === false || !flock($lockHandle, $lockMode)) {
     if (is_resource($lockHandle)) fclose($lockHandle);
     $reply(503, ['ok' => false, 'message' => 'Настройки временно заняты.']);
 }
@@ -79,7 +81,6 @@ $writeJson = static function (string $path, array $data) use ($storageDir): void
 };
 
 $config = $readJson($configFile);
-$method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 
 if ($method === 'GET') {
     $journal = array_values(array_filter($readJson($journalFile), 'is_array'));
