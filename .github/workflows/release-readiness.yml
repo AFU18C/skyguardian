@@ -45,6 +45,8 @@ jobs:
         run: php tests/admin-actions-security.php
       - name: Run backup archive integrity test
         run: php tests/backup-archive.php
+      - name: Run concurrent JSON write stress test
+        run: php tests/json-write-concurrency.php
       - name: Verify production command contract
         run: php tests/production-verification.php
       - name: Run worker test suite
