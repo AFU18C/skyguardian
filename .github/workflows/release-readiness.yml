@@ -31,6 +31,8 @@ jobs:
         run: find public bin src tests deploy -type f -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Run release smoke test
         run: php tests/release-smoke.php
+      - name: Run HTTP authentication smoke test
+        run: php tests/http-auth-smoke.php
       - name: Verify production command contract
         run: php tests/production-verification.php
       - name: Run worker test suite
