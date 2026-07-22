@@ -51,7 +51,8 @@ jobs:
           test -f public/assets/data-channel-runtime.js
           test -f public/assets/brand-logo.css
           test -f public/assets/brand-logo.js
-          test -f deploy/skyguardian-data-channels.service
+          test -f deploy/skyguardian-data-news.service
+          test -f deploy/skyguardian-data-alerts.service
 
       - name: Configure SSH
         env:
@@ -135,9 +136,11 @@ jobs:
               install -d -m 2770 -o root -g www-data "$target/storage/backups"
               install -d -m 2770 -o root -g www-data "$target/storage/telegram-sessions"
               install -d -m 2770 -o root -g www-data "$target/storage/telegram-news-sessions"
-              touch "$target/storage/data-channel-worker.lock"
-              chown www-data:www-data "$target/storage/data-channel-worker.lock"
-              chmod 660 "$target/storage/data-channel-worker.lock"
+              for lock in data-channel-worker-news.lock data-channel-worker-alerts.lock; do
+                touch "$target/storage/$lock"
+                chown www-data:www-data "$target/storage/$lock"
+                chmod 660 "$target/storage/$lock"
+              done
               if test -f "$target/storage/admin.json"; then
                 chgrp www-data "$target/storage/admin.json"
                 chmod 640 "$target/storage/admin.json"
@@ -150,8 +153,8 @@ jobs:
               done
             else
               chmod 777 "$target/storage"
-              touch "$target/storage/data-channel-worker.lock"
-              chmod 666 "$target/storage/data-channel-worker.lock"
+              touch "$target/storage/data-channel-worker-news.lock" "$target/storage/data-channel-worker-alerts.lock"
+              chmod 666 "$target/storage/data-channel-worker-news.lock" "$target/storage/data-channel-worker-alerts.lock"
             fi
 
             find "$target/public" -type d -exec chmod 755 {} +
@@ -161,18 +164,23 @@ jobs:
             find "$target/vendor" -type d -exec chmod 755 {} +
             find "$target/vendor" -type f -exec chmod 644 {} +
 
-            install -m 644 "$target/deploy/skyguardian-data-channels.service" /etc/systemd/system/skyguardian-data-channels.service
+            systemctl disable --now skyguardian-data-channels.service 2>/dev/null || true
+            rm -f /etc/systemd/system/skyguardian-data-channels.service
+            install -m 644 "$target/deploy/skyguardian-data-news.service" /etc/systemd/system/skyguardian-data-news.service
+            install -m 644 "$target/deploy/skyguardian-data-alerts.service" /etc/systemd/system/skyguardian-data-alerts.service
             systemctl daemon-reload
-            systemctl enable --now skyguardian-data-channels.service
-            systemctl restart skyguardian-data-channels.service
+            systemctl enable --now skyguardian-data-news.service skyguardian-data-alerts.service
+            systemctl restart skyguardian-data-news.service skyguardian-data-alerts.service
 
             rm -f /tmp/skyguardian-release.tar.gz
             test -f "$target/public/data-channel.php"
             test -f "$target/public/data-channel-status.php"
             test -f "$target/public/data-channel-run.php"
             test -f "$target/bin/data-channel-worker.php"
-            test -w "$target/storage/data-channel-worker.lock"
-            systemctl is-active --quiet skyguardian-data-channels.service
+            test -w "$target/storage/data-channel-worker-news.lock"
+            test -w "$target/storage/data-channel-worker-alerts.lock"
+            systemctl is-active --quiet skyguardian-data-news.service
+            systemctl is-active --quiet skyguardian-data-alerts.service
 
             nginx_site=/etc/nginx/sites-enabled/skyguardian
             if test -w "$nginx_site"; then
