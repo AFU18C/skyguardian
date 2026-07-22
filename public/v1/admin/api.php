@@ -10,6 +10,7 @@ use SkyGuardian\Moderation\ModerationSettingsRepository;
 use SkyGuardian\Telegram\AccountRepository;
 use SkyGuardian\Telegram\BotApiClient;
 use SkyGuardian\Telegram\BotConfigRepository;
+use SkyGuardian\Telegram\QrLoginService;
 use SkyGuardian\Telegram\TelegramAdminService;
 
 SessionAuth::requireLogin();
@@ -25,6 +26,18 @@ $redactAccount = static function (array $item): array {
     $item['session_configured'] = trim((string) ($item['session_path'] ?? '')) !== '';
     unset($item['session_path']);
     return $item;
+};
+$findAccount = static function (string $id) use ($accounts): array {
+    foreach ($accounts->all() as $candidate) {
+        if (($candidate['id'] ?? null) === $id) return $candidate;
+    }
+    throw new InvalidArgumentException('Техаккаунт не найден.');
+};
+$saveConnected = static function (array $account, array $user) use ($accounts): void {
+    $account['connected_user'] = $user;
+    $account['enabled'] = true;
+    $account['updated_at'] = gmdate(DATE_ATOM);
+    $accounts->save($account);
 };
 
 try {
@@ -92,6 +105,18 @@ try {
                 'updated_at' => gmdate(DATE_ATOM),
             ]);
             break;
+        case 'account-qr':
+            $account = $findAccount(trim((string) ($input['id'] ?? '')));
+            $result = (new QrLoginService(dirname(__DIR__, 3)))->qr($account, (bool) ($input['wait'] ?? false));
+            if (($result['logged_in'] ?? false) && is_array($result['user'] ?? null)) $saveConnected($account, $result['user']);
+            echo json_encode(['ok' => true, 'data' => $result], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            exit;
+        case 'account-2fa':
+            $account = $findAccount(trim((string) ($input['id'] ?? '')));
+            $result = (new QrLoginService(dirname(__DIR__, 3)))->complete2fa($account, (string) ($input['password'] ?? ''));
+            if (is_array($result['user'] ?? null)) $saveConnected($account, $result['user']);
+            echo json_encode(['ok' => true, 'data' => $result], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            exit;
         case 'account-delete':
             $id = (string) ($input['id'] ?? '');
             foreach ($accounts->all() as $candidate) {
