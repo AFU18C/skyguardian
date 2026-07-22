@@ -144,9 +144,10 @@ try {
     if ($dashboard['status'] !== 200 || !str_contains($dashboard['body'], 'SkyGuardian')) {
         $fail('authenticated dashboard is not available');
     }
-    if (!preg_match('/name="_token" value="([a-f0-9]{64})"/', $dashboard['body'], $dashboardTokenMatch)) {
-        $fail('dashboard does not provide a CSRF token');
+    if (!preg_match('/(?:name="_token" value|data-csrf)="([a-f0-9]{64})"/', $dashboard['body'], $dashboardTokenMatch)) {
+        $fail('dashboard does not expose a valid CSRF token');
     }
+    $dashboardCsrf = $dashboardTokenMatch[1];
 
     $missingCsrf = $request('POST', $baseUrl . '/?action=telegram-check', [
         'bot_token' => '123456:abcdefghijklmnopqrstuvwxyzABCDEFGH',
@@ -154,6 +155,15 @@ try {
     ], $cookieJar);
     if ($missingCsrf['status'] !== 419) {
         $fail('protected Telegram endpoint does not reject a missing CSRF token');
+    }
+
+    $invalidTelegram = $request('POST', $baseUrl . '/?action=telegram-check', [
+        '_token' => $dashboardCsrf,
+        'bot_token' => 'invalid-token',
+        'chat_id' => '-1001234567890',
+    ], $cookieJar);
+    if ($invalidTelegram['status'] !== 422) {
+        $fail('authenticated request with a valid CSRF token did not reach endpoint validation');
     }
 
     $logout = $request('GET', $baseUrl . '/?action=logout', [], $cookieJar);
