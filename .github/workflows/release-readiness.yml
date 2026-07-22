@@ -37,6 +37,8 @@ jobs:
         run: php tests/telegram-webhook-security.php
       - name: Run public endpoint security smoke test
         run: php tests/public-endpoints-security.php
+      - name: Run admin action security smoke test
+        run: php tests/admin-actions-security.php
       - name: Verify production command contract
         run: php tests/production-verification.php
       - name: Run worker test suite
