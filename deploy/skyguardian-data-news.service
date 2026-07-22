@@ -1,0 +1,22 @@
+[Unit]
+Description=SkyGuardian Telegram news data worker
+After=network-online.target php8.3-fpm.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/SkyGuardianUa/storage/telegram-news-sessions
+ExecStart=/usr/bin/php /var/www/SkyGuardianUa/bin/data-channel-worker.php news
+Restart=always
+RestartSec=5
+RuntimeMaxSec=600
+TimeoutStopSec=15
+KillMode=control-group
+SendSIGKILL=yes
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
