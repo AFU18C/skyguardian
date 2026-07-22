@@ -1,0 +1,37 @@
+name: Apply webhook URL hardening
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Remove webhook secret from URL
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('public/TelegramAutomation.php')
+          text = path.read_text()
+          text = text.replace("rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode($secret)", "rtrim($baseUrl, '/') . '/telegram-webhook.php'")
+          text = text.replace("rtrim($baseUrl, '/') . '/telegram-webhook.php?key=' . rawurlencode((string)$config['secret'])", "rtrim($baseUrl, '/') . '/telegram-webhook.php'")
+          text = text.replace("'webhook_url' => preg_replace('/key=[^&]+/', 'key=••••••', $webhookUrl)", "'webhook_url' => $webhookUrl")
+          path.write_text(text)
+          PY
+          rm .github/workflows/apply-webhook-hardening.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add public/TelegramAutomation.php .github/workflows/apply-webhook-hardening.yml
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Remove webhook secret from registration URL"
+          git push
