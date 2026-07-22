@@ -210,7 +210,7 @@ foreach ($channels as $channel) {
         $sourceInfo = $api->getInfo($sourceRaw);
         $destinationInfo = $api->getInfo($destinationRaw);
         $sourcePeer = $sourceInfo['InputPeer'] ?? $sourceRaw;
-        $destinationPeer = $destinationInfo['InputPeer'] ?? $destinationRaw;
+        $destinationPeer = $destinationRaw;
 
         $limit = max(1, min(50, (int) ($channel['fetch_limit'] ?? 10)));
         $history = (array) $api->messages->getHistory(peer: $sourcePeer, offset_id: 0, offset_date: 0, add_offset: 0, limit: max(20, $limit), max_id: 0, min_id: 0, hash: 0);
