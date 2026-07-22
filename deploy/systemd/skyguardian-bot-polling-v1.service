@@ -1,0 +1,20 @@
+[Unit]
+Description=SkyGuardian v1 Telegram bot polling worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/skyguardian
+ExecStart=/usr/bin/php /var/www/skyguardian/bin/bot-polling-worker.php
+Restart=on-failure
+RestartSec=5
+User=www-data
+Group=www-data
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/www/skyguardian/storage
+
+[Install]
+WantedBy=multi-user.target
