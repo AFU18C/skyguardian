@@ -1,0 +1,19 @@
+[Unit]
+Description=SkyGuardian worker notification watcher
+After=network-online.target php8.3-fpm.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/SkyGuardianUa
+ExecStart=/usr/bin/php /var/www/SkyGuardianUa/bin/worker-notification-watch.php
+TimeoutStartSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/www/SkyGuardianUa/storage
+
+[Install]
+WantedBy=multi-user.target
