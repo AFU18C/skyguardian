@@ -28,7 +28,6 @@
     const notify = (message, type = 'error') => {
       if (typeof globalThis.toast === 'function') globalThis.toast(message, type);
     };
-
     const setStatus = (state, title, text) => {
       if (statusTitle) statusTitle.textContent = title;
       if (statusText) statusText.textContent = text;
@@ -37,12 +36,10 @@
         statusDot.classList.add(state);
       }
     };
-
     const ensureAccountId = () => {
       if (!accountIdInput.value) accountIdInput.value = globalThis.crypto?.randomUUID?.() || `account-${Date.now()}`;
       return accountIdInput.value;
     };
-
     const apiRequest = async (url, options = {}) => {
       const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...options });
       const result = await response.json().catch(() => ({}));
@@ -52,12 +49,16 @@
 
     const syncAccountsFromServer = async () => {
       try {
-        const result = await apiRequest(`/technical-accounts.php?scope=${encodeURIComponent(scope)}`, {
-          headers: { Accept: 'application/json' }
-        });
-        if (Array.isArray(result.items)) {
-          localStorage.setItem(localKey, JSON.stringify(result.items));
-          globalThis.dispatchEvent(new StorageEvent('storage', { key: localKey, newValue: JSON.stringify(result.items) }));
+        const result = await apiRequest(`/technical-accounts.php?scope=${encodeURIComponent(scope)}`, { headers: { Accept: 'application/json' } });
+        if (!Array.isArray(result.items)) return;
+        const next = JSON.stringify(result.items);
+        const current = localStorage.getItem(localKey) || '[]';
+        if (next !== current) {
+          localStorage.setItem(localKey, next);
+          if (sessionStorage.getItem(`synced:${localKey}`) !== next) {
+            sessionStorage.setItem(`synced:${localKey}`, next);
+            window.location.reload();
+          }
         }
       } catch (error) {
         console.warn('Technical account sync failed:', error);
@@ -74,7 +75,6 @@
         api_hash: String(data.get('api_hash') || '').trim(),
       });
     };
-
     const requestQr = async (operation = 'status', password = '') => {
       const body = qrPayload(operation);
       if (password) body.set('password', password);
@@ -84,11 +84,11 @@
         body,
       });
     };
-
     const saveConnectedAccount = async account => {
       const data = new FormData(form);
-      const current = JSON.parse(localStorage.getItem(localKey) || '[]');
-      const existing = Array.isArray(current) ? current.find(item => item.id === ensureAccountId()) : null;
+      let localItems = [];
+      try { localItems = JSON.parse(localStorage.getItem(localKey) || '[]'); } catch { localItems = []; }
+      const existing = Array.isArray(localItems) ? localItems.find(item => item.id === ensureAccountId()) : null;
       const telegramName = [account?.first_name, account?.last_name].filter(Boolean).join(' ').trim();
       const item = {
         id: ensureAccountId(),
@@ -109,9 +109,10 @@
         headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
         body,
       });
-      localStorage.setItem(localKey, JSON.stringify(result.items || [item]));
+      const next = JSON.stringify(result.items || [item]);
+      localStorage.setItem(localKey, next);
+      sessionStorage.setItem(`synced:${localKey}`, next);
     };
-
     const renderMobileButton = link => {
       mobileLink?.remove();
       mobileLink = null;
@@ -124,12 +125,11 @@
       status.insertAdjacentElement('afterend', button);
       mobileLink = button;
     };
-
     const renderResult = async (result, currentGeneration) => {
       if (currentGeneration !== generation || !modal.classList.contains('open')) return false;
       if (result.logged_in) {
         await saveConnectedAccount(result.account || {});
-        setStatus('success', 'Аккаунт подключён', 'Данные сохранены на сервере и доступны на всех устройствах');
+        setStatus('success', 'Аккаунт подключён', 'Данные доступны на всех устройствах');
         notify('Технический аккаунт Telegram подключён', 'success');
         setTimeout(() => window.location.reload(), 800);
         return false;
@@ -142,19 +142,12 @@
       if (typeof result.svg !== 'string' || !result.svg.includes('<svg')) throw new Error('Сервер не вернул QR-код.');
       qrContainer.innerHTML = result.svg;
       const svg = qrContainer.querySelector('svg');
-      if (svg) {
-        svg.setAttribute('role', 'img');
-        svg.setAttribute('aria-label', 'QR-код для подключения Telegram');
-        Object.assign(svg.style, { width: '100%', height: 'auto', display: 'block' });
-      }
+      if (svg) Object.assign(svg.style, { width: '100%', height: 'auto', display: 'block' });
       renderMobileButton(result.link || '');
-      const seconds = Math.max(0, Number(result.expires_in || 0));
-      setStatus('pending', 'Ожидаем подтверждение', /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-        ? 'Нажмите «Открыть в Telegram» и подтвердите новое устройство'
-        : (seconds ? `Код действителен ещё ${seconds} сек.` : 'Код обновляется автоматически'));
+      const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      setStatus('pending', 'Ожидаем подтверждение', mobile ? 'Нажмите «Открыть в Telegram»' : 'Код обновляется автоматически');
       return true;
     };
-
     const poll = async currentGeneration => {
       if (polling || currentGeneration !== generation || !modal.classList.contains('open')) return;
       polling = true;
@@ -164,11 +157,8 @@
       } catch (error) {
         setStatus('error', 'Ошибка подключения', error.message || 'Не удалось получить QR-код');
         notify(error.message || 'Не удалось получить QR-код');
-      } finally {
-        polling = false;
-      }
+      } finally { polling = false; }
     };
-
     qrButton.addEventListener('click', () => {
       const data = new FormData(form);
       if (!String(data.get('name') || '').trim() || !String(data.get('api_id') || '').trim() || !String(data.get('api_hash') || '').trim()) {
@@ -177,17 +167,15 @@
       }
       generation += 1;
       renderMobileButton('');
-      setStatus('pending', 'Получаем QR-код', 'Устанавливаем защищённое соединение с Telegram…');
+      setStatus('pending', 'Получаем QR-код', 'Устанавливаем соединение с Telegram…');
       qrContainer.innerHTML = '<div style="padding:5rem 1rem;text-align:center">Загрузка QR-кода…</div>';
       setTimeout(() => poll(generation), 0);
     });
-
     modal.querySelectorAll('[data-modal-close]').forEach(button => button.addEventListener('click', () => {
       generation += 1;
       renderMobileButton('');
     }));
-
-    syncAccountsFromServer().then(() => setTimeout(() => globalThis.location.reload(), 50));
+    syncAccountsFromServer();
   };
 
   setupTelegramQrLogin();
@@ -195,24 +183,14 @@
   const host = document.querySelector('[data-worker-monitor]');
   if (!host) return;
   const labels = { news: 'Новости', alerts: 'Воздушная тревога', running: 'Работает', idle: 'Ожидает', error: 'Ошибка', stale: 'Нет отклика', not_started: 'Не запускался' };
-  const formatDuration = ms => Number(ms || 0) < 1000 ? `${Number(ms || 0)} мс` : `${(Number(ms || 0) / 1000).toFixed(1)} с`;
-  const formatAge = sec => Number(sec || 0) < 60 ? `${Number(sec || 0)} сек назад` : `${Math.floor(Number(sec || 0) / 60)} мин назад`;
-  const render = payload => {
-    const workers = Array.isArray(payload?.workers) ? payload.workers : Object.values(payload?.workers || {});
-    if (!workers.length) { host.innerHTML = '<div class="worker-monitor-message">Данные worker’ов пока недоступны.</div>'; return; }
-    host.innerHTML = workers.map(worker => {
-      const metrics = worker.metrics || {}, channels = worker.channels || {}, errors = Array.isArray(worker.errors) ? worker.errors : [];
-      return `<section class="worker-monitor-card status-${escapeHtml(worker.status || 'not_started')}"><header><div><span class="worker-monitor-dot"></span><div><strong>${escapeHtml(labels[worker.scope] || worker.scope)}</strong><small>Telegram worker</small></div></div><span class="worker-monitor-status">${escapeHtml(labels[worker.status] || worker.status)}</span></header><div class="worker-monitor-grid"><div><span>Последний запуск</span><strong>${escapeHtml(worker.age_seconds == null ? 'Нет данных' : formatAge(worker.age_seconds))}</strong></div><div><span>Длительность</span><strong>${escapeHtml(formatDuration(metrics.duration_ms))}</strong></div><div><span>Обработано</span><strong>${Number(metrics.processed_count || 0)}</strong></div><div><span>Опубликовано</span><strong>${Number(metrics.published_count || 0)}</strong></div><div><span>Повторные попытки</span><strong>${Number(metrics.retry_count || 0)}</strong></div><div><span>Каналы с ошибками</span><strong>${Number(channels.error || 0)} / ${Number(channels.total || 0)}</strong></div></div><button class="worker-monitor-toggle" type="button" data-worker-errors-toggle>Последние ошибки <span>${errors.length}</span></button><div class="worker-monitor-details" hidden>${errors.length ? errors.map(error => `<article><strong>${escapeHtml(error.channel_name || error.channel_id || 'Worker')}</strong><time>${escapeHtml(error.at || '')}</time><p>${escapeHtml(error.message || 'Неизвестная ошибка')}</p></article>`).join('') : '<div class="worker-monitor-empty">Ошибок нет</div>'}</div></section>`;
-    }).join('');
-    host.querySelectorAll('[data-worker-errors-toggle]').forEach(button => button.addEventListener('click', () => { const details = button.nextElementSibling; details.hidden = !details.hidden; button.classList.toggle('open', !details.hidden); }));
-  };
   const load = async ({ quiet = false } = {}) => {
     if (!quiet) host.classList.add('loading');
     try {
       const response = await fetch('/worker-status.php', { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok || payload.ok === false) throw new Error(payload.message || 'Не удалось получить статус worker’ов');
-      render(payload.data || payload);
+      const workers = Array.isArray(payload?.data?.workers) ? payload.data.workers : (Array.isArray(payload?.workers) ? payload.workers : Object.values(payload?.data?.workers || payload?.workers || {}));
+      host.innerHTML = workers.map(worker => `<section class="worker-monitor-card status-${escapeHtml(worker.status || 'not_started')}"><header><div><span class="worker-monitor-dot"></span><div><strong>${escapeHtml(labels[worker.scope] || worker.scope)}</strong><small>Telegram worker</small></div></div><span class="worker-monitor-status">${escapeHtml(labels[worker.status] || worker.status)}</span></header></section>`).join('') || '<div class="worker-monitor-message">Данные worker’ов пока недоступны.</div>';
     } catch (error) {
       if (!quiet) host.innerHTML = `<div class="worker-monitor-message error">${escapeHtml(error.message || 'Мониторинг недоступен')}</div>`;
     } finally { host.classList.remove('loading'); }
