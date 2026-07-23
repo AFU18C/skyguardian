@@ -31,7 +31,16 @@ jobs:
         run: composer dump-autoload --optimize --strict-psr
 
       - name: Lint PHP sources
-        run: find public src bin -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: find public src bin tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Run project tests
+        run: |
+          for test in tests/*.php; do
+            php "$test"
+          done
+
+      - name: Run non-production runtime audit
+        run: php bin/runtime-audit.php
 
       - name: Audit dependencies
         run: composer audit --no-interaction
