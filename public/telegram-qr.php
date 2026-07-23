@@ -76,9 +76,6 @@ if (!is_file($runtimeLog) && file_put_contents($runtimeLog, '') === false) {
 if (!is_writable($runtimeLog)) {
     $reply(503, ['ok' => false, 'message' => 'Журнал Telegram недоступен для записи.']);
 }
-
-// MadelineProto may resolve some internal paths against the process CWD before
-// all settings are applied. Keep both CWD and explicit logger outside public/.
 if (!chdir($runtimeDir)) {
     $reply(503, ['ok' => false, 'message' => 'Не удалось открыть рабочий каталог Telegram.']);
 }
@@ -131,6 +128,7 @@ try {
             'logged_in' => false,
             'needs_2fa' => false,
             'svg' => $qr->getQRSvg(420, 3),
+            'link' => $qr->link,
             'expires_in' => $qr->expiresIn(),
         ]);
     }
