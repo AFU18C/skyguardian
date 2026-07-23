@@ -32,11 +32,24 @@ find "$RUNTIME_BACKUP_DIR" -type f -name 'runtime-*.tar.gz' -mtime +14 -delete
 git fetch --prune origin
 git reset --hard origin/main
 
+# Always serve the current JavaScript after deployment. The old fixed ?v=1 URL
+# allowed mobile browsers to keep the broken Telegram synchronization code.
+asset_version="$(git rev-parse --short HEAD)"
+sed -i -E "s#assets/app\.js\?v=[^\"']+#assets/app.js?v=${asset_version}#" public/index.php
+sed -i -E "s#assets/worker-monitor\.js\?v=[^\"']+#assets/worker-monitor.js?v=${asset_version}#" public/index.php
+sed -i -E "s#assets/worker-notifications\.js\?v=[^\"']+#assets/worker-notifications.js?v=${asset_version}#" public/index.php
+if ! grep -q 'technical-accounts-runtime.js' public/index.php; then
+  sed -i "/assets\/worker-monitor.js/a\\<script src=\"assets/technical-accounts-runtime.js?v=${asset_version}\" defer></script>" public/index.php
+else
+  sed -i -E "s#assets/technical-accounts-runtime\.js\?v=[^\"']+#assets/technical-accounts-runtime.js?v=${asset_version}#" public/index.php
+fi
+
 mkdir -p \
   storage/backups \
   storage/telegram-news-sessions \
   storage/telegram-sessions \
-  storage/madeline-runtime
+  storage/madeline-runtime \
+  storage/technical-accounts
 
 if [[ -n "$COMPOSER_BIN" ]]; then
   "$COMPOSER_BIN" validate --no-check-lock
@@ -60,8 +73,10 @@ install -o www-data -g www-data -m 0660 /dev/null storage/madeline-runtime/Madel
 # Verify permissions as the actual PHP-FPM user, not as root.
 runuser -u www-data -- test -w storage/madeline-runtime
 runuser -u www-data -- test -w storage/telegram-sessions
+runuser -u www-data -- test -w storage/technical-accounts
 runuser -u www-data -- sh -c 'probe="storage/madeline-runtime/.write-probe-$$"; : > "$probe" && rm -f "$probe"'
 runuser -u www-data -- sh -c 'probe="storage/telegram-sessions/.write-probe-$$"; : > "$probe" && rm -f "$probe"'
+runuser -u www-data -- sh -c 'probe="storage/technical-accounts/.write-probe-$$"; : > "$probe" && rm -f "$probe"'
 
 install -m 0644 deploy/skyguardian-data-news.service /etc/systemd/system/skyguardian-data-news.service
 install -m 0644 deploy/skyguardian-data-alerts.service /etc/systemd/system/skyguardian-data-alerts.service
@@ -89,5 +104,7 @@ curl --fail --silent --show-error \
     status=$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Host: skyguardian.pp.ua' http://127.0.0.1/worker-status.php || true)
     [[ "$status" == "401" ]] || { echo "Worker status endpoint health check failed: HTTP $status" >&2; exit 1; }
   }
+
+grep -q "technical-accounts-runtime.js?v=${asset_version}" public/index.php
 
 echo "SkyGuardian update completed successfully. Runtime snapshot: $snapshot"
