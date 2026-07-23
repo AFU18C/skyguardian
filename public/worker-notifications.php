@@ -34,12 +34,6 @@ if (($_SESSION['admin_authenticated'] ?? false) !== true) {
 
 $projectDir = dirname(__DIR__);
 $storageDir = $projectDir . '/storage';
-$autoload = $projectDir . '/vendor/autoload.php';
-if (!is_file($autoload)) {
-    $reply(503, ['ok' => false, 'message' => 'Приложение не готово.']);
-}
-require_once $autoload;
-
 $configFile = $storageDir . '/worker-notifications.json';
 $journalFile = $storageDir . '/worker-notification-journal.json';
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
@@ -47,6 +41,7 @@ $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 if (!is_dir($storageDir) && !mkdir($storageDir, 0770, true) && !is_dir($storageDir)) {
     $reply(503, ['ok' => false, 'message' => 'Хранилище недоступно.']);
 }
+
 $lockHandle = @fopen($storageDir . '/worker-notifications.lock', 'c+');
 $lockMode = $method === 'GET' ? LOCK_SH : LOCK_EX;
 if ($lockHandle === false || !flock($lockHandle, $lockMode)) {
@@ -80,6 +75,24 @@ $writeJson = static function (string $path, array $data) use ($storageDir): void
     }
 };
 
+$publicConfig = static function (array $config): array {
+    $chatId = trim((string) ($config['chat_id'] ?? ''));
+    $token = trim((string) ($config['bot_token'] ?? ''));
+    $maskedChatId = $chatId;
+    if (strlen($chatId) > 6) {
+        $maskedChatId = substr($chatId, 0, 4) . '…' . substr($chatId, -3);
+    }
+
+    return [
+        'enabled' => (bool) ($config['enabled'] ?? false),
+        'configured' => $token !== '' && $chatId !== '',
+        'has_bot_token' => $token !== '',
+        'chat_id' => $chatId,
+        'chat_id_masked' => $maskedChatId,
+        'cooldown_seconds' => max(60, (int) ($config['cooldown_seconds'] ?? 900)),
+    ];
+};
+
 $config = $readJson($configFile);
 
 if ($method === 'GET') {
@@ -87,12 +100,7 @@ if ($method === 'GET') {
     $journal = array_reverse(array_slice($journal, -100));
     $reply(200, [
         'ok' => true,
-        'settings' => [
-            'enabled' => (bool) ($config['enabled'] ?? false),
-            'configured' => trim((string) ($config['bot_token'] ?? '')) !== '' && trim((string) ($config['chat_id'] ?? '')) !== '',
-            'chat_id' => (string) ($config['chat_id'] ?? ''),
-            'cooldown_seconds' => max(60, (int) ($config['cooldown_seconds'] ?? 900)),
-        ],
+        'config' => $publicConfig($config),
         'journal' => $journal,
     ]);
 }
@@ -122,6 +130,14 @@ if ($operation === 'save' || $operation === 'test') {
 
 try {
     if ($operation === 'test') {
+        $autoload = $projectDir . '/vendor/autoload.php';
+        if (!is_file($autoload)) {
+            throw new RuntimeException('Composer autoload is unavailable.');
+        }
+        require_once $autoload;
+        if (!class_exists(TelegramBotNotifier::class)) {
+            throw new RuntimeException('Telegram notifier is unavailable.');
+        }
         $notifier = new TelegramBotNotifier($token, $chatId);
         $notifier->send("✅ SkyGuardian\nТестовое уведомление доставлено успешно.");
         $reply(200, ['ok' => true, 'message' => 'Тестовое уведомление отправлено.']);
@@ -142,12 +158,7 @@ try {
     $reply(200, [
         'ok' => true,
         'message' => $saved['enabled'] ? 'Уведомления включены.' : 'Настройки сохранены, уведомления выключены.',
-        'settings' => [
-            'enabled' => $saved['enabled'],
-            'configured' => true,
-            'chat_id' => $saved['chat_id'],
-            'cooldown_seconds' => $saved['cooldown_seconds'],
-        ],
+        'config' => $publicConfig($saved),
     ]);
 } catch (Throwable $exception) {
     error_log('Worker notification settings error: ' . $exception::class . ': ' . $exception->getMessage());
