@@ -22,6 +22,9 @@ jobs:
           extensions: mbstring, fileinfo, zlib, gmp, gd, iconv, curl
           coverage: none
 
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
       - name: Apply remaining security fixes
         run: python3 .github/scripts/final_security_hardening.py
 
