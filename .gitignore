@@ -2,6 +2,8 @@
 *.log
 .idea/
 .vscode/
-storage/telegram-automation.json
-storage/telegram-automation-state.json
-storage/telegram-polling-offsets.json
+/vendor/
+
+# Runtime storage contains credentials, sessions, state, metrics and backups.
+/storage/*
+!/storage/.gitkeep
