@@ -12,6 +12,7 @@
   const scope = list.dataset.techScope || 'settings';
   const localKey = `skyguardian:${scope}:technical-accounts`;
   const csrf = $('[data-csrf]')?.dataset.csrf || $('input[name="_token"]')?.value || '';
+  let successHandled = false;
 
   const notify = (message, type = 'error') => {
     if (typeof globalThis.toast === 'function') globalThis.toast(message, type);
@@ -36,11 +37,7 @@
   };
 
   const normalizeItems = items => Array.isArray(items) ? items.filter(item => item && item.id) : [];
-
-  const writeLocal = items => {
-    localStorage.setItem(localKey, JSON.stringify(normalizeItems(items)));
-  };
-
+  const writeLocal = items => localStorage.setItem(localKey, JSON.stringify(normalizeItems(items)));
   const readLocal = () => {
     try { return normalizeItems(JSON.parse(localStorage.getItem(localKey) || '[]')); }
     catch { return []; }
@@ -84,7 +81,6 @@
   };
 
   const currentEditorItem = items => items.find(item => item.id === idInput.value) || null;
-
   const applyServerState = items => {
     const normalized = normalizeItems(items);
     const before = JSON.stringify(readLocal());
@@ -95,14 +91,16 @@
     return before !== after;
   };
 
+  const reloadFresh = () => {
+    const url = new URL(location.href);
+    url.searchParams.set('_sgsync', Date.now().toString());
+    location.replace(url.toString());
+  };
+
   const loadServerState = async ({ reloadOnChange = true } = {}) => {
     const payload = await request('/technical-accounts.php', { headers: { Accept: 'application/json' } }, 10000);
     const changed = applyServerState(payload.items || []);
-    if (changed && reloadOnChange) {
-      const url = new URL(location.href);
-      url.searchParams.set('_sgsync', Date.now().toString());
-      location.replace(url.toString());
-    }
+    if (changed && reloadOnChange) reloadFresh();
     return payload.items || [];
   };
 
@@ -137,41 +135,39 @@
     const id = idInput.value || crypto.randomUUID();
     idInput.value = id;
     const existing = readLocal().find(item => item.id === id) || {};
-    const item = {
-      ...existing,
-      id,
-      name,
-      api_id: apiId,
-      api_hash: apiHash,
-      connected: Boolean(existing.connected),
-      enabled: existing.enabled !== false,
-    };
+    const item = { ...existing, id, name, api_id: apiId, api_hash: apiHash, connected: Boolean(existing.connected), enabled: existing.enabled !== false };
     try {
       await saveServerItem(item);
       connectionModal?.classList.remove('open');
       connectionModal?.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
       notify('Сохранено', 'success');
-      const url = new URL(location.href);
-      url.searchParams.set('_sgsync', Date.now().toString());
-      location.replace(url.toString());
+      reloadFresh();
     } catch (error) {
       notify(error.message || 'Не удалось сохранить аккаунт');
     }
   }, true);
 
-  window.addEventListener('skyguardian:telegram-connected', async () => {
-    try {
-      await loadServerState({ reloadOnChange: false });
-    } finally {
+  const finishTelegramSuccess = async () => {
+    if (successHandled) return;
+    successHandled = true;
+    try { await loadServerState({ reloadOnChange: false }); }
+    finally {
       qrModal?.classList.remove('open');
       connectionModal?.classList.remove('open');
       document.body.style.overflow = '';
-      const url = new URL(location.href);
-      url.searchParams.set('_sgsync', Date.now().toString());
-      location.replace(url.toString());
+      reloadFresh();
     }
-  });
+  };
+
+  window.addEventListener('skyguardian:telegram-connected', finishTelegramSuccess);
+
+  const qrStatusTitle = qrModal?.querySelector('.qr-status strong');
+  if (qrStatusTitle) {
+    new MutationObserver(() => {
+      if (qrStatusTitle.textContent?.trim() === 'Аккаунт подключён') finishTelegramSuccess();
+    }).observe(qrStatusTitle, { childList: true, subtree: true, characterData: true });
+  }
 
   loadServerState().catch(error => notify(error.message || 'Не удалось загрузить технические аккаунты'));
   document.addEventListener('visibilitychange', () => {
