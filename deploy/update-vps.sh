@@ -24,8 +24,16 @@ if [[ ! -f storage/admin.json && "$ALLOW_UNINITIALIZED" != "1" ]]; then
   exit 1
 fi
 
+# Freeze writers before backing up runtime state. Socket/IPC files are transient
+# and must never make a production deployment fail.
+systemctl stop skyguardian-data-news.service skyguardian-data-alerts.service 2>/dev/null || true
+
 snapshot="$RUNTIME_BACKUP_DIR/runtime-$(date -u +%Y%m%d-%H%M%S).tar.gz"
-tar -czf "$snapshot" -C "$PROJECT_DIR" storage
+tar --warning=no-file-changed --ignore-failed-read \
+  --exclude='*.ipc' \
+  --exclude='*.sock' \
+  --exclude='callback.ipc' \
+  -czf "$snapshot" -C "$PROJECT_DIR" storage
 chmod 0600 "$snapshot"
 find "$RUNTIME_BACKUP_DIR" -type f -name 'runtime-*.tar.gz' -mtime +14 -delete
 
