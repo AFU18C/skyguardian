@@ -21,7 +21,10 @@ mkdir -p \
   storage/telegram-sessions
 
 if [[ -n "$COMPOSER_BIN" ]]; then
+  "$COMPOSER_BIN" validate --no-check-lock
   "$COMPOSER_BIN" install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+  "$COMPOSER_BIN" dump-autoload --no-dev --optimize --strict-psr
+  "$COMPOSER_BIN" audit --no-interaction
 elif [[ ! -f vendor/autoload.php ]]; then
   echo "Composer is unavailable and vendor/autoload.php is missing." >&2
   exit 1
@@ -36,11 +39,19 @@ install -m 0644 deploy/skyguardian-data-alerts.service /etc/systemd/system/skygu
 systemctl daemon-reload
 systemctl restart skyguardian-data-news.service skyguardian-data-alerts.service
 
-"$PHP_BIN" -l public/worker-status.php >/dev/null
-"$PHP_BIN" -l public/worker-notifications.php >/dev/null
-"$PHP_BIN" -l src/Worker/WorkerStatusService.php >/dev/null
+while IFS= read -r -d '' php_file; do
+  "$PHP_BIN" -l "$php_file" >/dev/null
+done < <(find public src bin -type f -name '*.php' -print0)
 
 systemctl is-active --quiet skyguardian-data-news.service
 systemctl is-active --quiet skyguardian-data-alerts.service
+
+curl --fail --silent --show-error \
+  -H 'Host: skyguardian.pp.ua' \
+  http://127.0.0.1/worker-status.php \
+  --output /dev/null || {
+    status=$(curl --silent --output /dev/null --write-out '%{http_code}' -H 'Host: skyguardian.pp.ua' http://127.0.0.1/worker-status.php || true)
+    [[ "$status" == "401" ]] || { echo "Worker status endpoint health check failed: HTTP $status" >&2; exit 1; }
+  }
 
 echo "SkyGuardian update completed successfully."
