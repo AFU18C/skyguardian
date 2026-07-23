@@ -38,8 +38,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    require dirname(__DIR__) . '/vendor/autoload.php';
-    $service = new WorkerStatusService(dirname(__DIR__) . '/storage');
+    $projectRoot = dirname(__DIR__);
+    $autoload = $projectRoot . '/vendor/autoload.php';
+    if (is_file($autoload)) {
+        require_once $autoload;
+    }
+
+    // Deployments may keep an older generated Composer autoloader after a
+    // fast-forward update. Load the status service directly as a safe fallback.
+    if (!class_exists(WorkerStatusService::class, false)) {
+        $serviceFile = $projectRoot . '/src/Worker/WorkerStatusService.php';
+        if (!is_file($serviceFile)) {
+            throw new RuntimeException('WorkerStatusService.php is missing.');
+        }
+        require_once $serviceFile;
+    }
+
+    if (!class_exists(WorkerStatusService::class)) {
+        throw new RuntimeException('WorkerStatusService is unavailable.');
+    }
+
+    $storageDir = $projectRoot . '/storage';
+    if (!is_dir($storageDir) && !mkdir($storageDir, 0750, true) && !is_dir($storageDir)) {
+        throw new RuntimeException('Storage directory is unavailable.');
+    }
+
+    $service = new WorkerStatusService($storageDir);
     $reply(200, ['ok' => true, 'data' => $service->overview()]);
 } catch (Throwable $exception) {
     error_log('Worker status endpoint: ' . $exception::class . ': ' . $exception->getMessage());
