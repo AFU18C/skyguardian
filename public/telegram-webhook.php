@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/TelegramAutomation.php';
+require __DIR__ . '/TelegramRuntimeLock.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -28,7 +29,8 @@ if ($headerSecret === '') {
     exit;
 }
 
-$automation = new TelegramAutomation(dirname(__DIR__) . '/storage');
+$storageDir = dirname(__DIR__) . '/storage';
+$automation = new TelegramAutomation($storageDir);
 $config = $automation->findBySecret($headerSecret);
 
 if (!is_array($config) || !hash_equals((string) ($config['secret'] ?? ''), $headerSecret)) {
@@ -58,7 +60,9 @@ if (!is_array($update)) {
     exit;
 }
 
+$runtimeLock = null;
 try {
+    $runtimeLock = TelegramRuntimeLock::acquire($storageDir);
     $automation->runMaintenance();
     $automation->process($config, $update);
     echo '{"ok":true}';
@@ -66,4 +70,6 @@ try {
     error_log('SkyGuardian Telegram webhook: ' . $exception->getMessage());
     http_response_code(500);
     echo '{"ok":false}';
+} finally {
+    $runtimeLock?->release();
 }

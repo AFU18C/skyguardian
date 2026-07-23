@@ -77,13 +77,7 @@ $telegram = static function (callable $operation) use ($retryPolicy, $metrics): 
         static fn (int $attempt): mixed => $operation($attempt),
         static function (int $attempt, Throwable $exception, int $delay) use ($metrics): void {
             $metrics->retried();
-            error_log(sprintf(
-                'Telegram retry attempt %d after %d ms: %s: %s',
-                $attempt,
-                $delay,
-                $exception::class,
-                $exception->getMessage()
-            ));
+            error_log(sprintf('Telegram retry attempt %d after %d ms: %s: %s', $attempt, $delay, $exception::class, $exception->getMessage()));
         }
     );
 };
@@ -152,42 +146,94 @@ $intervalSeconds = static function (array $channel): int {
     };
 };
 
-$sendTextOrMedia = static function (API $api, mixed $destination, array $message, string $text, array $entities, bool $includeMedia, callable $telegram): void {
+$stableRandomId = static function (string $scope, string $channelId, int $sourceMessageId, string $part): int {
+    // A stable positive 60-bit value makes Telegram retries idempotent.
+    return (int) hexdec(substr(hash('sha256', $scope . ':' . $channelId . ':' . $sourceMessageId . ':' . $part), 0, 15));
+};
+
+$sendTextOrMedia = static function (
+    API $api,
+    mixed $destination,
+    array $message,
+    string $text,
+    array $entities,
+    bool $includeMedia,
+    callable $telegram,
+    int $mediaRandomId,
+    int $textRandomId
+): void {
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
     if ($includeMedia && $hasMedia) {
-        $telegram(static fn (): mixed => $api->messages->sendMedia(peer: $destination, media: $message['media'], message: ''));
+        $telegram(static fn (): mixed => $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '', random_id: $mediaRandomId));
         if ($text !== '') {
-            $parameters = ['peer' => $destination, 'message' => $text];
+            $parameters = ['peer' => $destination, 'message' => $text, 'random_id' => $textRandomId];
             if ($entities !== []) $parameters['entities'] = $entities;
             $telegram(static fn (): mixed => $api->messages->sendMessage(...$parameters));
         }
         return;
     }
     if ($text !== '') {
-        $parameters = ['peer' => $destination, 'message' => $text];
+        $parameters = ['peer' => $destination, 'message' => $text, 'random_id' => $textRandomId];
         if ($entities !== []) $parameters['entities'] = $entities;
         $telegram(static fn (): mixed => $api->messages->sendMessage(...$parameters));
     }
 };
 
-$publish = static function (API $api, mixed $destination, array $channel, array $message, callable $telegram) use ($sanitizeText, $customizeText, $sendTextOrMedia): void {
+$publish = static function (API $api, mixed $destination, array $channel, array $message, callable $telegram, int $mediaRandomId, int $textRandomId) use ($sanitizeText, $customizeText, $sendTextOrMedia): void {
     $format = (string) ($channel['publication_format'] ?? 'original');
     if ($format === 'text_without_links') $format = 'text';
     [$text, $entities] = $sanitizeText($message);
     $hasMedia = isset($message['media']) && is_array($message['media']) && (($message['media']['_'] ?? '') !== 'messageMediaEmpty');
     if ($format === 'media') {
         if ($hasMedia) {
-            $telegram(static fn (): mixed => $api->messages->sendMedia(peer: $destination, media: $message['media'], message: ''));
+            $telegram(static fn (): mixed => $api->messages->sendMedia(peer: $destination, media: $message['media'], message: '', random_id: $mediaRandomId));
         }
         return;
     }
     $customizedText = $customizeText($text, $channel);
     if ($customizedText !== $text) $entities = [];
     if ($format === 'text') {
-        $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, false, $telegram);
+        $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, false, $telegram, $mediaRandomId, $textRandomId);
         return;
     }
-    $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, true, $telegram);
+    $sendTextOrMedia($api, $destination, $message, $customizedText, $entities, true, $telegram, $mediaRandomId, $textRandomId);
+};
+
+$fetchMessages = static function (API $api, mixed $sourcePeer, int $lastId, int $initialLimit, bool $initialized, callable $telegram): array {
+    $messagesById = [];
+    $offsetId = 0;
+    $pageSize = $initialized ? 100 : max(20, $initialLimit);
+    $maxPages = $initialized ? 100 : 1;
+
+    for ($page = 0; $page < $maxPages; $page++) {
+        $history = (array) $telegram(static fn (): mixed => $api->messages->getHistory(
+            peer: $sourcePeer,
+            offset_id: $offsetId,
+            offset_date: 0,
+            add_offset: 0,
+            limit: $pageSize,
+            max_id: 0,
+            min_id: 0,
+            hash: 0
+        ));
+        $pageMessages = array_values(array_filter((array) ($history['messages'] ?? []), static fn ($message): bool =>
+            is_array($message) && ($message['_'] ?? '') === 'message' && (int) ($message['id'] ?? 0) > 0
+        ));
+        if ($pageMessages === []) break;
+
+        $oldestId = PHP_INT_MAX;
+        foreach ($pageMessages as $message) {
+            $messageId = (int) $message['id'];
+            $oldestId = min($oldestId, $messageId);
+            if (!$initialized || $messageId > $lastId) $messagesById[$messageId] = $message;
+        }
+
+        if (!$initialized || $oldestId <= $lastId || count($pageMessages) < $pageSize) break;
+        $offsetId = $oldestId;
+    }
+
+    ksort($messagesById, SORT_NUMERIC);
+    return array_values($messagesById);
 };
 
 $channelsFile = $storageDir . '/telegram-' . $scope . '-channels.json';
@@ -248,13 +294,11 @@ try {
             $destinationPeer = $destinationRaw;
 
             $limit = max(1, min(50, (int) ($channel['fetch_limit'] ?? 10)));
-            $history = (array) $telegram(static fn (): mixed => $api->messages->getHistory(peer: $sourcePeer, offset_id: 0, offset_date: 0, add_offset: 0, limit: max(20, $limit), max_id: 0, min_id: 0, hash: 0));
-            $messages = array_values(array_filter((array) ($history['messages'] ?? []), static fn ($message): bool =>
-                is_array($message) && ($message['_'] ?? '') === 'message' && (int) ($message['id'] ?? 0) > 0
-            ));
-            usort($messages, static fn (array $a, array $b): int => ((int) $a['id']) <=> ((int) $b['id']));
+            $initialized = (bool) ($state['initialized'] ?? false);
+            $lastId = max(0, (int) ($state['last_message_id'] ?? 0));
+            $messages = $fetchMessages($api, $sourcePeer, $lastId, $limit, $initialized, $telegram);
 
-            $latestSourceId = $messages === [] ? 0 : (int) end($messages)['id'];
+            $latestSourceId = $messages === [] ? $lastId : (int) end($messages)['id'];
             $states[$id] = array_merge($states[$id], [
                 'source_peer_id' => (int) ($sourceInfo['bot_api_id'] ?? 0),
                 'destination_peer_id' => (int) ($destinationInfo['bot_api_id'] ?? 0),
@@ -262,8 +306,6 @@ try {
                 'latest_source_message_id' => $latestSourceId,
             ]);
 
-            $initialized = (bool) ($state['initialized'] ?? false);
-            $lastId = max(0, (int) ($state['last_message_id'] ?? 0));
             if (!$initialized) {
                 $start = (string) ($channel['processing_start'] ?? 'new');
                 if ($start === 'new') {
@@ -276,12 +318,12 @@ try {
                 $states[$id]['initialized'] = true;
                 unset($states[$id]['resume_from_now_at']);
                 $writeJson($stateFile, $states);
-            } else {
-                $messages = array_values(array_filter($messages, static fn (array $message): bool => (int) $message['id'] > $lastId));
             }
 
             foreach ($messages as $message) {
                 $messageId = (int) $message['id'];
+                if ($messageId <= (int) ($states[$id]['last_message_id'] ?? 0)) continue;
+
                 $metrics->processed();
                 $text = trim((string) ($message['message'] ?? ''));
                 $keywords = is_array($channel['keywords'] ?? null) ? $channel['keywords'] : [];
@@ -289,7 +331,15 @@ try {
                 $shouldPublish = (!$keywords || $containsAny($text, $keywords)) && !$containsAny($text, $stopWords);
 
                 if ($shouldPublish) {
-                    $publish($api, $destinationPeer, $channel, $message, $telegram);
+                    $publish(
+                        $api,
+                        $destinationPeer,
+                        $channel,
+                        $message,
+                        $telegram,
+                        $stableRandomId($scope, $id, $messageId, 'media'),
+                        $stableRandomId($scope, $id, $messageId, 'text')
+                    );
                     $metrics->published();
                     $states[$id]['last_publish_at'] = gmdate(DATE_ATOM);
                     $states[$id]['published_count'] = (int) ($states[$id]['published_count'] ?? 0) + 1;
