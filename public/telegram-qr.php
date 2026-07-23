@@ -30,12 +30,10 @@ $reply = static function (int $status, array $payload): never {
 if (($_SESSION['admin_authenticated'] ?? false) !== true) {
     $reply(401, ['ok' => false, 'message' => 'Требуется авторизация администратора.']);
 }
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Allow: POST');
     $reply(405, ['ok' => false, 'message' => 'Разрешён только POST-запрос.']);
 }
-
 if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), (string) ($_POST['_token'] ?? ''))) {
     $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
 }
@@ -79,8 +77,11 @@ if (!is_writable($runtimeLog)) {
     $reply(503, ['ok' => false, 'message' => 'Журнал Telegram недоступен для записи.']);
 }
 
-// MadelineProto running from a web endpoint otherwise redirects PHP errors to
-// public/MadelineProto.log. Configure both PHP and MadelineProto explicitly.
+// MadelineProto may resolve some internal paths against the process CWD before
+// all settings are applied. Keep both CWD and explicit logger outside public/.
+if (!chdir($runtimeDir)) {
+    $reply(503, ['ok' => false, 'message' => 'Не удалось открыть рабочий каталог Telegram.']);
+}
 ini_set('log_errors', '1');
 ini_set('display_errors', '0');
 ini_set('error_log', $runtimeLog);
@@ -172,5 +173,5 @@ try {
     if (str_contains($message, 'permission denied')) {
         $reply(503, ['ok' => false, 'message' => 'Сервер не может записать служебные файлы Telegram.']);
     }
-    $reply(503, ['ok' => false, 'message' => 'Не удалось получить QR-код Telegram. Проверьте журналы сервера.']);
+    $reply(503, ['ok' => false, 'message' => 'Не удалось получить QR-код Telegram. Проверьте журнал storage/madeline-runtime/MadelineProto.log.']);
 }
