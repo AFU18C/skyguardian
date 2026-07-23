@@ -63,8 +63,20 @@ if (!is_file($autoload)) {
 require_once $autoload;
 
 $sessionDir = $projectRoot . '/storage/telegram-sessions';
-if (!is_dir($sessionDir) && !mkdir($sessionDir, 0770, true) && !is_dir($sessionDir)) {
-    $reply(503, ['ok' => false, 'message' => 'Не удалось подготовить хранилище Telegram-сессии.']);
+$runtimeDir = $projectRoot . '/storage/madeline-runtime';
+foreach ([$sessionDir, $runtimeDir] as $directory) {
+    if (!is_dir($directory) && !mkdir($directory, 0770, true) && !is_dir($directory)) {
+        $reply(503, ['ok' => false, 'message' => 'Не удалось подготовить хранилище Telegram.']);
+    }
+    if (!is_writable($directory)) {
+        $reply(503, ['ok' => false, 'message' => 'Хранилище Telegram недоступно для записи.']);
+    }
+}
+
+// MadelineProto creates MadelineProto.log in the current working directory by default.
+// Never let a web request try to write that file into public/.
+if (!chdir($runtimeDir)) {
+    $reply(503, ['ok' => false, 'message' => 'Не удалось открыть рабочий каталог Telegram.']);
 }
 
 $sessionKey = hash('sha256', $accountId . ':' . $apiIdRaw);
@@ -134,6 +146,9 @@ try {
     }
     if (str_contains($message, 'flood_wait')) {
         $reply(429, ['ok' => false, 'message' => 'Telegram временно ограничил попытки входа. Подождите и попробуйте позже.']);
+    }
+    if (str_contains($message, 'permission denied')) {
+        $reply(503, ['ok' => false, 'message' => 'Сервер не может записать служебные файлы Telegram.']);
     }
     $reply(503, ['ok' => false, 'message' => 'Не удалось получить QR-код Telegram. Проверьте журналы сервера.']);
 }
