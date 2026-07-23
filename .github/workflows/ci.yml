@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate Composer configuration
+        run: composer validate --no-check-lock
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Check optimized autoloading
+        run: composer dump-autoload --optimize --strict-psr
+
+      - name: Lint PHP sources
+        run: find public src bin -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Audit dependencies
+        run: composer audit --no-interaction
