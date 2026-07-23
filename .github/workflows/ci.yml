@@ -35,7 +35,9 @@ jobs:
 
       - name: Run project tests
         run: |
+          set -e
           for test in tests/*.php; do
+            echo "Running $test"
             php "$test"
           done
 
