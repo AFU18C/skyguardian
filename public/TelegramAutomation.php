@@ -20,8 +20,8 @@ final class TelegramAutomation
     private function resolveStorageDir(string $preferredDir): string
     {
         $preferredDir = rtrim($preferredDir, '/');
-        $sessionDir = rtrim((string)session_save_path(), '/');
-        $configuredDir = rtrim((string)getenv('SKYGUARDIAN_STORAGE_DIR'), '/');
+        $sessionDir = rtrim((string) session_save_path(), '/');
+        $configuredDir = rtrim((string) getenv('SKYGUARDIAN_STORAGE_DIR'), '/');
         $candidates = array_values(array_unique(array_filter([
             $configuredDir,
             $preferredDir,
@@ -30,21 +30,14 @@ final class TelegramAutomation
         ])));
 
         foreach ($candidates as $candidate) {
-            if (!is_dir($candidate) && !@mkdir($candidate, 0700, true) && !is_dir($candidate)) {
-                continue;
-            }
-            if (!is_writable($candidate)) {
-                continue;
-            }
-
+            if (!is_dir($candidate) && !@mkdir($candidate, 0700, true) && !is_dir($candidate)) continue;
+            if (!is_writable($candidate)) continue;
             @chmod($candidate, 0700);
             if ($candidate !== $preferredDir && is_dir($preferredDir) && is_readable($preferredDir)) {
                 foreach (['telegram-automation.json', 'telegram-automation-state.json', 'telegram-automation.log'] as $file) {
                     $source = $preferredDir . '/' . $file;
                     $target = $candidate . '/' . $file;
-                    if (is_file($source) && !is_file($target) && @copy($source, $target)) {
-                        @chmod($target, 0600);
-                    }
+                    if (is_file($source) && !is_file($target) && @copy($source, $target)) @chmod($target, 0600);
                 }
             }
             return $candidate;
@@ -55,18 +48,15 @@ final class TelegramAutomation
 
     public function save(array $input, string $baseUrl): array
     {
-        $token = trim((string)($input['bot_token'] ?? ''));
-        $chatId = trim((string)($input['chat_id'] ?? ''));
-        if (!preg_match('/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $token) || !preg_match('/^-?\d+$/', $chatId)) {
-            throw new InvalidArgumentException('Проверьте токен и Chat ID.');
-        }
+        $token = trim((string) ($input['bot_token'] ?? ''));
+        $chatId = trim((string) ($input['chat_id'] ?? ''));
+        $this->validateIdentity($token, $chatId);
 
         $configs = $this->readJson($this->configFile);
         $key = hash('sha256', $token . ':' . $chatId);
         $existing = is_array($configs[$key] ?? null) ? $configs[$key] : [];
-        $secret = (string)($existing['secret'] ?? bin2hex(random_bytes(24)));
-        $mode = in_array(($input['mode'] ?? 'webhook'), ['webhook', 'polling'], true) ? (string)$input['mode'] : 'webhook';
-
+        $secret = (string) ($existing['secret'] ?? bin2hex(random_bytes(24)));
+        $mode = in_array(($input['mode'] ?? 'webhook'), ['webhook', 'polling'], true) ? (string) $input['mode'] : 'webhook';
         $config = [
             'id' => $key,
             'secret' => $secret,
@@ -76,45 +66,38 @@ final class TelegramAutomation
             'group_enabled' => ($existing['group_enabled'] ?? true) !== false,
             'mode' => $mode,
             'anti_spam' => isset($input['anti_spam']),
-            'spam_limit' => max(2, min(20, (int)($input['spam_limit'] ?? 5))),
-            'spam_window' => max(3, min(120, (int)($input['spam_window'] ?? 10))),
-            'spam_mute' => max(60, min(604800, (int)($input['spam_mute'] ?? 3600))),
+            'spam_limit' => max(2, min(20, (int) ($input['spam_limit'] ?? 5))),
+            'spam_window' => max(3, min(120, (int) ($input['spam_window'] ?? 10))),
+            'spam_mute' => max(60, min(604800, (int) ($input['spam_mute'] ?? 3600))),
             'filter_links' => isset($input['filter_links']),
             'forbidden_words' => array_values(array_unique(array_filter(array_map(
-                static fn(string $word): string => mb_strtolower(trim($word)),
-                preg_split('/[,\r\n]+/u', (string)($input['forbidden_words'] ?? '')) ?: []
+                static fn (string $word): string => mb_strtolower(trim($word)),
+                preg_split('/[,\r\n]+/u', (string) ($input['forbidden_words'] ?? '')) ?: []
             )))),
             'captcha' => isset($input['captcha']),
-            'captcha_timeout' => max(30, min(3600, (int)($input['captcha_timeout'] ?? 180))),
+            'captcha_timeout' => max(30, min(3600, (int) ($input['captcha_timeout'] ?? 180))),
             'welcome' => isset($input['welcome']),
-            'welcome_text' => mb_substr(trim((string)($input['welcome_text'] ?? 'Добро пожаловать, {name}!')), 0, 3500),
-            'welcome_delete_after' => max(0, min(86400, (int)($input['welcome_delete_after'] ?? 60))),
+            'welcome_text' => mb_substr(trim((string) ($input['welcome_text'] ?? 'Добро пожаловать, {name}!')), 0, 3500),
+            'welcome_delete_after' => max(0, min(86400, (int) ($input['welcome_delete_after'] ?? 60))),
             'violation_delete' => isset($input['violation_delete']),
             'updated_at' => date(DATE_ATOM),
         ];
-        $configs[$key] = $config;
-        $this->writeJson($this->configFile, $configs);
 
         $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php';
-        if ($config['enabled'] && $mode === 'webhook') {
-            $this->api($token, 'setWebhook', [
-                'url' => $webhookUrl,
-                'secret_token' => $secret,
-                'allowed_updates' => json_encode(['message', 'callback_query', 'chat_member'], JSON_UNESCAPED_SLASHES),
-                'drop_pending_updates' => 'false',
-            ]);
-        } else {
-            $this->api($token, 'deleteWebhook', ['drop_pending_updates' => 'false']);
-        }
+        $this->synchroniseWebhook($config, $webhookUrl);
+
+        // Persist only after Telegram accepted the requested transport mode.
+        $this->mutateJson($this->configFile, static function (array $current) use ($key, $config): array {
+            $current[$key] = $config;
+            return $current;
+        });
 
         return $this->publicConfig($config, $webhookUrl);
     }
 
     public function setGroupEnabled(string $token, string $chatId, bool $enabled, string $baseUrl): array
     {
-        if (!preg_match('/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $token) || !preg_match('/^-?\d+$/', $chatId)) {
-            throw new InvalidArgumentException('Проверьте токен и Chat ID.');
-        }
+        $this->validateIdentity($token, $chatId);
         $configs = $this->readJson($this->configFile);
         $key = hash('sha256', $token . ':' . $chatId);
         $config = is_array($configs[$key] ?? null) ? $configs[$key] : [
@@ -122,6 +105,7 @@ final class TelegramAutomation
             'secret' => bin2hex(random_bytes(24)),
             'bot_token' => $token,
             'chat_id' => $chatId,
+            'enabled' => false,
             'mode' => 'webhook',
             'anti_spam' => false,
             'spam_limit' => 5,
@@ -138,22 +122,25 @@ final class TelegramAutomation
         ];
         $config['group_enabled'] = $enabled;
         $config['updated_at'] = date(DATE_ATOM);
-        $configs[$key] = $config;
-        $this->writeJson($this->configFile, $configs);
         $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php';
-        // Persist the master switch first. Webhook synchronisation must never
-        // roll the UI state back when Telegram is temporarily unavailable.
-        if ($enabled && ($config['enabled'] ?? false) === true && ($config['mode'] ?? 'webhook') === 'webhook') {
-            $this->safeApi($token, 'setWebhook', ['url' => $webhookUrl, 'secret_token' => $config['secret'], 'allowed_updates' => json_encode(['message', 'callback_query', 'chat_member'], JSON_UNESCAPED_SLASHES), 'drop_pending_updates' => 'false']);
-        } else {
-            $this->safeApi($token, 'deleteWebhook', ['drop_pending_updates' => 'false']);
-        }
+
+        $this->synchroniseWebhook($config, $webhookUrl);
+        $this->mutateJson($this->configFile, static function (array $current) use ($key, $config): array {
+            $current[$key] = $config;
+            return $current;
+        });
+
         if (!$enabled) {
             try {
-                $state = $this->readJson($this->stateFile);
-                $state['delete'] = array_values(array_filter((array)($state['delete'] ?? []), static fn($item): bool => is_array($item) && ((string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId)));
-                $state['captcha'] = array_filter((array)($state['captcha'] ?? []), static fn($item): bool => is_array($item) && ((string)($item['token'] ?? '') !== $token || (string)($item['chat_id'] ?? '') !== $chatId));
-                $this->writeJson($this->stateFile, $state);
+                $this->mutateJson($this->stateFile, static function (array $state) use ($token, $chatId): array {
+                    $state['delete'] = array_values(array_filter((array) ($state['delete'] ?? []), static fn ($item): bool =>
+                        is_array($item) && ((string) ($item['token'] ?? '') !== $token || (string) ($item['chat_id'] ?? '') !== $chatId)
+                    ));
+                    $state['captcha'] = array_filter((array) ($state['captcha'] ?? []), static fn ($item): bool =>
+                        is_array($item) && ((string) ($item['token'] ?? '') !== $token || (string) ($item['chat_id'] ?? '') !== $chatId)
+                    );
+                    return $state;
+                });
             } catch (Throwable $exception) {
                 $this->logRaw('group_cleanup_error', ['chat_id' => $chatId, 'error' => $exception->getMessage()]);
             }
@@ -161,17 +148,35 @@ final class TelegramAutomation
         try {
             $this->logRaw($enabled ? 'group_enabled' : 'group_disabled', ['chat_id' => $chatId]);
         } catch (Throwable) {
-            // The switch state is already saved; logging must not fail the request.
         }
         return $this->publicConfig($config, $webhookUrl);
+    }
+
+    private function synchroniseWebhook(array $config, string $webhookUrl): void
+    {
+        if (($config['enabled'] ?? false) === true && ($config['group_enabled'] ?? true) !== false && ($config['mode'] ?? 'webhook') === 'webhook') {
+            $this->api((string) $config['bot_token'], 'setWebhook', [
+                'url' => $webhookUrl,
+                'secret_token' => (string) $config['secret'],
+                'allowed_updates' => json_encode(['message', 'callback_query', 'chat_member'], JSON_UNESCAPED_SLASHES),
+                'drop_pending_updates' => 'false',
+            ]);
+            return;
+        }
+        $this->api((string) $config['bot_token'], 'deleteWebhook', ['drop_pending_updates' => 'false']);
+    }
+
+    private function validateIdentity(string $token, string $chatId): void
+    {
+        if (!preg_match('/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $token) || !preg_match('/^-?\d+$/', $chatId)) {
+            throw new InvalidArgumentException('Проверьте токен и Chat ID.');
+        }
     }
 
     public function findBySecret(string $secret): ?array
     {
         foreach ($this->readJson($this->configFile) as $config) {
-            if (is_array($config) && hash_equals((string)($config['secret'] ?? ''), $secret)) {
-                return $config;
-            }
+            if (is_array($config) && hash_equals((string) ($config['secret'] ?? ''), $secret)) return $config;
         }
         return null;
     }
@@ -180,16 +185,12 @@ final class TelegramAutomation
     {
         $key = hash('sha256', $token . ':' . $chatId);
         $config = $this->readJson($this->configFile)[$key] ?? null;
-
-        // Existing groups that have never used the master switch keep their
-        // previous behaviour. Once explicitly disabled, every server endpoint
-        // must stop before making any Telegram API request.
         return !is_array($config) || ($config['group_enabled'] ?? true) !== false;
     }
 
     public function pollingConfigs(): array
     {
-        return array_values(array_filter($this->readJson($this->configFile), static fn($c): bool =>
+        return array_values(array_filter($this->readJson($this->configFile), static fn ($c): bool =>
             is_array($c) && ($c['enabled'] ?? false) === true && ($c['group_enabled'] ?? true) !== false && ($c['mode'] ?? '') === 'polling'
         ));
     }
@@ -198,185 +199,158 @@ final class TelegramAutomation
     {
         $key = hash('sha256', $token . ':' . $chatId);
         $config = $this->readJson($this->configFile)[$key] ?? null;
-        if (!is_array($config)) {
-            return ['configured' => false];
-        }
+        if (!is_array($config)) return ['configured' => false];
         $webhookUrl = rtrim($baseUrl, '/') . '/telegram-webhook.php';
-        if (($config['group_enabled'] ?? true) === false) {
-            return array_merge(['configured' => true], $this->publicConfig($config, $webhookUrl), [
-                'stopped' => true,
-                'telegram' => [
-                    'url' => '',
-                    'pending_update_count' => 0,
-                    'last_error_message' => '',
-                ],
-            ]);
-        }
-
         $info = $this->api($token, 'getWebhookInfo');
-        return array_merge(['configured' => true], $this->publicConfig($config, $webhookUrl), ['telegram' => [
-            'url' => (string)($info['url'] ?? ''),
-            'pending_update_count' => (int)($info['pending_update_count'] ?? 0),
-            'last_error_message' => (string)($info['last_error_message'] ?? ''),
-        ]]);
+        return array_merge(['configured' => true], $this->publicConfig($config, $webhookUrl), [
+            'stopped' => ($config['group_enabled'] ?? true) === false,
+            'telegram' => [
+                'url' => (string) ($info['url'] ?? ''),
+                'pending_update_count' => (int) ($info['pending_update_count'] ?? 0),
+                'last_error_message' => (string) ($info['last_error_message'] ?? ''),
+            ],
+        ]);
     }
 
     public function process(array $config, array $update): void
     {
-        if (($config['enabled'] ?? false) !== true || ($config['group_enabled'] ?? true) === false) {
-            return;
-        }
+        if (($config['enabled'] ?? false) !== true || ($config['group_enabled'] ?? true) === false) return;
         if (isset($update['callback_query'])) {
-            $this->captchaCallback($config, (array)$update['callback_query']);
+            $this->captchaCallback($config, (array) $update['callback_query']);
             return;
         }
         $message = $update['message'] ?? null;
-        if (!is_array($message) || (string)($message['chat']['id'] ?? '') !== (string)$config['chat_id']) {
-            return;
-        }
-
+        if (!is_array($message) || (string) ($message['chat']['id'] ?? '') !== (string) $config['chat_id']) return;
         if (!empty($message['new_chat_members'])) {
-            foreach ((array)$message['new_chat_members'] as $member) {
-                if (is_array($member) && !($member['is_bot'] ?? false)) {
-                    $this->newMember($config, $message, $member);
-                }
+            foreach ((array) $message['new_chat_members'] as $member) {
+                if (is_array($member) && !($member['is_bot'] ?? false)) $this->newMember($config, $message, $member);
             }
             return;
         }
-
-        $user = (array)($message['from'] ?? []);
-        $userId = (string)($user['id'] ?? '');
-        if ($userId === '' || ($user['is_bot'] ?? false) || $this->isAdmin($config, $userId)) {
-            return;
-        }
-        $text = (string)($message['text'] ?? $message['caption'] ?? '');
+        $user = (array) ($message['from'] ?? []);
+        $userId = (string) ($user['id'] ?? '');
+        if ($userId === '' || ($user['is_bot'] ?? false) || $this->isAdmin($config, $userId)) return;
+        $text = (string) ($message['text'] ?? $message['caption'] ?? '');
         $reason = null;
-        if (($config['filter_links'] ?? false) && preg_match('~(?:https?://|www\.|t\.me/|telegram\.me/)~iu', $text)) {
-            $reason = 'ссылка';
-        }
+        if (($config['filter_links'] ?? false) && preg_match('~(?:https?://|www\.|t\.me/|telegram\.me/)~iu', $text)) $reason = 'ссылка';
         if ($reason === null && $text !== '') {
             $lower = mb_strtolower($text);
-            foreach ((array)($config['forbidden_words'] ?? []) as $word) {
-                if ($word !== '' && mb_strpos($lower, (string)$word) !== false) {
+            foreach ((array) ($config['forbidden_words'] ?? []) as $word) {
+                if ($word !== '' && mb_strpos($lower, (string) $word) !== false) {
                     $reason = 'запрещённое слово';
                     break;
                 }
             }
         }
-        if ($reason === null && ($config['anti_spam'] ?? false)) {
-            $reason = $this->recordMessage($config, $userId) ? 'флуд' : null;
-        }
-        if ($reason !== null) {
-            $this->moderate($config, $message, $userId, $reason);
-        }
+        if ($reason === null && ($config['anti_spam'] ?? false)) $reason = $this->recordMessage($config, $userId) ? 'флуд' : null;
+        if ($reason !== null) $this->moderate($config, $message, $userId, $reason);
     }
 
     private function newMember(array $config, array $message, array $member): void
     {
-        $userId = (string)$member['id'];
-        $name = trim((string)($member['first_name'] ?? '') . ' ' . (string)($member['last_name'] ?? ''));
-        if (($config['captcha'] ?? false) === true) {
-            $this->api($config['bot_token'], 'restrictChatMember', [
-                'chat_id' => $config['chat_id'],
-                'user_id' => $userId,
-                'permissions' => json_encode(['can_send_messages' => false], JSON_UNESCAPED_SLASHES),
-                'until_date' => time() + (int)$config['captcha_timeout'],
-            ]);
-            $sent = $this->api($config['bot_token'], 'sendMessage', [
-                'chat_id' => $config['chat_id'],
-                'text' => ($name !== '' ? $name : 'Новый участник') . ', подтвердите, что вы человек.',
-                'reply_markup' => json_encode(['inline_keyboard' => [[[
-                    'text' => '✅ Я человек',
-                    'callback_data' => 'sgcaptcha:' . $userId,
-                ]]]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            ]);
-            $state = $this->readJson($this->stateFile);
+        $userId = (string) $member['id'];
+        $name = trim((string) ($member['first_name'] ?? '') . ' ' . (string) ($member['last_name'] ?? ''));
+        if (($config['captcha'] ?? false) !== true) {
+            $this->welcome($config, $userId, $name);
+            return;
+        }
+        $this->api($config['bot_token'], 'restrictChatMember', [
+            'chat_id' => $config['chat_id'],
+            'user_id' => $userId,
+            'permissions' => json_encode(['can_send_messages' => false], JSON_UNESCAPED_SLASHES),
+            'until_date' => time() + (int) $config['captcha_timeout'],
+        ]);
+        $sent = $this->api($config['bot_token'], 'sendMessage', [
+            'chat_id' => $config['chat_id'],
+            'text' => ($name !== '' ? $name : 'Новый участник') . ', подтвердите, что вы человек.',
+            'reply_markup' => json_encode(['inline_keyboard' => [[['text' => '✅ Я человек', 'callback_data' => 'sgcaptcha:' . $userId]]]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ]);
+        $this->mutateJson($this->stateFile, static function (array $state) use ($config, $userId, $name, $sent): array {
             $state['captcha'][$config['id'] . ':' . $userId] = [
-                'message_id' => (int)($sent['message_id'] ?? 0),
-                'expires_at' => time() + (int)$config['captcha_timeout'],
+                'message_id' => (int) ($sent['message_id'] ?? 0),
+                'expires_at' => time() + (int) $config['captcha_timeout'],
                 'name' => $name,
                 'token' => $config['bot_token'],
                 'chat_id' => $config['chat_id'],
                 'user_id' => $userId,
             ];
-            $this->writeJson($this->stateFile, $state);
-            $this->log('captcha_started', $config, ['user_id' => $userId]);
-        } else {
-            $this->welcome($config, $userId, $name);
-        }
+            return $state;
+        });
+        $this->log('captcha_started', $config, ['user_id' => $userId]);
     }
 
     private function captchaCallback(array $config, array $callback): void
     {
-        $data = (string)($callback['data'] ?? '');
+        $data = (string) ($callback['data'] ?? '');
         if (!str_starts_with($data, 'sgcaptcha:')) return;
         $expected = substr($data, 10);
-        $actual = (string)($callback['from']['id'] ?? '');
+        $actual = (string) ($callback['from']['id'] ?? '');
         if ($expected === '' || !hash_equals($expected, $actual)) {
-            $this->api($config['bot_token'], 'answerCallbackQuery', [
-                'callback_query_id' => $callback['id'],
-                'text' => 'Эта кнопка предназначена другому участнику.',
-                'show_alert' => 'true',
-            ]);
+            $this->api($config['bot_token'], 'answerCallbackQuery', ['callback_query_id' => $callback['id'], 'text' => 'Эта кнопка предназначена другому участнику.', 'show_alert' => 'true']);
             return;
         }
-        $state = $this->readJson($this->stateFile);
         $key = $config['id'] . ':' . $actual;
-        $captcha = $state['captcha'][$key] ?? null;
-        if (!is_array($captcha) || (int)($captcha['expires_at'] ?? 0) < time()) {
+        $captcha = null;
+        $this->mutateJson($this->stateFile, static function (array $state) use ($key, &$captcha): array {
+            $candidate = $state['captcha'][$key] ?? null;
+            if (is_array($candidate) && (int) ($candidate['expires_at'] ?? 0) >= time()) {
+                $captcha = $candidate;
+                unset($state['captcha'][$key]);
+            }
+            return $state;
+        });
+        if (!is_array($captcha)) {
             $this->api($config['bot_token'], 'answerCallbackQuery', ['callback_query_id' => $callback['id'], 'text' => 'Проверка уже истекла.']);
             return;
         }
         $permissions = ['can_send_messages' => true, 'can_send_audios' => true, 'can_send_documents' => true, 'can_send_photos' => true, 'can_send_videos' => true, 'can_send_video_notes' => true, 'can_send_voice_notes' => true, 'can_send_polls' => true, 'can_send_other_messages' => true, 'can_add_web_page_previews' => true, 'can_invite_users' => true];
         $this->api($config['bot_token'], 'restrictChatMember', ['chat_id' => $config['chat_id'], 'user_id' => $actual, 'permissions' => json_encode($permissions, JSON_UNESCAPED_SLASHES)]);
         $this->api($config['bot_token'], 'answerCallbackQuery', ['callback_query_id' => $callback['id'], 'text' => 'Проверка пройдена.']);
-        if ((int)$captcha['message_id'] > 0) {
-            $this->safeApi($config['bot_token'], 'deleteMessage', ['chat_id' => $config['chat_id'], 'message_id' => $captcha['message_id']]);
-        }
-        unset($state['captcha'][$key]);
-        $this->writeJson($this->stateFile, $state);
-        $this->welcome($config, $actual, (string)($captcha['name'] ?? ''));
+        if ((int) ($captcha['message_id'] ?? 0) > 0) $this->safeApi($config['bot_token'], 'deleteMessage', ['chat_id' => $config['chat_id'], 'message_id' => $captcha['message_id']]);
+        $this->welcome($config, $actual, (string) ($captcha['name'] ?? ''));
         $this->log('captcha_passed', $config, ['user_id' => $actual]);
     }
 
     private function welcome(array $config, string $userId, string $name): void
     {
-        if (($config['welcome'] ?? false) !== true || trim((string)$config['welcome_text']) === '') return;
+        if (($config['welcome'] ?? false) !== true || trim((string) $config['welcome_text']) === '') return;
         $mention = '<a href="tg://user?id=' . htmlspecialchars($userId, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($name !== '' ? $name : 'участник', ENT_QUOTES, 'UTF-8') . '</a>';
-        $text = str_replace(['{name}', '{user_id}'], [$mention, $userId], (string)$config['welcome_text']);
+        $text = str_replace(['{name}', '{user_id}'], [$mention, $userId], (string) $config['welcome_text']);
         $sent = $this->api($config['bot_token'], 'sendMessage', ['chat_id' => $config['chat_id'], 'text' => $text, 'parse_mode' => 'HTML']);
-        $after = (int)($config['welcome_delete_after'] ?? 0);
+        $after = (int) ($config['welcome_delete_after'] ?? 0);
         if ($after > 0) {
-            $state = $this->readJson($this->stateFile);
-            $state['delete'][] = ['at' => time() + $after, 'token' => $config['bot_token'], 'chat_id' => $config['chat_id'], 'message_id' => (int)($sent['message_id'] ?? 0)];
-            $this->writeJson($this->stateFile, $state);
+            $this->mutateJson($this->stateFile, static function (array $state) use ($after, $config, $sent): array {
+                $state['delete'][] = ['at' => time() + $after, 'token' => $config['bot_token'], 'chat_id' => $config['chat_id'], 'message_id' => (int) ($sent['message_id'] ?? 0)];
+                return $state;
+            });
         }
     }
 
     private function recordMessage(array $config, string $userId): bool
     {
-        $state = $this->readJson($this->stateFile);
-        $key = $config['id'] . ':' . $userId;
-        $now = time();
-        $window = (int)$config['spam_window'];
-        $events = array_values(array_filter((array)($state['spam'][$key] ?? []), static fn($time): bool => (int)$time >= $now - $window));
-        $events[] = $now;
-        $state['spam'][$key] = $events;
-        $this->writeJson($this->stateFile, $state);
-        return count($events) >= (int)$config['spam_limit'];
+        $isSpam = false;
+        $this->mutateJson($this->stateFile, static function (array $state) use ($config, $userId, &$isSpam): array {
+            $key = $config['id'] . ':' . $userId;
+            $now = time();
+            $window = (int) $config['spam_window'];
+            $events = array_values(array_filter((array) ($state['spam'][$key] ?? []), static fn ($time): bool => (int) $time >= $now - $window));
+            $events[] = $now;
+            $state['spam'][$key] = $events;
+            $isSpam = count($events) >= (int) $config['spam_limit'];
+            return $state;
+        });
+        return $isSpam;
     }
 
     private function moderate(array $config, array $message, string $userId, string $reason): void
     {
-        if (($config['violation_delete'] ?? true) && isset($message['message_id'])) {
-            $this->safeApi($config['bot_token'], 'deleteMessage', ['chat_id' => $config['chat_id'], 'message_id' => $message['message_id']]);
-        }
+        if (($config['violation_delete'] ?? true) && isset($message['message_id'])) $this->safeApi($config['bot_token'], 'deleteMessage', ['chat_id' => $config['chat_id'], 'message_id' => $message['message_id']]);
         if ($reason === 'флуд') {
             $this->safeApi($config['bot_token'], 'restrictChatMember', [
                 'chat_id' => $config['chat_id'],
                 'user_id' => $userId,
                 'permissions' => json_encode(['can_send_messages' => false], JSON_UNESCAPED_SLASHES),
-                'until_date' => time() + (int)$config['spam_mute'],
+                'until_date' => time() + (int) $config['spam_mute'],
             ]);
         }
         $this->log('moderated', $config, ['user_id' => $userId, 'reason' => $reason, 'message_id' => $message['message_id'] ?? null]);
@@ -386,7 +360,7 @@ final class TelegramAutomation
     {
         try {
             $member = $this->api($config['bot_token'], 'getChatMember', ['chat_id' => $config['chat_id'], 'user_id' => $userId]);
-            return in_array((string)($member['status'] ?? ''), ['administrator', 'creator'], true);
+            return in_array((string) ($member['status'] ?? ''), ['administrator', 'creator'], true);
         } catch (Throwable) {
             return false;
         }
@@ -394,32 +368,39 @@ final class TelegramAutomation
 
     public function runMaintenance(): void
     {
-        $state = $this->readJson($this->stateFile);
-        $remaining = [];
-        foreach ((array)($state['delete'] ?? []) as $item) {
-            if ((int)($item['at'] ?? 0) <= time()) {
-                $this->safeApi((string)$item['token'], 'deleteMessage', ['chat_id' => $item['chat_id'], 'message_id' => $item['message_id']]);
-            } else {
-                $remaining[] = $item;
+        $dueDeletes = [];
+        $expiredCaptchas = [];
+        $this->mutateJson($this->stateFile, static function (array $state) use (&$dueDeletes, &$expiredCaptchas): array {
+            $remaining = [];
+            foreach ((array) ($state['delete'] ?? []) as $item) {
+                if ((int) ($item['at'] ?? 0) <= time()) $dueDeletes[] = $item;
+                else $remaining[] = $item;
+            }
+            $state['delete'] = $remaining;
+            foreach ((array) ($state['captcha'] ?? []) as $key => $captcha) {
+                if ((int) ($captcha['expires_at'] ?? 0) <= time()) {
+                    $expiredCaptchas[] = $captcha;
+                    unset($state['captcha'][$key]);
+                }
+            }
+            return $state;
+        });
+
+        foreach ($dueDeletes as $item) {
+            $this->safeApi((string) ($item['token'] ?? ''), 'deleteMessage', ['chat_id' => $item['chat_id'] ?? '', 'message_id' => $item['message_id'] ?? 0]);
+        }
+        foreach ($expiredCaptchas as $captcha) {
+            $token = (string) ($captcha['token'] ?? '');
+            $chatId = (string) ($captcha['chat_id'] ?? '');
+            $userId = (string) ($captcha['user_id'] ?? '');
+            if ($token !== '' && $chatId !== '' && $userId !== '') {
+                $this->safeApi($token, 'banChatMember', ['chat_id' => $chatId, 'user_id' => $userId, 'revoke_messages' => 'true']);
+                $this->safeApi($token, 'unbanChatMember', ['chat_id' => $chatId, 'user_id' => $userId, 'only_if_banned' => 'true']);
+            }
+            if ($token !== '' && $chatId !== '' && (int) ($captcha['message_id'] ?? 0) > 0) {
+                $this->safeApi($token, 'deleteMessage', ['chat_id' => $chatId, 'message_id' => (int) $captcha['message_id']]);
             }
         }
-        $state['delete'] = $remaining;
-        foreach ((array)($state['captcha'] ?? []) as $key => $captcha) {
-            if ((int)($captcha['expires_at'] ?? 0) <= time()) {
-                $token = (string)($captcha['token'] ?? '');
-                $chatId = (string)($captcha['chat_id'] ?? '');
-                $userId = (string)($captcha['user_id'] ?? '');
-                if ($token !== '' && $chatId !== '' && $userId !== '') {
-                    $this->safeApi($token, 'banChatMember', ['chat_id' => $chatId, 'user_id' => $userId, 'revoke_messages' => 'true']);
-                    $this->safeApi($token, 'unbanChatMember', ['chat_id' => $chatId, 'user_id' => $userId, 'only_if_banned' => 'true']);
-                }
-                if ($token !== '' && $chatId !== '' && (int)($captcha['message_id'] ?? 0) > 0) {
-                    $this->safeApi($token, 'deleteMessage', ['chat_id' => $chatId, 'message_id' => (int)$captcha['message_id']]);
-                }
-                unset($state['captcha'][$key]);
-            }
-        }
-        $this->writeJson($this->stateFile, $state);
     }
 
     public function api(string $token, string $method, array $fields = []): mixed
@@ -428,18 +409,23 @@ final class TelegramAutomation
         curl_setopt_array($handle, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query($fields), CURLOPT_RETURNTRANSFER => true, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 30, CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded']]);
         $body = curl_exec($handle);
         $error = curl_error($handle);
-        $code = (int)curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        $code = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         curl_close($handle);
-        $data = json_decode((string)$body, true);
+        $data = json_decode((string) $body, true);
         if ($body === false || $error !== '' || !is_array($data) || $code >= 400 || ($data['ok'] ?? false) !== true) {
-            throw new RuntimeException((string)($data['description'] ?? $error ?: 'Telegram API недоступен.'));
+            throw new RuntimeException((string) ($data['description'] ?? $error ?: 'Telegram API недоступен.'));
         }
         return $data['result'] ?? true;
     }
 
     private function safeApi(string $token, string $method, array $fields): void
     {
-        try { $this->api($token, $method, $fields); } catch (Throwable $e) { $this->logRaw('api_error', ['method' => $method, 'error' => $e->getMessage()]); }
+        if ($token === '') return;
+        try {
+            $this->api($token, $method, $fields);
+        } catch (Throwable $exception) {
+            $this->logRaw('api_error', ['method' => $method, 'error' => $exception->getMessage()]);
+        }
     }
 
     private function publicConfig(array $config, string $webhookUrl): array
@@ -447,9 +433,9 @@ final class TelegramAutomation
         return [
             'enabled' => ($config['enabled'] ?? false) === true,
             'group_enabled' => ($config['group_enabled'] ?? true) !== false,
-            'mode' => (string)($config['mode'] ?? 'webhook'),
+            'mode' => (string) ($config['mode'] ?? 'webhook'),
             'webhook_url' => $webhookUrl,
-            'updated_at' => (string)($config['updated_at'] ?? date(DATE_ATOM)),
+            'updated_at' => (string) ($config['updated_at'] ?? date(DATE_ATOM)),
         ];
     }
 
@@ -457,22 +443,48 @@ final class TelegramAutomation
     {
         if (!is_file($file)) return [];
         $handle = fopen($file, 'rb');
-        if (!$handle) return [];
-        flock($handle, LOCK_SH);
-        $content = stream_get_contents($handle);
-        flock($handle, LOCK_UN);
-        fclose($handle);
-        $data = json_decode((string)$content, true);
+        if ($handle === false) return [];
+        try {
+            flock($handle, LOCK_SH);
+            $content = stream_get_contents($handle);
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
+        $data = json_decode((string) $content, true);
         return is_array($data) ? $data : [];
+    }
+
+    private function mutateJson(string $file, callable $mutator): array
+    {
+        $lockFile = $file . '.lock';
+        $lock = fopen($lockFile, 'c+');
+        if ($lock === false) throw new RuntimeException('Не удалось открыть блокировку состояния автоматизации.');
+        @chmod($lockFile, 0600);
+        try {
+            if (!flock($lock, LOCK_EX)) throw new RuntimeException('Не удалось заблокировать состояние автоматизации.');
+            $current = $this->readJson($file);
+            $updated = $mutator($current);
+            if (!is_array($updated)) throw new RuntimeException('Некорректное состояние автоматизации.');
+            $this->writeJson($file, $updated);
+            return $updated;
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
     }
 
     private function writeJson(string $file, array $data): void
     {
         $tmp = $file . '.' . bin2hex(random_bytes(6)) . '.tmp';
-        $payload = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $payload = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         if (file_put_contents($tmp, $payload, LOCK_EX) === false) throw new RuntimeException('Не удалось сохранить настройки автоматизации.');
         chmod($tmp, 0600);
-        if (!rename($tmp, $file)) { @unlink($tmp); throw new RuntimeException('Не удалось применить настройки автоматизации.'); }
+        if (!rename($tmp, $file)) {
+            @unlink($tmp);
+            throw new RuntimeException('Не удалось применить настройки автоматизации.');
+        }
+        @chmod($file, 0600);
     }
 
     private function log(string $event, array $config, array $context = []): void
