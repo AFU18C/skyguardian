@@ -54,16 +54,14 @@ if ($action === 'telegram-automation' && $_SERVER['REQUEST_METHOD'] === 'POST') 
     } catch (InvalidArgumentException $exception) {
         $reply(422, ['ok' => false, 'message' => $exception->getMessage()]);
     } catch (RuntimeException $exception) {
-        $message = $exception->getMessage();
-        if (str_contains(strtolower($message), 'bad webhook')) $message = 'Telegram не принял webhook. Проверьте HTTPS и публичный адрес сайта.';
+        error_log('Telegram automation runtime error: ' . $exception->getMessage());
+        $message = str_contains(strtolower($exception->getMessage()), 'bad webhook')
+            ? 'Telegram не принял webhook. Проверьте HTTPS и публичный адрес сайта.'
+            : 'Telegram отклонил настройки автоматизации.';
         $reply(422, ['ok' => false, 'message' => $message]);
     } catch (Throwable $exception) {
         error_log('Telegram automation error: ' . $exception::class . ': ' . $exception->getMessage());
-        $message = $exception->getMessage();
-        if ($message === '') {
-            $message = 'Не удалось сохранить автоматизацию.';
-        }
-        $reply(503, ['ok' => false, 'message' => $message]);
+        $reply(503, ['ok' => false, 'message' => 'Не удалось сохранить автоматизацию.']);
     }
 }
 
@@ -216,8 +214,10 @@ if ($action === 'telegram-manage' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $reply(200, ['ok' => true, 'message' => $message, 'result' => $result, 'performed_at' => (new DateTimeImmutable('now', new DateTimeZone('Europe/Kyiv')))->format(DATE_ATOM)]);
     } catch (RuntimeException $exception) {
-        $reply(422, ['ok' => false, 'message' => $exception->getMessage()]);
-    } catch (Throwable) {
+        error_log('Telegram manage error: ' . $exception->getMessage());
+        $reply(422, ['ok' => false, 'message' => 'Telegram отклонил команду. Проверьте права бота и параметры.']);
+    } catch (Throwable $exception) {
+        error_log('Telegram manage failure: ' . $exception::class . ': ' . $exception->getMessage());
         $reply(503, ['ok' => false, 'message' => 'Не удалось выполнить команду Telegram.']);
     }
 }
@@ -271,9 +271,28 @@ if ($action === 'telegram-publish' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string) $file['tmp_name'])) {
             $reply(422, ['ok' => false, 'message' => 'Выберите файл для отправки.']);
         }
-        if ((int) $file['size'] > 49 * 1024 * 1024) $reply(422, ['ok' => false, 'message' => 'Файл превышает лимит 49 МБ.']);
+        if ((int) $file['size'] <= 0 || (int) $file['size'] > 49 * 1024 * 1024) {
+            $reply(422, ['ok' => false, 'message' => 'Файл пустой или превышает лимит 49 МБ.']);
+        }
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $detectedMime = (string) $finfo->file((string) $file['tmp_name']);
+        $allowedMime = [
+            'photo' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+            'video' => ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska'],
+        ];
+        if (isset($allowedMime[$kind]) && !in_array($detectedMime, $allowedMime[$kind], true)) {
+            $reply(422, ['ok' => false, 'message' => 'Содержимое файла не соответствует выбранному типу публикации.']);
+        }
+        if ($kind === 'document' && in_array($detectedMime, [
+            'text/x-php', 'application/x-httpd-php', 'application/x-php',
+            'application/x-executable', 'application/x-dosexec', 'application/x-sharedlib',
+        ], true)) {
+            $reply(422, ['ok' => false, 'message' => 'Этот тип документа запрещён.']);
+        }
+        $safeName = preg_replace('/[\x00-\x1F\x7F\\\/]+/u', '_', basename((string) $file['name'])) ?: 'upload';
+        $safeName = mb_substr($safeName, 0, 180);
         $method = ['photo' => 'sendPhoto', 'video' => 'sendVideo', 'document' => 'sendDocument'][$kind];
-        $parameters[$kind] = new CURLFile((string) $file['tmp_name'], (string) ($file['type'] ?: 'application/octet-stream'), basename((string) $file['name']));
+        $parameters[$kind] = new CURLFile((string) $file['tmp_name'], $detectedMime !== '' ? $detectedMime : 'application/octet-stream', $safeName);
         if ($text !== '') $parameters['caption'] = $text;
     }
 
@@ -297,10 +316,13 @@ if ($action === 'telegram-publish' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $reply(200, ['ok' => true, 'message' => 'Публикация отправлена.', 'message_id' => $message['message_id'] ?? null]);
     } catch (RuntimeException $exception) {
-        $message = $exception->getMessage();
-        if (str_contains(strtolower($message), 'not enough rights')) $message = 'У бота недостаточно прав для этого действия.';
+        error_log('Telegram publish error: ' . $exception->getMessage());
+        $message = str_contains(strtolower($exception->getMessage()), 'not enough rights')
+            ? 'У бота недостаточно прав для этого действия.'
+            : 'Telegram отклонил публикацию. Проверьте файл, текст и права бота.';
         $reply(422, ['ok' => false, 'message' => $message]);
-    } catch (Throwable) {
+    } catch (Throwable $exception) {
+        error_log('Telegram publish failure: ' . $exception::class . ': ' . $exception->getMessage());
         $reply(503, ['ok' => false, 'message' => 'Не удалось отправить публикацию.']);
     }
 }
@@ -444,8 +466,13 @@ if ($action === 'telegram-check' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (str_contains(strtolower($message), 'chat not found')) {
             $message = 'Чат не найден. Проверьте Chat ID и добавьте бота в чат.';
         }
+        if (!str_contains(strtolower($message), 'unauthorized') && !str_contains(strtolower($message), 'chat not found')) {
+            error_log('Telegram check error: ' . $message);
+            $message = 'Telegram отклонил проверку подключения.';
+        }
         $reply(422, ['ok' => false, 'message' => $message]);
-    } catch (Throwable) {
+    } catch (Throwable $exception) {
+        error_log('Telegram check failure: ' . $exception::class . ': ' . $exception->getMessage());
         $reply(503, ['ok' => false, 'message' => 'Не удалось проверить подключение Telegram.']);
     }
 }
@@ -530,10 +557,26 @@ if ($action === 'reboot' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($action === 'logout') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Allow: POST');
+        http_response_code(405);
+        exit;
+    }
+    if (!$isAuthenticated || !hash_equals((string) ($_SESSION['csrf_token'] ?? ''), (string) ($_POST['_token'] ?? ''))) {
+        http_response_code(419);
+        exit;
+    }
     $_SESSION = [];
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'] ?? '', (bool) $params['secure'], (bool) $params['httponly']);
+        setcookie(session_name(), '', [
+            'expires' => time() - 42000,
+            'path' => $params['path'],
+            'domain' => $params['domain'] ?? '',
+            'secure' => (bool) $params['secure'],
+            'httponly' => (bool) $params['httponly'],
+            'samesite' => $params['samesite'] ?? 'Strict',
+        ]);
     }
     session_destroy();
     header('Location: /?page=login');
@@ -777,7 +820,10 @@ function active(string $current, string $target): string
             <div class="nav-heading">ОБЩИЕ НАСТРОЙКИ</div>
             <a class="nav-link<?= active($page, 'group') ?>" href="?page=group"><span class="nav-icon">♟</span><span>Управление группой</span></a>
             <a class="nav-link<?= active($page, 'site') ?>" href="?page=site"><span class="nav-icon">◎</span><span>Управление сайтом</span></a>
-            <a class="nav-link logout" href="/?action=logout"><span class="nav-icon">↪</span><span>Выйти</span></a>
+            <form method="post" action="/?action=logout" class="logout-form">
+                <input type="hidden" name="_token" value="<?= htmlspecialchars((string) $_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                <button class="nav-link logout" type="submit"><span class="nav-icon">↪</span><span>Выйти</span></button>
+            </form>
         </nav>
 
         <div class="sidebar-footer"><span class="status-dot online"></span><div><strong>Система доступна</strong><small>Макет интерфейса</small></div></div>

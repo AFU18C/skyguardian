@@ -118,8 +118,13 @@ try {
     $dashboard = $request('GET', $baseUrl . '/?page=home', [], $cookieJar);
     if ($dashboard['status'] !== 200) $fail('authenticated session cannot access dashboard');
 
-    $logout = $request('GET', $baseUrl . '/?action=logout', [], $cookieJar);
-    if ($logout['status'] !== 302) $fail('logout did not redirect');
+    if (!preg_match('/<form method="post" action="\/\?action=logout"[^>]*>.*?name="_token" value="([a-f0-9]{64})"/s', $dashboard['body'], $logoutMatch)) {
+        $fail('logout CSRF form missing');
+    }
+    $logoutGet = $request('GET', $baseUrl . '/?action=logout', [], $cookieJar);
+    if ($logoutGet['status'] !== 405) $fail('GET logout was not rejected');
+    $logout = $request('POST', $baseUrl . '/?action=logout', ['_token' => $logoutMatch[1]], $cookieJar);
+    if ($logout['status'] !== 302) $fail('POST logout did not redirect');
 
     $afterLogout = $request('GET', $baseUrl . '/?page=home', [], $cookieJar);
     if ($afterLogout['status'] !== 302 || !preg_match('/^Location:\s*\/\?page=login\s*$/mi', $afterLogout['headers'])) {
