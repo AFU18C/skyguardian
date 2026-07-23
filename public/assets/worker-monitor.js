@@ -21,6 +21,7 @@
     const csrf = document.querySelector('[data-csrf]')?.dataset.csrf || '';
     const scope = list?.dataset.techScope || 'settings';
     const localKey = `skyguardian:${scope}:technical-accounts`;
+    const syncMarkerKey = `skyguardian:${scope}:server-state`;
     let polling = false;
     let generation = 0;
     let pollTimer = 0;
@@ -79,35 +80,41 @@
       }, 10000);
     };
 
+    const applyServerItems = items => {
+      const normalized = Array.isArray(items) ? items : [];
+      const next = JSON.stringify(normalized);
+      const current = localStorage.getItem(localKey) || '[]';
+      localStorage.setItem(localKey, next);
+      if (next === current) {
+        sessionStorage.setItem(syncMarkerKey, next);
+        return false;
+      }
+      if (sessionStorage.getItem(syncMarkerKey) === next) return false;
+      sessionStorage.setItem(syncMarkerKey, next);
+      window.location.reload();
+      return true;
+    };
+
     const syncAccountsFromServer = async () => {
       try {
         const localItems = readLocalItems();
-        const result = await apiRequest(`/technical-accounts.php?scope=${encodeURIComponent(scope)}`, { headers: { Accept: 'application/json' } }, 10000);
+        const result = await apiRequest('/technical-accounts.php', { headers: { Accept: 'application/json' } }, 10000);
         const serverItems = Array.isArray(result.items) ? result.items : [];
 
-        // One-time migration of accounts that were previously stored only in this browser.
         if (serverItems.length === 0 && localItems.length > 0) {
-          let latest = localItems;
+          let latest = [];
           for (const item of localItems) {
             const saved = await saveItemToServer(item);
-            if (Array.isArray(saved.items)) latest = saved.items;
+            latest = Array.isArray(saved.items) ? saved.items : latest;
           }
-          localStorage.setItem(localKey, JSON.stringify(latest));
+          applyServerItems(latest);
           return;
         }
 
-        const next = JSON.stringify(serverItems);
-        const current = JSON.stringify(localItems);
-        if (next !== current) {
-          localStorage.setItem(localKey, next);
-          const marker = `server-sync:${localKey}:${next.length}:${serverItems.length}`;
-          if (sessionStorage.getItem('skyguardian:last-account-sync') !== marker) {
-            sessionStorage.setItem('skyguardian:last-account-sync', marker);
-            window.location.reload();
-          }
-        }
+        applyServerItems(serverItems);
       } catch (error) {
-        console.warn('Technical account sync failed:', error);
+        console.error('Technical account sync failed:', error);
+        notify(error.message || 'Не удалось синхронизировать технические аккаунты');
       }
     };
 
@@ -152,7 +159,7 @@
         connected_at: new Date().toISOString(),
       };
       const result = await saveItemToServer(item);
-      localStorage.setItem(localKey, JSON.stringify(result.items || [item]));
+      applyServerItems(result.items || [item]);
     };
     const renderMobileButton = link => {
       mobileLink?.remove();
@@ -177,9 +184,8 @@
       if (result.logged_in) {
         await saveConnectedAccount(result.account || {});
         renderMobileButton('');
-        setStatus('success', 'Аккаунт подключён', 'Сессия сохранена и синхронизирована');
+        setStatus('success', 'Аккаунт подключён', 'Сессия сохранена на сервере');
         notify('Технический аккаунт Telegram подключён', 'success');
-        window.setTimeout(() => window.location.reload(), 700);
         return false;
       }
       if (result.needs_2fa) {
