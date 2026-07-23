@@ -2,7 +2,10 @@
 declare(strict_types=1);
 
 use danog\MadelineProto\API;
+use danog\MadelineProto\Logger as MadelineLogger;
+use danog\MadelineProto\Settings;
 use danog\MadelineProto\Settings\AppInfo;
+use danog\MadelineProto\Settings\Logger as LoggerSettings;
 
 $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 session_name('skyguardian_admin');
@@ -56,12 +59,6 @@ if (!in_array($operation, ['status', '2fa'], true)) {
 }
 
 $projectRoot = dirname(__DIR__);
-$autoload = $projectRoot . '/vendor/autoload.php';
-if (!is_file($autoload)) {
-    $reply(503, ['ok' => false, 'message' => 'Зависимости проекта не установлены.']);
-}
-require_once $autoload;
-
 $sessionDir = $projectRoot . '/storage/telegram-sessions';
 $runtimeDir = $projectRoot . '/storage/madeline-runtime';
 foreach ([$sessionDir, $runtimeDir] as $directory) {
@@ -73,23 +70,48 @@ foreach ([$sessionDir, $runtimeDir] as $directory) {
     }
 }
 
-// MadelineProto creates MadelineProto.log in the current working directory by default.
-// Never let a web request try to write that file into public/.
-if (!chdir($runtimeDir)) {
-    $reply(503, ['ok' => false, 'message' => 'Не удалось открыть рабочий каталог Telegram.']);
+$runtimeLog = $runtimeDir . '/MadelineProto.log';
+if (!is_file($runtimeLog) && file_put_contents($runtimeLog, '') === false) {
+    $reply(503, ['ok' => false, 'message' => 'Не удалось создать журнал Telegram.']);
 }
+@chmod($runtimeLog, 0660);
+if (!is_writable($runtimeLog)) {
+    $reply(503, ['ok' => false, 'message' => 'Журнал Telegram недоступен для записи.']);
+}
+
+// MadelineProto running from a web endpoint otherwise redirects PHP errors to
+// public/MadelineProto.log. Configure both PHP and MadelineProto explicitly.
+ini_set('log_errors', '1');
+ini_set('display_errors', '0');
+ini_set('error_log', $runtimeLog);
+
+$autoload = $projectRoot . '/vendor/autoload.php';
+if (!is_file($autoload)) {
+    $reply(503, ['ok' => false, 'message' => 'Зависимости проекта не установлены.']);
+}
+require_once $autoload;
 
 $sessionKey = hash('sha256', $accountId . ':' . $apiIdRaw);
 $sessionPath = $sessionDir . '/account-' . $sessionKey . '.madeline';
 
 try {
-    $settings = (new AppInfo())
+    $appInfo = (new AppInfo())
         ->setApiId((int) $apiIdRaw)
         ->setApiHash($apiHash)
         ->setDeviceModel('SkyGuardian VPS')
         ->setAppVersion('SkyGuardian 1.0')
         ->setLangCode('ru')
         ->setSystemLangCode('ru');
+
+    $logger = (new LoggerSettings())
+        ->setType(MadelineLogger::LOGGER_FILE)
+        ->setExtra($runtimeLog)
+        ->setLevel(MadelineLogger::LEVEL_ERROR)
+        ->setMaxSize(10 * 1024 * 1024);
+
+    $settings = (new Settings())
+        ->setAppInfo($appInfo)
+        ->setLogger($logger);
 
     $telegram = new API($sessionPath, $settings);
 
