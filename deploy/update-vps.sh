@@ -24,10 +24,33 @@ if [[ ! -f storage/admin.json && "$ALLOW_UNINITIALIZED" != "1" ]]; then
   exit 1
 fi
 
+# Runtime storage is live: PHP-FPM and workers may change sessions or logs while
+# tar reads them. GNU tar returns status 1 for this race even when the archive is
+# usable. Accept only status 0/1, verify the archive, then publish it atomically.
 snapshot="$RUNTIME_BACKUP_DIR/runtime-$(date -u +%Y%m%d-%H%M%S).tar.gz"
-tar -czf "$snapshot" -C "$PROJECT_DIR" storage
+snapshot_tmp="${snapshot}.tmp.$$"
+rm -f "$snapshot_tmp"
+set +e
+tar --warning=no-file-changed -czf "$snapshot_tmp" -C "$PROJECT_DIR" storage
+tar_status=$?
+set -e
+if (( tar_status > 1 )) || [[ ! -s "$snapshot_tmp" ]]; then
+  rm -f "$snapshot_tmp"
+  echo "Runtime snapshot failed (tar exit $tar_status)." >&2
+  exit 1
+fi
+if ! tar -tzf "$snapshot_tmp" >/dev/null; then
+  rm -f "$snapshot_tmp"
+  echo "Runtime snapshot integrity check failed." >&2
+  exit 1
+fi
+mv -f "$snapshot_tmp" "$snapshot"
 chmod 0600 "$snapshot"
+if (( tar_status == 1 )); then
+  echo "Runtime changed during snapshot; verified archive kept, deployment continues."
+fi
 find "$RUNTIME_BACKUP_DIR" -type f -name 'runtime-*.tar.gz' -mtime +14 -delete
+find "$RUNTIME_BACKUP_DIR" -type f -name 'runtime-*.tar.gz.tmp.*' -delete
 
 git fetch --prune origin
 git reset --hard origin/main
