@@ -1,0 +1,1 @@
+Technical account UI state is loaded from the canonical server store and frontend assets are cache-busted during deployment.
