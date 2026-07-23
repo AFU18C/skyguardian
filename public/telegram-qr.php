@@ -42,7 +42,6 @@ $apiIdRaw = trim((string) ($_POST['api_id'] ?? ''));
 $apiHash = strtolower(trim((string) ($_POST['api_hash'] ?? '')));
 $accountId = trim((string) ($_POST['account_id'] ?? ''));
 $operation = trim((string) ($_POST['operation'] ?? 'status'));
-$scope = trim((string) ($_POST['scope'] ?? 'settings'));
 $connectionName = trim((string) ($_POST['name'] ?? ''));
 
 if (!preg_match('/^[1-9]\d{3,11}$/', $apiIdRaw)) {
@@ -57,12 +56,7 @@ if (!preg_match('/^[A-Za-z0-9_-]{8,80}$/', $accountId)) {
 if (!in_array($operation, ['status', '2fa'], true)) {
     $reply(422, ['ok' => false, 'message' => 'Неизвестная операция подключения.']);
 }
-if (!preg_match('/^[a-z][a-z0-9_-]{1,40}$/', $scope)) {
-    $reply(422, ['ok' => false, 'message' => 'Некорректный раздел технических аккаунтов.']);
-}
 
-// Do not hold the PHP session lock while MadelineProto connects to Telegram.
-// Holding it made every other request from the same browser wait and looked like a frozen site.
 session_write_close();
 @set_time_limit(25);
 
@@ -99,20 +93,19 @@ require_once $autoload;
 
 $sessionKey = hash('sha256', $accountId . ':' . $apiIdRaw);
 $sessionPath = $sessionDir . '/account-' . $sessionKey . '.madeline';
+$accountsFile = $accountsDir . '/telegram.json';
 
-$saveConnectedAccount = static function (array $self) use ($accountsDir, $scope, $accountId, $connectionName, $apiIdRaw, $apiHash): void {
-    $file = $accountsDir . '/' . $scope . '.json';
-    $handle = fopen($file, 'c+');
+$saveConnectedAccount = static function (array $self) use ($accountsFile, $accountId, $connectionName, $apiIdRaw, $apiHash): array {
+    $handle = fopen($accountsFile, 'c+');
     if ($handle === false) {
-        throw new RuntimeException('Не удалось открыть хранилище технических аккаунтов.');
+        throw new RuntimeException('Не удалось открыть единое хранилище технических аккаунтов.');
     }
     try {
         if (!flock($handle, LOCK_EX)) {
             throw new RuntimeException('Не удалось заблокировать хранилище технических аккаунтов.');
         }
         rewind($handle);
-        $raw = stream_get_contents($handle);
-        $decoded = json_decode((string) $raw, true);
+        $decoded = json_decode((string) stream_get_contents($handle), true);
         $items = is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
         $telegramName = trim((string) (($self['first_name'] ?? '') . ' ' . ($self['last_name'] ?? '')));
         $item = [
@@ -149,8 +142,9 @@ $saveConnectedAccount = static function (array $self) use ($accountsDir, $scope,
         if (fwrite($handle, $json) === false || !fflush($handle)) {
             throw new RuntimeException('Не удалось сохранить технический аккаунт.');
         }
-        @chmod($file, 0660);
+        @chmod($accountsFile, 0660);
         flock($handle, LOCK_UN);
+        return $item;
     } finally {
         fclose($handle);
     }
@@ -193,15 +187,14 @@ try {
         $telegram->complete2faLogin($password);
     }
 
-    // Check the existing session before requesting another QR code.
     $authorization = $telegram->getAuthorization();
     if ($authorization === API::LOGGED_IN) {
         $self = $telegram->getSelf();
         if (!is_array($self)) {
             throw new RuntimeException('Telegram-сессия авторизована, но данные аккаунта недоступны.');
         }
-        $saveConnectedAccount($self);
-        $reply(200, ['ok' => true, 'logged_in' => true, 'needs_2fa' => false, 'account' => $accountPayload($self)]);
+        $stored = $saveConnectedAccount($self);
+        $reply(200, ['ok' => true, 'logged_in' => true, 'needs_2fa' => false, 'account' => $accountPayload($self), 'stored' => $stored]);
     }
     if ($authorization === API::WAITING_PASSWORD) {
         $reply(200, [
@@ -224,7 +217,6 @@ try {
         ]);
     }
 
-    // Authorization can change immediately after scanning, so check once more.
     $authorization = $telegram->getAuthorization();
     if ($authorization === API::WAITING_PASSWORD) {
         $reply(200, ['ok' => true, 'logged_in' => false, 'needs_2fa' => true, 'hint' => (string) $telegram->getHint()]);
@@ -233,8 +225,8 @@ try {
     if (!is_array($self)) {
         $reply(200, ['ok' => true, 'logged_in' => false, 'needs_2fa' => false, 'pending' => true]);
     }
-    $saveConnectedAccount($self);
-    $reply(200, ['ok' => true, 'logged_in' => true, 'needs_2fa' => false, 'account' => $accountPayload($self)]);
+    $stored = $saveConnectedAccount($self);
+    $reply(200, ['ok' => true, 'logged_in' => true, 'needs_2fa' => false, 'account' => $accountPayload($self), 'stored' => $stored]);
 } catch (Throwable $exception) {
     error_log('Telegram QR login error: ' . $exception::class . ': ' . $exception->getMessage());
     $message = strtolower($exception->getMessage());
