@@ -35,7 +35,8 @@ git reset --hard origin/main
 mkdir -p \
   storage/backups \
   storage/telegram-news-sessions \
-  storage/telegram-sessions
+  storage/telegram-sessions \
+  storage/madeline-runtime
 
 if [[ -n "$COMPOSER_BIN" ]]; then
   "$COMPOSER_BIN" validate --no-check-lock
@@ -47,9 +48,20 @@ elif [[ ! -f vendor/autoload.php ]]; then
   exit 1
 fi
 
+# Runtime state belongs to PHP-FPM and workers, never to root.
 chown -R www-data:www-data storage
 chmod -R u+rwX,g+rwX,o-rwx storage
 find storage -type f -exec chmod 0660 {} +
+
+# Remove the obsolete web-root log and prepare the only allowed MadelineProto log.
+rm -f public/MadelineProto.log
+install -o www-data -g www-data -m 0660 /dev/null storage/madeline-runtime/MadelineProto.log
+
+# Verify permissions as the actual PHP-FPM user, not as root.
+runuser -u www-data -- test -w storage/madeline-runtime
+runuser -u www-data -- test -w storage/telegram-sessions
+runuser -u www-data -- sh -c 'probe="storage/madeline-runtime/.write-probe-$$"; : > "$probe" && rm -f "$probe"'
+runuser -u www-data -- sh -c 'probe="storage/telegram-sessions/.write-probe-$$"; : > "$probe" && rm -f "$probe"'
 
 install -m 0644 deploy/skyguardian-data-news.service /etc/systemd/system/skyguardian-data-news.service
 install -m 0644 deploy/skyguardian-data-alerts.service /etc/systemd/system/skyguardian-data-alerts.service
