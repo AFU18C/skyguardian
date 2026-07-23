@@ -166,9 +166,16 @@ try {
         $fail('authenticated request with a valid CSRF token did not reach endpoint validation');
     }
 
-    $logout = $request('GET', $baseUrl . '/?action=logout', [], $cookieJar);
+    $logoutGet = $request('GET', $baseUrl . '/?action=logout', [], $cookieJar);
+    if ($logoutGet['status'] !== 405) {
+        $fail('GET logout is not rejected');
+    }
+
+    $logout = $request('POST', $baseUrl . '/?action=logout', [
+        '_token' => $dashboardCsrf,
+    ], $cookieJar);
     if ($logout['status'] !== 302 || !preg_match('/^Location:\s*\/\?page=login\s*$/mi', $logout['headers'])) {
-        $fail('logout does not redirect to the login page');
+        $fail('POST logout does not redirect to the login page');
     }
 
     $afterLogout = $request('GET', $baseUrl . '/?page=home', [], $cookieJar);
