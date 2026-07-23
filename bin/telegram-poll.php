@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require dirname(__DIR__) . '/public/TelegramAutomation.php';
+require dirname(__DIR__) . '/public/TelegramRuntimeLock.php';
 
 $storageDir = dirname(__DIR__) . '/storage';
 $lockFile = $storageDir . '/telegram-poll.lock';
@@ -18,12 +19,15 @@ if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
     exit(0);
 }
 
+$runtimeLock = null;
 $automation = new TelegramAutomation($storageDir);
 $offsetsFile = $storageDir . '/telegram-polling-offsets.json';
 $offsets = is_file($offsetsFile) ? json_decode((string)file_get_contents($offsetsFile), true) : [];
 $offsets = is_array($offsets) ? $offsets : [];
 
 try {
+    $runtimeLock = TelegramRuntimeLock::acquire($storageDir);
+
     foreach ($automation->pollingConfigs() as $config) {
         $id = (string)$config['id'];
         try {
@@ -63,6 +67,7 @@ try {
     fwrite(STDERR, '[' . date(DATE_ATOM) . '] ' . $exception->getMessage() . PHP_EOL);
     exit(1);
 } finally {
+    $runtimeLock?->release();
     flock($lockHandle, LOCK_UN);
     fclose($lockHandle);
 }
