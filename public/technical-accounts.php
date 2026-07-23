@@ -25,73 +25,116 @@ if (($_SESSION['admin_authenticated'] ?? false) !== true) {
     $reply(401, ['ok' => false, 'message' => 'Требуется авторизация администратора.']);
 }
 
-$scope = trim((string) ($_REQUEST['scope'] ?? 'settings'));
-if (!preg_match('/^[a-z][a-z0-9_-]{1,40}$/', $scope)) {
-    $reply(422, ['ok' => false, 'message' => 'Некорректный раздел технических аккаунтов.']);
-}
-
+// Technical Telegram accounts are global runtime state. They must not be split
+// by page (news-settings, alerts-settings, etc.), otherwise each browser sees a
+// different list and an account connected on desktop disappears on mobile.
 $storageDir = dirname(__DIR__) . '/storage/technical-accounts';
 if (!is_dir($storageDir) && !mkdir($storageDir, 0770, true) && !is_dir($storageDir)) {
     $reply(503, ['ok' => false, 'message' => 'Не удалось подготовить хранилище аккаунтов.']);
 }
-$file = $storageDir . '/' . $scope . '.json';
+$canonicalFile = $storageDir . '/telegram.json';
 
-$readItems = static function () use ($file): array {
-    if (!is_file($file)) {
-        return [];
-    }
-    $decoded = json_decode((string) file_get_contents($file), true);
+$readFile = static function (string $path): array {
+    if (!is_file($path)) return [];
+    $decoded = json_decode((string) file_get_contents($path), true);
     return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
 };
 
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $reply(200, ['ok' => true, 'items' => $readItems()]);
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Allow: GET, POST');
-    $reply(405, ['ok' => false, 'message' => 'Разрешены только GET и POST.']);
-}
-
-if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), (string) ($_POST['_token'] ?? ''))) {
-    $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
-}
-
-$item = json_decode((string) ($_POST['item'] ?? ''), true);
-if (!is_array($item) || !preg_match('/^[A-Za-z0-9_-]{8,80}$/', (string) ($item['id'] ?? ''))) {
-    $reply(422, ['ok' => false, 'message' => 'Некорректные данные технического аккаунта.']);
-}
-
-$allowed = ['id','name','api_id','api_hash','connected','enabled','telegram_id','telegram_name','telegram_username','phone','connected_at'];
-$clean = [];
-foreach ($allowed as $key) {
-    if (array_key_exists($key, $item)) {
-        $clean[$key] = in_array($key, ['connected', 'enabled'], true)
-            ? (bool) $item[$key]
-            : mb_substr((string) $item[$key], 0, 500);
+$mergeItems = static function (array $groups): array {
+    $merged = [];
+    foreach ($groups as $items) {
+        foreach ($items as $item) {
+            $id = (string) ($item['id'] ?? '');
+            if ($id === '') continue;
+            if (!isset($merged[$id])) {
+                $merged[$id] = $item;
+                continue;
+            }
+            // Prefer connected and more complete data over old browser-only rows.
+            $existing = $merged[$id];
+            $candidateScore = (!empty($item['connected']) ? 100 : 0)
+                + (!empty($item['telegram_id']) ? 20 : 0)
+                + (!empty($item['phone']) ? 10 : 0)
+                + count(array_filter($item, static fn($value) => $value !== '' && $value !== null));
+            $existingScore = (!empty($existing['connected']) ? 100 : 0)
+                + (!empty($existing['telegram_id']) ? 20 : 0)
+                + (!empty($existing['phone']) ? 10 : 0)
+                + count(array_filter($existing, static fn($value) => $value !== '' && $value !== null));
+            $merged[$id] = $candidateScore >= $existingScore
+                ? array_merge($existing, $item)
+                : array_merge($item, $existing);
+        }
     }
-}
+    return array_values($merged);
+};
 
-$items = $readItems();
-$index = null;
-foreach ($items as $i => $existing) {
-    if (($existing['id'] ?? null) === $clean['id']) {
-        $index = $i;
-        break;
+$writeItems = static function (array $items) use ($canonicalFile): void {
+    $tmp = $canonicalFile . '.tmp-' . bin2hex(random_bytes(6));
+    $json = json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false || file_put_contents($tmp, $json, LOCK_EX) === false || !rename($tmp, $canonicalFile)) {
+        @unlink($tmp);
+        throw new RuntimeException('Не удалось сохранить технический аккаунт.');
     }
-}
-if ($index === null) {
-    $items[] = $clean;
-} else {
-    $items[$index] = array_merge($items[$index], $clean);
-}
+    @chmod($canonicalFile, 0660);
+};
 
-$tmp = $file . '.tmp-' . bin2hex(random_bytes(6));
-$json = json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-if ($json === false || file_put_contents($tmp, $json, LOCK_EX) === false || !rename($tmp, $file)) {
-    @unlink($tmp);
-    $reply(503, ['ok' => false, 'message' => 'Не удалось сохранить технический аккаунт.']);
-}
-@chmod($file, 0660);
+$loadAll = static function () use ($storageDir, $canonicalFile, $readFile, $mergeItems, $writeItems): array {
+    $groups = [$readFile($canonicalFile)];
+    foreach (glob($storageDir . '/*.json') ?: [] as $legacyFile) {
+        if ($legacyFile === $canonicalFile) continue;
+        $groups[] = $readFile($legacyFile);
+    }
+    $items = $mergeItems($groups);
+    if ($items !== $readFile($canonicalFile)) {
+        $writeItems($items);
+    }
+    return $items;
+};
 
-$reply(200, ['ok' => true, 'items' => $items]);
+try {
+    $items = $loadAll();
+
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+        $reply(200, ['ok' => true, 'items' => $items]);
+    }
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Allow: GET, POST');
+        $reply(405, ['ok' => false, 'message' => 'Разрешены только GET и POST.']);
+    }
+
+    if (!hash_equals((string) ($_SESSION['csrf_token'] ?? ''), (string) ($_POST['_token'] ?? ''))) {
+        $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
+    }
+
+    $item = json_decode((string) ($_POST['item'] ?? ''), true);
+    if (!is_array($item) || !preg_match('/^[A-Za-z0-9_-]{8,80}$/', (string) ($item['id'] ?? ''))) {
+        $reply(422, ['ok' => false, 'message' => 'Некорректные данные технического аккаунта.']);
+    }
+
+    $allowed = ['id','name','api_id','api_hash','connected','enabled','telegram_id','telegram_name','telegram_username','phone','connected_at'];
+    $clean = [];
+    foreach ($allowed as $key) {
+        if (array_key_exists($key, $item)) {
+            $clean[$key] = in_array($key, ['connected', 'enabled'], true)
+                ? (bool) $item[$key]
+                : mb_substr((string) $item[$key], 0, 500);
+        }
+    }
+
+    $index = null;
+    foreach ($items as $i => $existing) {
+        if (($existing['id'] ?? null) === $clean['id']) {
+            $index = $i;
+            break;
+        }
+    }
+    if ($index === null) $items[] = $clean;
+    else $items[$index] = array_merge($items[$index], $clean);
+
+    $writeItems($items);
+    $reply(200, ['ok' => true, 'items' => $items]);
+} catch (Throwable $exception) {
+    error_log('Technical accounts error: ' . $exception::class . ': ' . $exception->getMessage());
+    $reply(503, ['ok' => false, 'message' => 'Не удалось синхронизировать технические аккаунты.']);
+}
