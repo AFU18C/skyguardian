@@ -10,9 +10,11 @@ class Source extends Model
     use HasFactory;
 
     protected $fillable = [
+        'telegram_account_id',
         'name',
         'type',
         'identifier',
+        'peer_id',
         'is_active',
     ];
 
