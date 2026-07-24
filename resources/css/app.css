@@ -920,6 +920,12 @@
         cursor: pointer;
     }
 
+    .data-channel-frequency {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 190px;
+        gap: 12px;
+    }
+
     .back-link {
         display: inline-flex;
         align-items: center;
@@ -1247,6 +1253,10 @@
 
         .settings-form-wide {
             grid-column: auto;
+        }
+
+        .data-channel-frequency {
+            grid-template-columns: minmax(0, 1fr) 135px;
         }
 
         .button {

@@ -16,11 +16,14 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
 
-    Route::view('/admin/news/channels', 'admin.section', [
-        'group' => 'Новости',
-        'title' => 'Каналы данных',
-        'description' => 'Раздел подготовлен для добавления источников новостей.',
-    ])->name('news.channels');
+    Route::view('/admin/news/channels', 'admin.news-channels')
+        ->name('news.channels');
+    Route::view('/admin/news/channels/create', 'admin.news-channel-form', [
+        'editing' => false,
+    ])->name('news.channels.create');
+    Route::view('/admin/news/channels/{channel}/edit', 'admin.news-channel-form', [
+        'editing' => true,
+    ])->name('news.channels.edit');
     Route::view('/admin/news/settings', 'admin.news-settings')
         ->name('news.settings');
     Route::view('/admin/news/settings/create', 'admin.news-setting-form', [

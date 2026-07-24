@@ -89,4 +89,39 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Сохранить')
             ->assertSee('Удалить');
     }
+
+    public function test_news_channels_opens_separate_add_form_page(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('news.channels'))
+            ->assertOk()
+            ->assertSee('Каналы данных')
+            ->assertSee(route('news.channels.create'))
+            ->assertDontSee('Канал или группа — источник сообщений');
+
+        $this->actingAs($user)
+            ->get(route('news.channels.create'))
+            ->assertOk()
+            ->assertSee('Добавить канал данных')
+            ->assertSee('Название')
+            ->assertSee('Канал или группа — источник сообщений')
+            ->assertSee('Технический аккаунт')
+            ->assertSee('Канал или группа для публикации')
+            ->assertSee('Формат публикации')
+            ->assertSee('Частота проверки');
+    }
+
+    public function test_news_channel_edit_form_contains_save_and_delete_buttons(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('news.channels.edit', ['channel' => 1]))
+            ->assertOk()
+            ->assertSee('Редактировать канал данных')
+            ->assertSee('Сохранить')
+            ->assertSee('Удалить');
+    }
 }
