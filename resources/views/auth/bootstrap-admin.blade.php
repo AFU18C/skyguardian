@@ -9,6 +9,12 @@
             <h1 class="mt-2 text-2xl font-semibold text-white">Создание администратора</h1>
         </div>
 
+        @if ($errors->any())
+            <div class="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                {{ $errors->first() }}
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('bootstrap-admin.store', ['token' => $token]) }}" class="space-y-4">
             @csrf
 
