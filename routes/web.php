@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\SourceController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,8 @@ Route::middleware('auth')->group(function (): void {
     Route::put('/sources/{source}', [SourceController::class, 'update'])->name('sources.update');
     Route::patch('/sources/{source}/toggle', [SourceController::class, 'toggle'])->name('sources.toggle');
     Route::delete('/sources/{source}', [SourceController::class, 'destroy'])->name('sources.destroy');
+
+    Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
 });
