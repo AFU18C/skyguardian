@@ -52,10 +52,14 @@
     }
     apply(server);
   };
-  const syncAfterLegacyHandler = () => queueMicrotask(() => save(readLocal()).catch(error => globalThis.toast?.(error.message, 'error')));
+  const syncAfterLegacyHandler = () => setTimeout(() => {
+    save(readLocal()).catch(error => globalThis.toast?.(error.message, 'error'));
+  }, 0);
 
   form.addEventListener('submit', syncAfterLegacyHandler, false);
-  document.querySelector('[data-source-delete]')?.addEventListener('click', syncAfterLegacyHandler, false);
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-source-delete]')) syncAfterLegacyHandler();
+  }, false);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load().catch(() => {}); });
   load().catch(error => globalThis.toast?.(error.message || 'Не удалось загрузить каналы данных', 'error'));
 })();
