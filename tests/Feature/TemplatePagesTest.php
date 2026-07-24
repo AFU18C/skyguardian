@@ -56,7 +56,7 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Страница не найдена');
     }
 
-    public function test_news_settings_contains_add_form_template(): void
+    public function test_news_settings_opens_separate_add_form_page(): void
     {
         $user = User::factory()->create();
 
@@ -64,10 +64,29 @@ class TemplatePagesTest extends TestCase
             ->get(route('news.settings'))
             ->assertOk()
             ->assertSee('Telegram API и технические аккаунты новостей.')
+            ->assertSee(route('news.settings.create'))
+            ->assertDontSee('Название API');
+
+        $this->actingAs($user)
+            ->get(route('news.settings.create'))
+            ->assertOk()
             ->assertSee('Добавить Telegram API и технический аккаунт')
             ->assertSee('Название API')
             ->assertSee('API ID')
             ->assertSee('API Hash')
-            ->assertSee('Номер телефона');
+            ->assertSee('Номер телефона')
+            ->assertSee('QR-код');
+    }
+
+    public function test_news_settings_edit_form_contains_save_and_delete_buttons(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('news.settings.edit', ['account' => 1]))
+            ->assertOk()
+            ->assertSee('Редактировать Telegram API и технический аккаунт')
+            ->assertSee('Сохранить')
+            ->assertSee('Удалить');
     }
 }
