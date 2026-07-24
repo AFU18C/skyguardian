@@ -13,9 +13,7 @@ class NewsSettingsController extends Controller
 {
     public function index(): View
     {
-        return view('admin.news-settings', [
-            'accounts' => TelegramAccount::query()->forPurpose('news')->latest()->get(),
-        ]);
+        return view('admin.news-settings');
     }
 
     public function create(): View
