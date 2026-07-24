@@ -40,17 +40,44 @@ jobs:
             sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
           fi
 
+          if ! grep -Eq '^DB_PASSWORD=.+$' .env; then
+            DB_PASSWORD="$(openssl rand -hex 32)"
+
+            sudo -u postgres psql --set=ON_ERROR_STOP=1 --set=db_password="$DB_PASSWORD" <<'SQL'
+          DO $$
+          BEGIN
+              IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'skyguardian') THEN
+                  CREATE ROLE skyguardian LOGIN;
+              END IF;
+          END
+          $$;
+          ALTER ROLE skyguardian WITH LOGIN PASSWORD :'db_password';
+          SELECT 'CREATE DATABASE skyguardian OWNER skyguardian'
+          WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'skyguardian')\gexec
+          ALTER DATABASE skyguardian OWNER TO skyguardian;
+          SQL
+
+            sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=$DB_PASSWORD/" .env
+            unset DB_PASSWORD
+          fi
+
+          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+          chown -R www-data:www-data storage bootstrap/cache
+          chmod -R ug+rwX storage bootstrap/cache
+
           composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
           npm ci
           npm run build
 
-          php artisan key:generate --force
+          if ! grep -Eq '^APP_KEY=base64:.+' .env; then
+            php artisan key:generate --force
+          fi
+
           php artisan optimize:clear
           php artisan migrate --force
           php artisan config:cache
           php artisan view:cache
 
-          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
           chown -R www-data:www-data storage bootstrap/cache
           chmod -R ug+rwX storage bootstrap/cache
 
