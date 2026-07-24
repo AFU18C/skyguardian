@@ -224,10 +224,50 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Выключен');
     }
 
+    public function test_news_lists_do_not_show_alert_accounts_or_their_channels(): void
+    {
+        $user = User::factory()->create();
+        $newsAccount = $this->telegramAccount(['name' => 'Новости 0986414076']);
+        $alertAccount = $this->telegramAccount([
+            'name' => 'Тривога 0936414076',
+            'purpose' => 'alerts',
+        ]);
+        $alertChannel = Source::query()->create([
+            'telegram_account_id' => $alertAccount->id,
+            'name' => 'Канал тревоги',
+            'type' => 'telegram',
+            'identifier' => '@alert_source',
+            'publication_identifier' => '@alert_destination',
+            'publication_format' => 'original',
+            'check_interval_seconds' => 300,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('news.settings'))
+            ->assertOk()
+            ->assertSee($newsAccount->name)
+            ->assertDontSee($alertAccount->name);
+
+        $this->actingAs($user)
+            ->get(route('news.channels'))
+            ->assertOk()
+            ->assertDontSee($alertChannel->name);
+
+        $this->actingAs($user)
+            ->get(route('news.settings.edit', $alertAccount))
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->get(route('news.channels.edit', $alertChannel))
+            ->assertNotFound();
+    }
+
     private function telegramAccount(array $overrides = []): TelegramAccount
     {
         return TelegramAccount::query()->create(array_merge([
             'name' => 'Telegram 33042494',
+            'purpose' => 'news',
             'api_id' => '33042494',
             'api_hash' => str_repeat('a', 32),
             'login_method' => 'phone',
