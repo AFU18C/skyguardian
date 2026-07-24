@@ -885,6 +885,34 @@
         padding: 20px;
     }
 
+    .settings-form-card {
+        margin-bottom: 15px;
+    }
+
+    .settings-form {
+        display: grid;
+        gap: 20px;
+    }
+
+    .settings-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+
+    .settings-form-wide {
+        grid-column: 1 / -1;
+    }
+
+    .settings-form-submit {
+        width: 100%;
+    }
+
+    .settings-form select.input {
+        appearance: auto;
+        cursor: pointer;
+    }
+
     .empty-state {
         display: grid;
         min-height: 270px;
@@ -1172,6 +1200,14 @@
 
         .metrics-grid {
             grid-template-columns: 1fr;
+        }
+
+        .settings-form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .settings-form-wide {
+            grid-column: auto;
         }
 
         .button {

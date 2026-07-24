@@ -55,4 +55,19 @@ class TemplatePagesTest extends TestCase
             ->assertNotFound()
             ->assertSee('Страница не найдена');
     }
+
+    public function test_news_settings_contains_add_form_template(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->get(route('news.settings'))
+            ->assertOk()
+            ->assertSee('Telegram API и технические аккаунты новостей.')
+            ->assertSee('Добавить Telegram API и технический аккаунт')
+            ->assertSee('Название API')
+            ->assertSee('API ID')
+            ->assertSee('API Hash')
+            ->assertSee('Номер телефона');
+    }
 }

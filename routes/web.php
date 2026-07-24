@@ -21,11 +21,8 @@ Route::middleware('auth')->group(function (): void {
         'title' => 'Каналы данных',
         'description' => 'Раздел подготовлен для добавления источников новостей.',
     ])->name('news.channels');
-    Route::view('/admin/news/settings', 'admin.section', [
-        'group' => 'Новости',
-        'title' => 'Настройка',
-        'description' => 'Раздел подготовлен для Telegram API и технических аккаунтов новостей.',
-    ])->name('news.settings');
+    Route::view('/admin/news/settings', 'admin.news-settings')
+        ->name('news.settings');
 
     Route::view('/admin/alerts/channels', 'admin.section', [
         'group' => 'Воздушная тревога',
