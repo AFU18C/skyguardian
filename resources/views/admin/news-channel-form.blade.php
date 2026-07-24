@@ -17,7 +17,11 @@
 </div>
 
 <section class="panel settings-form-card">
-    <form class="panel-body settings-form" @submit.prevent>
+    <form
+        class="panel-body settings-form"
+        x-data="{ appendCustomText: false }"
+        @submit.prevent
+    >
         <div class="settings-form-grid">
             <label class="field settings-form-wide">
                 <span class="field-label">Название *</span>
@@ -45,8 +49,74 @@
                 <span class="field-label">Формат публикации *</span>
                 <select class="input" required>
                     <option value="">Выберите формат публикации</option>
+                    <option value="original">Оригинал</option>
+                    <option value="text">Только текст</option>
                 </select>
             </label>
+
+            <div class="settings-form-wide form-section">
+                <div class="form-section-heading">
+                    <h2>Фильтры сообщений</h2>
+                    <p>Укажите слова через запятую. Поля можно оставить пустыми.</p>
+                </div>
+
+                <div class="settings-form-grid">
+                    <label class="field">
+                        <span class="field-label">Ключевые слова</span>
+                        <textarea
+                            class="input textarea"
+                            rows="4"
+                            placeholder="Например: Запорожье, событие, новости"
+                        ></textarea>
+                        <span class="field-hint">Будут обрабатываться сообщения, содержащие хотя бы одно слово.</span>
+                    </label>
+
+                    <label class="field">
+                        <span class="field-label">Стоп-слова</span>
+                        <textarea
+                            class="input textarea"
+                            rows="4"
+                            placeholder="Например: реклама, розыгрыш"
+                        ></textarea>
+                        <span class="field-hint">Сообщения с этими словами не будут публиковаться.</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="settings-form-wide form-section">
+                <label class="custom-text-toggle">
+                    <input
+                        class="checkbox"
+                        type="checkbox"
+                        x-model="appendCustomText"
+                    >
+                    <span>
+                        <strong>Добавить свой текст в конце сообщения</strong>
+                        <small>Если галочка выключена, дополнительный текст не добавляется.</small>
+                    </span>
+                </label>
+
+                <div
+                    x-cloak
+                    x-show="appendCustomText"
+                    x-transition
+                    class="field custom-text-editor"
+                >
+                    <span class="field-label">Свой текст</span>
+                    <div class="editor-shell">
+                        <div class="editor-toolbar" aria-label="Панель форматирования">
+                            <button type="button" title="Жирный"><strong>B</strong></button>
+                            <button type="button" title="Курсив"><em>I</em></button>
+                            <button type="button" title="Ссылка">Ссылка</button>
+                        </div>
+                        <textarea
+                            class="editor-area"
+                            rows="6"
+                            placeholder="Введите текст, который будет добавлен в конце скопированного сообщения"
+                        ></textarea>
+                    </div>
+                </div>
+            </div>
 
             <div class="field settings-form-wide">
                 <span class="field-label">Частота проверки *</span>
