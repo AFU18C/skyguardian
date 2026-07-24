@@ -41,15 +41,23 @@ class BootstrapAdminController extends Controller
             'password' => ['required', 'string', 'min:10'],
         ]);
 
-        User::query()->updateOrCreate(
-            ['email' => $validated['email']],
-            [
-                'name' => $validated['name'],
-                'password' => Hash::make($validated['password']),
-            ],
-        );
+        try {
+            User::query()->updateOrCreate(
+                ['email' => $validated['email']],
+                [
+                    'name' => $validated['name'],
+                    'password' => Hash::make($validated['password']),
+                ],
+            );
 
-        File::put(storage_path('app/admin-bootstrap.lock'), now()->toIso8601String());
+            File::put(storage_path('app/admin-bootstrap.lock'), now()->toIso8601String());
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()
+                ->withErrors(['setup' => $exception::class.': '.$exception->getMessage()])
+                ->onlyInput('name', 'email');
+        }
 
         return redirect()->route('login')->with('status', 'Администратор создан.');
     }
