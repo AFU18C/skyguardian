@@ -14,7 +14,7 @@ class NewsSettingsController extends Controller
     public function index(): View
     {
         return view('admin.news-settings', [
-            'accounts' => TelegramAccount::query()->latest()->get(),
+            'accounts' => TelegramAccount::query()->forPurpose('news')->latest()->get(),
         ]);
     }
 
@@ -28,9 +28,10 @@ class NewsSettingsController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        abort_if(TelegramAccount::query()->count() >= 10, 422, 'Можно добавить не более 10 Telegram API.');
+        abort_if(TelegramAccount::query()->forPurpose('news')->count() >= 10, 422, 'Можно добавить не более 10 Telegram API.');
 
         $data = $this->validated($request);
+        $data['purpose'] = 'news';
         $data['status'] = 'not_connected';
 
         TelegramAccount::query()->create($data);
@@ -40,6 +41,8 @@ class NewsSettingsController extends Controller
 
     public function edit(TelegramAccount $account): View
     {
+        $this->ensureNewsAccount($account);
+
         return view('admin.news-setting-form', [
             'editing' => true,
             'account' => $account,
@@ -48,6 +51,8 @@ class NewsSettingsController extends Controller
 
     public function update(Request $request, TelegramAccount $account): RedirectResponse
     {
+        $this->ensureNewsAccount($account);
+
         $data = $this->validated($request, true);
 
         if (blank($data['api_hash'] ?? null)) {
@@ -61,6 +66,8 @@ class NewsSettingsController extends Controller
 
     public function toggle(TelegramAccount $account): RedirectResponse
     {
+        $this->ensureNewsAccount($account);
+
         if ($account->status !== 'disabled') {
             $account->update(['status' => 'disabled']);
         } elseif ($account->connected_at && File::exists($account->sessionPath())) {
@@ -77,6 +84,8 @@ class NewsSettingsController extends Controller
 
     public function destroy(TelegramAccount $account): RedirectResponse
     {
+        $this->ensureNewsAccount($account);
+
         File::deleteDirectory(dirname($account->sessionPath()));
         $account->delete();
 
@@ -92,5 +101,10 @@ class NewsSettingsController extends Controller
             'login_method' => ['required', Rule::in(['phone', 'qr'])],
             'phone' => ['nullable', 'string', 'max:30', 'required_if:login_method,phone'],
         ]);
+    }
+
+    private function ensureNewsAccount(TelegramAccount $account): void
+    {
+        abort_unless($account->purpose === 'news', 404);
     }
 }
