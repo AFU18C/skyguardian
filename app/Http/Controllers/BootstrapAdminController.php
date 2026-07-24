@@ -12,7 +12,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class BootstrapAdminController extends Controller
 {
-    private const TOKEN_HASH = '033e8a9a28379fe332c27afd7403ef4a98f1126e5641dc4107978de53749cf31';
+    private const TOKEN_HASH = '822a96fb606441235b84ba9d198f3164f3e9958ac19b5bd436d879cc8be6bffb';
 
     private function authorizeToken(string $token): void
     {
@@ -22,21 +22,6 @@ class BootstrapAdminController extends Controller
         ) {
             throw new NotFoundHttpException();
         }
-    }
-
-    public function diagnose(string $token)
-    {
-        if (! hash_equals(self::TOKEN_HASH, hash('sha256', $token))) {
-            throw new NotFoundHttpException();
-        }
-
-        $path = storage_path('logs/laravel.log');
-
-        return response()->json([
-            'log' => File::exists($path)
-                ? implode("\n", array_slice(file($path, FILE_IGNORE_NEW_LINES) ?: [], -120))
-                : 'Log file not found.',
-        ]);
     }
 
     public function create(string $token): View
@@ -70,7 +55,7 @@ class BootstrapAdminController extends Controller
             report($exception);
 
             return back()
-                ->withErrors(['setup' => $exception::class.': '.$exception->getMessage()])
+                ->withErrors(['setup' => 'Не удалось создать администратора. Повторите попытку.'])
                 ->onlyInput('name', 'email');
         }
 
