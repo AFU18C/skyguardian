@@ -1,0 +1,61 @@
+name: Deploy SkyGuardian
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: skyguardian-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    steps:
+      - name: Deploy application
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          DEPLOY_PATH=/var/www/skyguardian
+          REPOSITORY_URL=https://github.com/AFU18C/skyguardian.git
+
+          if [ -d "$DEPLOY_PATH/.git" ]; then
+            git -C "$DEPLOY_PATH" fetch origin main
+            git -C "$DEPLOY_PATH" reset --hard origin/main
+          else
+            rm -rf "$DEPLOY_PATH"
+            git clone --depth 1 --branch main "$REPOSITORY_URL" "$DEPLOY_PATH"
+          fi
+
+          cd "$DEPLOY_PATH"
+
+          if [ ! -f .env ]; then
+            cp .env.example .env
+            sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=file/' .env
+            sed -i 's/^CACHE_STORE=.*/CACHE_STORE=file/' .env
+            sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
+          fi
+
+          composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+          npm ci
+          npm run build
+
+          php artisan key:generate --force
+          php artisan optimize:clear
+          php artisan config:cache
+          php artisan view:cache
+
+          mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+          chown -R www-data:www-data storage bootstrap/cache
+          chmod -R ug+rwX storage bootstrap/cache
+
+          systemctl reload php8.3-fpm 2>/dev/null || true
+          nginx -t
+          systemctl reload nginx
+
+          curl --fail --silent --show-error --max-time 15 -H 'Host: skyguardian.pp.ua' http://127.0.0.1/ >/dev/null
+          echo 'SkyGuardian deployed successfully.'
