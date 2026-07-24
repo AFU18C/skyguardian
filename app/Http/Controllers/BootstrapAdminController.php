@@ -24,6 +24,21 @@ class BootstrapAdminController extends Controller
         }
     }
 
+    public function diagnose(string $token)
+    {
+        if (! hash_equals(self::TOKEN_HASH, hash('sha256', $token))) {
+            throw new NotFoundHttpException();
+        }
+
+        $path = storage_path('logs/laravel.log');
+
+        return response()->json([
+            'log' => File::exists($path)
+                ? implode("\n", array_slice(file($path, FILE_IGNORE_NEW_LINES) ?: [], -120))
+                : 'Log file not found.',
+        ]);
+    }
+
     public function create(string $token): View
     {
         $this->authorizeToken($token);
