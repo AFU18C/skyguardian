@@ -1,0 +1,56 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\View\View;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+class BootstrapAdminController extends Controller
+{
+    private const TOKEN_HASH = '033e8a9a28379fe332c27afd7403ef4a98f1126e5641dc4107978de53749cf31';
+
+    private function authorizeToken(string $token): void
+    {
+        if (
+            File::exists(storage_path('app/admin-bootstrap.lock'))
+            || ! hash_equals(self::TOKEN_HASH, hash('sha256', $token))
+        ) {
+            throw new NotFoundHttpException();
+        }
+    }
+
+    public function create(string $token): View
+    {
+        $this->authorizeToken($token);
+
+        return view('auth.bootstrap-admin', ['token' => $token]);
+    }
+
+    public function store(Request $request, string $token): RedirectResponse
+    {
+        $this->authorizeToken($token);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'password' => ['required', 'string', 'min:10'],
+        ]);
+
+        User::query()->updateOrCreate(
+            ['email' => $validated['email']],
+            [
+                'name' => $validated['name'],
+                'password' => Hash::make($validated['password']),
+            ],
+        );
+
+        File::put(storage_path('app/admin-bootstrap.lock'), now()->toIso8601String());
+
+        return redirect()->route('login')->with('status', 'Администратор создан.');
+    }
+}
