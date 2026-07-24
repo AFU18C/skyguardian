@@ -17,6 +17,7 @@ class NewsChannelsController extends Controller
         return view('admin.news-channels', [
             'channels' => Source::query()
                 ->with('telegramAccount')
+                ->whereHas('telegramAccount', fn ($query) => $query->forPurpose('news'))
                 ->latest()
                 ->get(),
         ]);
@@ -42,11 +43,15 @@ class NewsChannelsController extends Controller
 
     public function edit(Source $channel): View
     {
+        $this->ensureNewsChannel($channel);
+
         return view('admin.news-channel-form', $this->formData($channel));
     }
 
     public function update(Request $request, Source $channel): RedirectResponse
     {
+        $this->ensureNewsChannel($channel);
+
         $data = $this->validated($request, $channel);
         $data['remove_links'] = true;
         $data['remove_hashtags'] = true;
@@ -58,6 +63,8 @@ class NewsChannelsController extends Controller
 
     public function toggle(Source $channel): RedirectResponse
     {
+        $this->ensureNewsChannel($channel);
+
         $channel->update(['is_active' => ! $channel->is_active]);
 
         return redirect()->route('news.channels')->with('status', 'Статус канала изменён.');
@@ -65,6 +72,8 @@ class NewsChannelsController extends Controller
 
     public function destroy(Source $channel): RedirectResponse
     {
+        $this->ensureNewsChannel($channel);
+
         $channel->delete();
 
         return redirect()->route('news.channels')->with('status', 'Канал данных удалён.');
@@ -87,7 +96,7 @@ class NewsChannelsController extends Controller
         return [
             'editing' => $channel !== null,
             'channel' => $channel,
-            'accounts' => TelegramAccount::query()->orderBy('name')->get(),
+            'accounts' => TelegramAccount::query()->forPurpose('news')->orderBy('name')->get(),
             'frequencyUnit' => $unit,
             'frequencyValue' => $value,
         ];
@@ -103,7 +112,10 @@ class NewsChannelsController extends Controller
                 'max:255',
                 Rule::unique('sources', 'identifier')->ignore($channel),
             ],
-            'telegram_account_id' => ['required', 'exists:telegram_accounts,id'],
+            'telegram_account_id' => [
+                'required',
+                Rule::exists('telegram_accounts', 'id')->where('purpose', 'news'),
+            ],
             'publication_identifier' => ['required', 'string', 'max:255'],
             'publication_format' => ['required', Rule::in(['original', 'text'])],
             'keywords' => ['nullable', 'string', 'max:2000'],
@@ -135,5 +147,10 @@ class NewsChannelsController extends Controller
         $data['check_interval_seconds'] = $seconds;
 
         return $data;
+    }
+
+    private function ensureNewsChannel(Source $channel): void
+    {
+        abort_unless($channel->telegramAccount?->purpose === 'news', 404);
     }
 }
