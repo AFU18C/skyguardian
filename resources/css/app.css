@@ -926,6 +926,125 @@
         gap: 12px;
     }
 
+    .textarea {
+        min-height: 104px;
+        resize: vertical;
+    }
+
+    .field-hint {
+        color: #5f7087;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .form-section {
+        display: grid;
+        gap: 16px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(148, 163, 184, .09);
+    }
+
+    .form-section-heading h2 {
+        margin: 0;
+        color: #e5edf6;
+        font-size: 14px;
+        font-weight: 720;
+    }
+
+    .form-section-heading p {
+        margin: 5px 0 0;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .custom-text-toggle {
+        display: flex;
+        align-items: flex-start;
+        gap: 11px;
+        cursor: pointer;
+    }
+
+    .custom-text-toggle .checkbox {
+        flex: 0 0 auto;
+        margin-top: 2px;
+    }
+
+    .custom-text-toggle span {
+        display: grid;
+        gap: 4px;
+    }
+
+    .custom-text-toggle strong {
+        color: #dce6f1;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .custom-text-toggle small {
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.5;
+    }
+
+    .custom-text-editor {
+        margin-top: 2px;
+    }
+
+    .editor-shell {
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, .17);
+        border-radius: 11px;
+        background: rgba(15, 23, 42, .72);
+        transition: border-color .18s, box-shadow .18s;
+    }
+
+    .editor-shell:focus-within {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-primary) 13%, transparent);
+    }
+
+    .editor-toolbar {
+        display: flex;
+        gap: 5px;
+        padding: 8px;
+        border-bottom: 1px solid rgba(148, 163, 184, .12);
+    }
+
+    .editor-toolbar button {
+        min-width: 32px;
+        height: 30px;
+        padding: 0 9px;
+        border: 1px solid rgba(148, 163, 184, .13);
+        border-radius: 7px;
+        background: rgba(30, 41, 59, .65);
+        color: #a8b5c8;
+        font-size: 11px;
+        cursor: pointer;
+    }
+
+    .editor-toolbar button:hover {
+        border-color: rgba(96, 165, 250, .35);
+        color: #e5edf6;
+    }
+
+    .editor-area {
+        display: block;
+        width: 100%;
+        min-height: 132px;
+        padding: 13px;
+        border: 0;
+        outline: 0;
+        resize: vertical;
+        background: transparent;
+        color: #edf4fc;
+        line-height: 1.6;
+    }
+
+    .editor-area::placeholder {
+        color: #4f5e72;
+    }
+
     .back-link {
         display: inline-flex;
         align-items: center;
