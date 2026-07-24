@@ -110,6 +110,12 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Технический аккаунт')
             ->assertSee('Канал или группа для публикации')
             ->assertSee('Формат публикации')
+            ->assertSee('Оригинал')
+            ->assertSee('Только текст')
+            ->assertSee('Ключевые слова')
+            ->assertSee('Стоп-слова')
+            ->assertSee('Добавить свой текст в конце сообщения')
+            ->assertSee('Свой текст')
             ->assertSee('Частота проверки');
     }
 
@@ -122,6 +128,9 @@ class TemplatePagesTest extends TestCase
             ->assertOk()
             ->assertSee('Редактировать канал данных')
             ->assertSee('Сохранить')
-            ->assertSee('Удалить');
+            ->assertSee('Удалить')
+            ->assertSee('Ключевые слова')
+            ->assertSee('Стоп-слова')
+            ->assertSee('Добавить свой текст в конце сообщения');
     }
 }
