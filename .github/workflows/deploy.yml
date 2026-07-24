@@ -46,8 +46,12 @@ jobs:
           DEPLOY_PATH=/var/www/skyguardian
           REPOSITORY_URL=https://github.com/AFU18C/skyguardian.git
 
+          if [ -f "$DEPLOY_PATH/artisan" ]; then
+            php "$DEPLOY_PATH/artisan" down --retry=15 2>/dev/null || true
+          fi
+
           systemctl stop skyguardian-news-worker.service skyguardian-queue.service 2>/dev/null || true
-          trap 'systemctl start skyguardian-news-worker.service skyguardian-queue.service 2>/dev/null || true' ERR
+          trap 'php "$DEPLOY_PATH/artisan" up 2>/dev/null || true; systemctl start skyguardian-news-worker.service skyguardian-queue.service 2>/dev/null || true' ERR
 
           if [ -d "$DEPLOY_PATH/.git" ]; then
             git -C "$DEPLOY_PATH" fetch origin main
@@ -78,7 +82,6 @@ jobs:
 
           set_env QUEUE_CONNECTION database
           set_env DB_QUEUE_RETRY_AFTER 360
-          set_env CACHE_STORE database
           set_env TELEGRAM_RUNTIME_PATH /dev/shm/skyguardian-telegram
 
           if ! grep -Eq '^DB_PASSWORD=.+$' .env; then
@@ -170,6 +173,7 @@ jobs:
           systemctl daemon-reload
           systemctl enable skyguardian-news-worker.service skyguardian-queue.service
           systemctl restart skyguardian-news-worker.service skyguardian-queue.service
+          php artisan up
 
           systemctl reload php8.3-fpm 2>/dev/null || true
           nginx -t

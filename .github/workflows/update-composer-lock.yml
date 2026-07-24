@@ -18,13 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve dependencies
-        run: composer update danog/madelineproto --with-all-dependencies --no-interaction
-
-      - name: Verify implementation
+      - name: Resolve and verify implementation
         shell: bash
         run: |
-          set -Eeuo pipefail
+          set -uo pipefail
+
+          result=0
+          log_file=/tmp/skyguardian-news-ci.log
+          : > "$log_file"
+
+          composer update danog/madelineproto --with-all-dependencies --no-interaction >>"$log_file" 2>&1 || result=$?
 
           cp .env.example .env
           sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env
@@ -34,20 +37,32 @@ jobs:
           sed -i 's/^CACHE_STORE=.*/CACHE_STORE=array/' .env
           sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
 
-          php artisan key:generate --force
-          php artisan view:cache
-          php artisan test
-          npm ci
-          npm run build
+          if [ "$result" -eq 0 ]; then
+            php artisan key:generate --force >>"$log_file" 2>&1 || result=$?
+            php artisan view:cache >>"$log_file" 2>&1 || result=$?
+            php artisan test >>"$log_file" 2>&1 || result=$?
+            npm ci >>"$log_file" 2>&1 || result=$?
+            npm run build >>"$log_file" 2>&1 || result=$?
+          fi
+
+          if [ "$result" -eq 0 ]; then
+            printf 'PASS\n' > .github/news-ci-result.txt
+          else
+            {
+              printf 'FAIL\n\n'
+              tail -n 200 "$log_file"
+            } > .github/news-ci-result.txt
+          fi
 
       - name: Commit lock file
+        if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
 
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add composer.lock
+          git add composer.lock .github/news-ci-result.txt
 
           if git diff --cached --quiet; then
             exit 0
@@ -55,3 +70,5 @@ jobs:
 
           git commit -m 'Update Composer lock'
           git push origin HEAD:agent/news-implementation
+
+          test "$(head -n 1 .github/news-ci-result.txt)" = PASS
