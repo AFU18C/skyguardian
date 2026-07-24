@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\NewsChannelsController;
+use App\Http\Controllers\NewsSettingsController;
 use App\Http\Controllers\SourceController;
 use App\Http\Controllers\TelegramDialogController;
 use Illuminate\Support\Facades\Route;
@@ -16,22 +18,35 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
 
-    Route::view('/admin/news/channels', 'admin.news-channels')
+    Route::get('/admin/news/channels', [NewsChannelsController::class, 'index'])
         ->name('news.channels');
-    Route::view('/admin/news/channels/create', 'admin.news-channel-form', [
-        'editing' => false,
-    ])->name('news.channels.create');
-    Route::view('/admin/news/channels/{channel}/edit', 'admin.news-channel-form', [
-        'editing' => true,
-    ])->name('news.channels.edit');
-    Route::view('/admin/news/settings', 'admin.news-settings')
+    Route::get('/admin/news/channels/create', [NewsChannelsController::class, 'create'])
+        ->name('news.channels.create');
+    Route::post('/admin/news/channels', [NewsChannelsController::class, 'store'])
+        ->name('news.channels.store');
+    Route::get('/admin/news/channels/{channel}/edit', [NewsChannelsController::class, 'edit'])
+        ->name('news.channels.edit');
+    Route::put('/admin/news/channels/{channel}', [NewsChannelsController::class, 'update'])
+        ->name('news.channels.update');
+    Route::patch('/admin/news/channels/{channel}/toggle', [NewsChannelsController::class, 'toggle'])
+        ->name('news.channels.toggle');
+    Route::delete('/admin/news/channels/{channel}', [NewsChannelsController::class, 'destroy'])
+        ->name('news.channels.destroy');
+
+    Route::get('/admin/news/settings', [NewsSettingsController::class, 'index'])
         ->name('news.settings');
-    Route::view('/admin/news/settings/create', 'admin.news-setting-form', [
-        'editing' => false,
-    ])->name('news.settings.create');
-    Route::view('/admin/news/settings/{account}/edit', 'admin.news-setting-form', [
-        'editing' => true,
-    ])->name('news.settings.edit');
+    Route::get('/admin/news/settings/create', [NewsSettingsController::class, 'create'])
+        ->name('news.settings.create');
+    Route::post('/admin/news/settings', [NewsSettingsController::class, 'store'])
+        ->name('news.settings.store');
+    Route::get('/admin/news/settings/{account}/edit', [NewsSettingsController::class, 'edit'])
+        ->name('news.settings.edit');
+    Route::put('/admin/news/settings/{account}', [NewsSettingsController::class, 'update'])
+        ->name('news.settings.update');
+    Route::patch('/admin/news/settings/{account}/toggle', [NewsSettingsController::class, 'toggle'])
+        ->name('news.settings.toggle');
+    Route::delete('/admin/news/settings/{account}', [NewsSettingsController::class, 'destroy'])
+        ->name('news.settings.destroy');
 
     Route::view('/admin/alerts/channels', 'admin.section', [
         'group' => 'Воздушная тревога',

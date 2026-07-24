@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Source;
+use App\Models\TelegramAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -65,10 +67,7 @@ class TemplatePagesTest extends TestCase
             ->assertOk()
             ->assertSee('Telegram API и технические аккаунты новостей.')
             ->assertSee(route('news.settings.create'))
-            ->assertSee(route('news.settings.edit', ['account' => 1]))
-            ->assertSee('Telegram 33042494')
-            ->assertSee('API ID: 33042494')
-            ->assertSee('Технический аккаунт подключён')
+            ->assertSee('Настройки ещё не добавлены')
             ->assertDontSee('Название API');
 
         $this->actingAs($user)
@@ -85,9 +84,10 @@ class TemplatePagesTest extends TestCase
     public function test_news_settings_edit_form_contains_save_and_delete_buttons(): void
     {
         $user = User::factory()->create();
+        $account = $this->telegramAccount();
 
         $this->actingAs($user)
-            ->get(route('news.settings.edit', ['account' => 1]))
+            ->get(route('news.settings.edit', $account))
             ->assertOk()
             ->assertSee('Редактировать Telegram API и технический аккаунт')
             ->assertSee('Сохранить')
@@ -103,10 +103,8 @@ class TemplatePagesTest extends TestCase
             ->assertOk()
             ->assertSee('Каналы данных')
             ->assertSee(route('news.channels.create'))
-            ->assertSee(route('news.channels.edit', ['channel' => 1]))
-            ->assertSee('Новости города')
-            ->assertSee('@source_channel')
-            ->assertSee('@destination_channel')
+            ->assertSee('Каналы данных ещё не добавлены')
+            ->assertDontSee('Источники сообщений и каналы публикации новостей.')
             ->assertDontSee('Канал или группа — источник сообщений');
 
         $this->actingAs($user)
@@ -120,19 +118,35 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Формат публикации')
             ->assertSee('Оригинал')
             ->assertSee('Только текст')
+            ->assertSee('В обоих форматах ссылки и хештеги удаляются.')
             ->assertSee('Ключевые слова')
             ->assertSee('Стоп-слова')
             ->assertSee('Добавить свой текст в конце сообщения')
             ->assertSee('Свой текст')
-            ->assertSee('Частота проверки');
+            ->assertSee('Частота проверки')
+            ->assertSee('Секунды')
+            ->assertSee('Минуты')
+            ->assertSee('Часы')
+            ->assertSee('от 3 секунд до 12 часов');
     }
 
     public function test_news_channel_edit_form_contains_save_and_delete_buttons(): void
     {
         $user = User::factory()->create();
+        $account = $this->telegramAccount();
+        $channel = Source::query()->create([
+            'telegram_account_id' => $account->id,
+            'name' => 'Новости города',
+            'type' => 'telegram',
+            'identifier' => '@source_channel',
+            'publication_identifier' => '@destination_channel',
+            'publication_format' => 'original',
+            'check_interval_seconds' => 180,
+            'is_active' => true,
+        ]);
 
         $this->actingAs($user)
-            ->get(route('news.channels.edit', ['channel' => 1]))
+            ->get(route('news.channels.edit', $channel))
             ->assertOk()
             ->assertSee('Редактировать канал данных')
             ->assertSee('Сохранить')
@@ -140,5 +154,61 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Ключевые слова')
             ->assertSee('Стоп-слова')
             ->assertSee('Добавить свой текст в конце сообщения');
+    }
+
+    public function test_news_lists_use_real_records_statuses_and_toggle_actions(): void
+    {
+        $user = User::factory()->create();
+        $account = $this->telegramAccount(['status' => 'connected', 'connected_at' => now()]);
+        $channel = Source::query()->create([
+            'telegram_account_id' => $account->id,
+            'name' => 'Новости города',
+            'type' => 'telegram',
+            'identifier' => '@source_channel',
+            'publication_identifier' => '@destination_channel',
+            'publication_format' => 'text',
+            'check_interval_seconds' => 300,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('news.settings'))
+            ->assertOk()
+            ->assertSee($account->name)
+            ->assertSee('Работает')
+            ->assertSee(route('news.settings.edit', $account))
+            ->assertDontSee('Настройки ещё не добавлены');
+
+        $this->actingAs($user)
+            ->get(route('news.channels'))
+            ->assertOk()
+            ->assertSee($channel->name)
+            ->assertSee('Работает')
+            ->assertSee('@destination_channel')
+            ->assertSee('Только текст')
+            ->assertSee(route('news.channels.edit', $channel))
+            ->assertDontSee('Каналы данных ещё не добавлены');
+
+        $this->actingAs($user)
+            ->patch(route('news.channels.toggle', $channel))
+            ->assertRedirect(route('news.channels'));
+
+        $this->assertFalse($channel->fresh()->is_active);
+
+        $this->actingAs($user)
+            ->get(route('news.channels'))
+            ->assertSee('Выключен');
+    }
+
+    private function telegramAccount(array $overrides = []): TelegramAccount
+    {
+        return TelegramAccount::query()->create(array_merge([
+            'name' => 'Telegram 33042494',
+            'api_id' => '33042494',
+            'api_hash' => str_repeat('a', 32),
+            'login_method' => 'phone',
+            'phone' => '+380000000000',
+            'status' => 'not_connected',
+        ], $overrides));
     }
 }

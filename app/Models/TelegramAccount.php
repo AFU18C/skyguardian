@@ -32,4 +32,13 @@ class TelegramAccount extends Model
     {
         return storage_path('app/telegram/accounts/'.$this->id.'/session.madeline');
     }
+
+    public function statusState(): string
+    {
+        return match ($this->status) {
+            'connected' => 'working',
+            'error' => 'error',
+            default => 'off',
+        };
+    }
 }

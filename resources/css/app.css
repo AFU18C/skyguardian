@@ -789,6 +789,10 @@
         line-height: 1.6;
     }
 
+    .content-heading-actions-only {
+        justify-content: flex-end;
+    }
+
     .metrics-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -913,6 +917,15 @@
         flex-wrap: wrap;
         gap: 10px;
         padding-top: 2px;
+    }
+
+    .panel-form-actions,
+    .danger-form {
+        padding: 0 20px 20px;
+    }
+
+    .danger-form {
+        padding-top: 0;
     }
 
     .settings-form select.input {
@@ -1192,6 +1205,11 @@
         gap: 12px;
     }
 
+    .resource-card-actions form {
+        display: flex;
+        margin: 0;
+    }
+
     .resource-switch {
         position: relative;
         display: inline-flex;
@@ -1233,6 +1251,45 @@
     .resource-switch input:checked + span::after {
         transform: translateX(20px);
         background: #5ee3b5;
+    }
+
+    .status-pill-working {
+        border-color: rgba(52, 211, 153, .16);
+        background: rgba(16, 185, 129, .08);
+        color: #6ee7b7;
+    }
+
+    .status-pill-working::before {
+        background: #34d399;
+        box-shadow: 0 0 0 4px rgba(52, 211, 153, .08);
+    }
+
+    .status-pill-error {
+        border-color: rgba(248, 113, 113, .2);
+        background: rgba(127, 29, 29, .12);
+        color: #fca5a5;
+    }
+
+    .status-pill-error::before {
+        background: #f87171;
+        box-shadow: 0 0 0 4px rgba(248, 113, 113, .08);
+    }
+
+    .status-pill-off {
+        border-color: rgba(148, 163, 184, .16);
+        background: rgba(100, 116, 139, .09);
+        color: #94a3b8;
+    }
+
+    .status-pill-off::before {
+        background: #64748b;
+        box-shadow: 0 0 0 4px rgba(100, 116, 139, .08);
+    }
+
+    .alert-success {
+        border-color: rgba(52, 211, 153, .2);
+        background: rgba(6, 78, 59, .12);
+        color: #6ee7b7;
     }
 
     .empty-action {

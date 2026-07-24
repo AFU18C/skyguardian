@@ -16,42 +16,67 @@
     </div>
 </div>
 
-<section class="panel settings-form-card">
+@if($errors->any())
+    <x-ui.alert>{{ $errors->first() }}</x-ui.alert>
+@endif
+
+<section
+    class="panel settings-form-card"
+    x-data="{
+        appendCustomText: @js((bool) old('append_custom_text', $channel?->append_custom_text ?? false)),
+        frequencyUnit: @js(old('frequency_unit', $frequencyUnit))
+    }"
+>
     <form
+        id="news-channel-form"
         class="panel-body settings-form"
-        x-data="{ appendCustomText: false }"
-        @submit.prevent
+        method="POST"
+        action="{{ $editing ? route('news.channels.update', $channel) : route('news.channels.store') }}"
     >
+        @csrf
+        @if($editing)
+            @method('PUT')
+        @endif
+
         <div class="settings-form-grid">
             <label class="field settings-form-wide">
                 <span class="field-label">Название *</span>
-                <input class="input" type="text" placeholder="Например: Новости города" autocomplete="off" required>
+                <input class="input" name="name" type="text" value="{{ old('name', $channel?->name) }}" placeholder="Например: Новости города" autocomplete="off" required>
             </label>
 
             <label class="field settings-form-wide">
                 <span class="field-label">Канал или группа — источник сообщений *</span>
-                <input class="input" type="text" placeholder="@source_channel или ссылка" autocomplete="off" required>
+                <input class="input" name="identifier" type="text" value="{{ old('identifier', $channel?->identifier) }}" placeholder="@source_channel или ссылка" autocomplete="off" required>
             </label>
 
             <label class="field settings-form-wide">
-                <span class="field-label">Технический аккаунт</span>
-                <select class="input">
-                    <option value="">Нет подключённых аккаунтов</option>
+                <span class="field-label">Технический аккаунт *</span>
+                <select class="input" name="telegram_account_id" required>
+                    <option value="">Выберите технический аккаунт</option>
+                    @foreach($accounts as $accountOption)
+                        <option
+                            value="{{ $accountOption->id }}"
+                            @selected((string) old('telegram_account_id', $channel?->telegram_account_id) === (string) $accountOption->id)
+                        >
+                            {{ $accountOption->name }}
+                        </option>
+                    @endforeach
                 </select>
             </label>
 
             <label class="field settings-form-wide">
                 <span class="field-label">Канал или группа для публикации *</span>
-                <input class="input" type="text" placeholder="@destination_channel или ссылка" autocomplete="off" required>
+                <input class="input" name="publication_identifier" type="text" value="{{ old('publication_identifier', $channel?->publication_identifier) }}" placeholder="@destination_channel или ссылка" autocomplete="off" required>
             </label>
 
             <label class="field settings-form-wide">
                 <span class="field-label">Формат публикации *</span>
-                <select class="input" required>
+                <select class="input" name="publication_format" required>
                     <option value="">Выберите формат публикации</option>
-                    <option value="original">Оригинал</option>
-                    <option value="text">Только текст</option>
+                    <option value="original" @selected(old('publication_format', $channel?->publication_format) === 'original')>Оригинал</option>
+                    <option value="text" @selected(old('publication_format', $channel?->publication_format) === 'text')>Только текст</option>
                 </select>
+                <span class="field-hint">В обоих форматах ссылки и хештеги удаляются.</span>
             </label>
 
             <div class="settings-form-wide form-section">
@@ -63,21 +88,13 @@
                 <div class="settings-form-grid">
                     <label class="field">
                         <span class="field-label">Ключевые слова</span>
-                        <textarea
-                            class="input textarea"
-                            rows="4"
-                            placeholder="Например: Запорожье, событие, новости"
-                        ></textarea>
+                        <textarea class="input textarea" name="keywords" rows="4" placeholder="Например: Запорожье, событие, новости">{{ old('keywords', $channel?->keywords) }}</textarea>
                         <span class="field-hint">Будут обрабатываться сообщения, содержащие хотя бы одно слово.</span>
                     </label>
 
                     <label class="field">
                         <span class="field-label">Стоп-слова</span>
-                        <textarea
-                            class="input textarea"
-                            rows="4"
-                            placeholder="Например: реклама, розыгрыш"
-                        ></textarea>
+                        <textarea class="input textarea" name="stop_words" rows="4" placeholder="Например: реклама, розыгрыш">{{ old('stop_words', $channel?->stop_words) }}</textarea>
                         <span class="field-hint">Сообщения с этими словами не будут публиковаться.</span>
                     </label>
                 </div>
@@ -85,23 +102,15 @@
 
             <div class="settings-form-wide form-section">
                 <label class="custom-text-toggle">
-                    <input
-                        class="checkbox"
-                        type="checkbox"
-                        x-model="appendCustomText"
-                    >
+                    <input type="hidden" name="append_custom_text" value="0">
+                    <input class="checkbox" name="append_custom_text" value="1" type="checkbox" x-model="appendCustomText">
                     <span>
                         <strong>Добавить свой текст в конце сообщения</strong>
                         <small>Если галочка выключена, дополнительный текст не добавляется.</small>
                     </span>
                 </label>
 
-                <div
-                    x-cloak
-                    x-show="appendCustomText"
-                    x-transition
-                    class="field custom-text-editor"
-                >
+                <div x-cloak x-show="appendCustomText" x-transition class="field custom-text-editor">
                     <span class="field-label">Свой текст</span>
                     <div class="editor-shell">
                         <div class="editor-toolbar" aria-label="Панель форматирования">
@@ -111,9 +120,10 @@
                         </div>
                         <textarea
                             class="editor-area"
+                            name="custom_text"
                             rows="6"
                             placeholder="Введите текст, который будет добавлен в конце скопированного сообщения"
-                        ></textarea>
+                        >{{ old('custom_text', $channel?->custom_text) }}</textarea>
                     </div>
                 </div>
             </div>
@@ -121,25 +131,38 @@
             <div class="field settings-form-wide">
                 <span class="field-label">Частота проверки *</span>
                 <div class="data-channel-frequency">
-                    <input class="input" type="number" min="3" max="86400" placeholder="От 3 до 86400" required>
-                    <select class="input" required>
+                    <input
+                        class="input"
+                        name="frequency_value"
+                        type="number"
+                        value="{{ old('frequency_value', $frequencyValue) }}"
+                        :min="frequencyUnit === 'seconds' ? 3 : 1"
+                        :max="frequencyUnit === 'hours' ? 12 : (frequencyUnit === 'minutes' ? 720 : 43200)"
+                        required
+                    >
+                    <select class="input" name="frequency_unit" x-model="frequencyUnit" required>
                         <option value="seconds">Секунды</option>
+                        <option value="minutes">Минуты</option>
+                        <option value="hours">Часы</option>
                     </select>
                 </div>
+                <span class="field-hint">Допустимый интервал — от 3 секунд до 12 часов.</span>
             </div>
         </div>
-
-        <div class="settings-form-actions">
-            <x-ui.button type="submit" variant="primary">
-                {{ $editing ? 'Сохранить' : 'Добавить' }}
-            </x-ui.button>
-
-            @if($editing)
-                <x-ui.button type="button" variant="danger">
-                    Удалить
-                </x-ui.button>
-            @endif
-        </div>
     </form>
+
+    <div class="settings-form-actions panel-form-actions">
+        <x-ui.button type="submit" variant="primary" form="news-channel-form">
+            {{ $editing ? 'Сохранить' : 'Добавить' }}
+        </x-ui.button>
+
+        @if($editing)
+            <form method="POST" action="{{ route('news.channels.destroy', $channel) }}" onsubmit="return confirm('Удалить этот канал данных?')">
+                @csrf
+                @method('DELETE')
+                <x-ui.button type="submit" variant="danger">Удалить</x-ui.button>
+            </form>
+        @endif
+    </div>
 </section>
 @endsection
