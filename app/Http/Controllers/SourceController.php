@@ -12,7 +12,7 @@ class SourceController extends Controller
     public function index(): View
     {
         return view('sources.index', [
-            'sources' => Source::query()->latest()->get(),
+            'sources' => Source::query()->whereNull('purpose')->latest()->get(),
         ]);
     }
 
@@ -34,6 +34,8 @@ class SourceController extends Controller
 
     public function update(Request $request, Source $source): RedirectResponse
     {
+        $this->ensureLegacySource($source);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'identifier' => ['required', 'string', 'max:255', 'unique:sources,identifier,'.$source->id],
@@ -46,6 +48,7 @@ class SourceController extends Controller
 
     public function toggle(Source $source): RedirectResponse
     {
+        $this->ensureLegacySource($source);
         $source->update(['is_active' => ! $source->is_active]);
 
         return back()->with('status', 'Статус источника изменён.');
@@ -53,8 +56,14 @@ class SourceController extends Controller
 
     public function destroy(Source $source): RedirectResponse
     {
+        $this->ensureLegacySource($source);
         $source->delete();
 
         return back()->with('status', 'Источник удалён.');
+    }
+
+    private function ensureLegacySource(Source $source): void
+    {
+        abort_if($source->purpose !== null, 404);
     }
 }

@@ -2,107 +2,192 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TelegramAccount;
+use App\Models\TelegramApp;
+use App\Services\TelegramSessionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class NewsSettingsController extends Controller
 {
+    public function __construct(private readonly TelegramSessionService $sessions)
+    {
+    }
+
     public function index(): View
     {
-        return view('admin.news-settings');
+        return view('admin.news-settings', [
+            'apps' => TelegramApp::query()
+                ->forPurpose('news')
+                ->with(['accounts' => fn ($query) => $query
+                    ->with('telegramApp')
+                    ->orderBy('name')])
+                ->latest()
+                ->get(),
+        ]);
     }
 
     public function create(): View
     {
         return view('admin.news-setting-form', [
             'editing' => false,
-            'account' => null,
+            'telegramApp' => null,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        abort_if(TelegramAccount::query()->forPurpose('news')->count() >= 10, 422, 'Можно добавить не более 10 Telegram API.');
+        abort_if(TelegramApp::query()->forPurpose('news')->count() >= 10, 422, 'Можно добавить не более 10 Telegram App.');
 
         $data = $this->validated($request);
         $data['purpose'] = 'news';
-        $data['status'] = 'not_connected';
 
-        TelegramAccount::query()->create($data);
+        $telegramApp = TelegramApp::query()->create($data);
 
-        return redirect()->route('news.settings')->with('status', 'Telegram API добавлен.');
+        return redirect()
+            ->route('news.settings.edit', $telegramApp)
+            ->with('status', 'Telegram App сохранён. Теперь добавьте технический аккаунт.');
     }
 
-    public function edit(TelegramAccount $account): View
+    public function edit(TelegramApp $telegramApp): View
     {
-        $this->ensureNewsAccount($account);
+        $this->ensureNewsApp($telegramApp);
+        $telegramApp->load(['accounts' => fn ($query) => $query->orderBy('name')]);
 
         return view('admin.news-setting-form', [
             'editing' => true,
-            'account' => $account,
+            'telegramApp' => $telegramApp,
         ]);
     }
 
-    public function update(Request $request, TelegramAccount $account): RedirectResponse
+    public function update(Request $request, TelegramApp $telegramApp): RedirectResponse
     {
-        $this->ensureNewsAccount($account);
+        $this->ensureNewsApp($telegramApp);
 
-        $data = $this->validated($request, true);
+        $data = $this->validated($request, $telegramApp);
+        $credentialsChanged = (string) $data['api_id'] !== $telegramApp->api_id
+            || filled($data['api_hash'] ?? null);
 
         if (blank($data['api_hash'] ?? null)) {
             unset($data['api_hash']);
         }
 
-        $account->update($data);
+        if ($credentialsChanged) {
+            $accounts = $telegramApp->accounts()->get();
+            $locks = [];
 
-        return redirect()->route('news.settings')->with('status', 'Настройка сохранена.');
+            foreach ($accounts as $account) {
+                $lock = Cache::lock('news:telegram-account:'.$account->id, 180);
+
+                if (! $lock->get()) {
+                    foreach ($locks as $heldLock) {
+                        $heldLock->release();
+                    }
+
+                    throw ValidationException::withMessages([
+                        'telegram_app' => 'Один из техаккаунтов сейчас выполняет проверку. Повторите через несколько секунд.',
+                    ]);
+                }
+
+                $locks[] = $lock;
+            }
+
+            try {
+                $telegramApp->update($data);
+
+                foreach ($accounts as $account) {
+                    $this->sessions->purge($account);
+                    $account->update([
+                        'status' => 'not_connected',
+                        'connected_at' => null,
+                        'last_error' => 'Данные Telegram App изменены. Подключите техаккаунт заново.',
+                    ]);
+                    $account->sources()
+                        ->where('purpose', 'news')
+                        ->update([
+                            'resume_from_latest' => true,
+                            'next_check_at' => null,
+                        ]);
+                }
+            } finally {
+                foreach ($locks as $lock) {
+                    $lock->release();
+                }
+            }
+        } else {
+            $telegramApp->update($data);
+        }
+
+        return redirect()
+            ->route('news.settings.edit', $telegramApp)
+            ->with('status', 'Telegram App сохранён.');
     }
 
-    public function toggle(TelegramAccount $account): RedirectResponse
+    public function toggle(TelegramApp $telegramApp): RedirectResponse
     {
-        $this->ensureNewsAccount($account);
+        $this->ensureNewsApp($telegramApp);
+        $enabling = ! $telegramApp->is_active;
+        $telegramApp->update(['is_active' => $enabling]);
 
-        if ($account->status !== 'disabled') {
-            $account->update(['status' => 'disabled']);
-        } elseif ($account->connected_at && File::exists($account->sessionPath())) {
-            $account->update(['status' => 'connected', 'last_error' => null]);
-        } else {
-            $account->update([
-                'status' => 'error',
-                'last_error' => 'Технический аккаунт нужно подключить к Telegram.',
+        $telegramApp->accounts()
+            ->with('sources')
+            ->get()
+            ->each(function ($account) use ($enabling): void {
+                $account->sources()
+                    ->where('purpose', 'news')
+                    ->where('is_active', true)
+                    ->update([
+                        'resume_from_latest' => $enabling,
+                        'next_check_at' => $enabling ? now() : null,
+                    ]);
+            });
+
+        return redirect()->route('news.settings')->with('status', 'Статус Telegram App изменён.');
+    }
+
+    public function destroy(TelegramApp $telegramApp): RedirectResponse
+    {
+        $this->ensureNewsApp($telegramApp);
+
+        if ($telegramApp->accounts()->exists()) {
+            throw ValidationException::withMessages([
+                'telegram_app' => 'Сначала удалите все технические аккаунты этого Telegram App.',
             ]);
         }
 
-        return redirect()->route('news.settings')->with('status', 'Статус настройки изменён.');
+        $telegramApp->delete();
+
+        return redirect()->route('news.settings')->with('status', 'Telegram App удалён.');
     }
 
-    public function destroy(TelegramAccount $account): RedirectResponse
+    private function validated(Request $request, ?TelegramApp $telegramApp = null): array
     {
-        $this->ensureNewsAccount($account);
+        $editing = $telegramApp !== null;
 
-        File::deleteDirectory(dirname($account->sessionPath()));
-        $account->delete();
-
-        return redirect()->route('news.settings')->with('status', 'Настройка удалена.');
-    }
-
-    private function validated(Request $request, bool $editing = false): array
-    {
         return $request->validate([
-            'name' => ['required', 'string', 'max:100'],
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('telegram_apps', 'name')
+                    ->where(fn ($query) => $query->where('purpose', 'news'))
+                    ->ignore($telegramApp?->id),
+            ],
             'api_id' => ['required', 'digits_between:4,12'],
-            'api_hash' => [$editing ? 'nullable' : 'required', 'string', 'size:32'],
-            'login_method' => ['required', Rule::in(['phone', 'qr'])],
-            'phone' => ['nullable', 'string', 'max:30', 'required_if:login_method,phone'],
+            'api_hash' => [
+                $editing ? 'nullable' : 'required',
+                'string',
+                'size:32',
+                'regex:/^[a-f0-9]{32}$/i',
+            ],
         ]);
     }
 
-    private function ensureNewsAccount(TelegramAccount $account): void
+    private function ensureNewsApp(TelegramApp $telegramApp): void
     {
-        abort_unless($account->purpose === 'news', 404);
+        abort_unless($telegramApp->purpose === 'news', 404);
     }
 }

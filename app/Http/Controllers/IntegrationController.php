@@ -8,7 +8,6 @@ use danog\MadelineProto\API;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\File;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -28,14 +27,21 @@ class IntegrationController extends Controller
             'madelineInstalled' => class_exists(API::class),
             'extensions' => $extensions,
             'requirementsReady' => $extensions->every(fn (bool $loaded): bool => $loaded),
-            'accounts' => TelegramAccount::query()->latest()->get(),
+            'accounts' => TelegramAccount::query()
+                ->whereNull('telegram_app_id')
+                ->latest()
+                ->get(),
             'accountsLimit' => 10,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        abort_if(TelegramAccount::query()->count() >= 10, 422, 'Можно добавить не более 10 Telegram API.');
+        abort_if(
+            TelegramAccount::query()->whereNull('telegram_app_id')->count() >= 10,
+            422,
+            'Можно добавить не более 10 Telegram API.',
+        );
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
@@ -53,6 +59,8 @@ class IntegrationController extends Controller
 
     public function update(Request $request, TelegramAccount $telegramAccount): RedirectResponse
     {
+        $this->ensureLegacyAccount($telegramAccount);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'api_id' => ['required', 'digits_between:4,12'],
@@ -72,6 +80,7 @@ class IntegrationController extends Controller
 
     public function startPhone(TelegramAccount $telegramAccount): RedirectResponse
     {
+        $this->ensureLegacyAccount($telegramAccount);
         abort_unless($telegramAccount->login_method === 'phone', 422);
 
         try {
@@ -88,6 +97,7 @@ class IntegrationController extends Controller
 
     public function completePhone(Request $request, TelegramAccount $telegramAccount): RedirectResponse
     {
+        $this->ensureLegacyAccount($telegramAccount);
         $data = $request->validate(['code' => ['required', 'string', 'max:20']]);
 
         try {
@@ -113,6 +123,7 @@ class IntegrationController extends Controller
 
     public function completePassword(Request $request, TelegramAccount $telegramAccount): RedirectResponse
     {
+        $this->ensureLegacyAccount($telegramAccount);
         $data = $request->validate(['password' => ['required', 'string', 'max:255']]);
 
         try {
@@ -129,6 +140,7 @@ class IntegrationController extends Controller
 
     public function qr(TelegramAccount $telegramAccount): JsonResponse
     {
+        $this->ensureLegacyAccount($telegramAccount);
         abort_unless($telegramAccount->login_method === 'qr', 422);
 
         try {
@@ -155,7 +167,8 @@ class IntegrationController extends Controller
 
     public function disconnect(TelegramAccount $telegramAccount): RedirectResponse
     {
-        File::deleteDirectory(dirname($telegramAccount->sessionPath()));
+        $this->ensureLegacyAccount($telegramAccount);
+        $this->telegramSessions->purge($telegramAccount);
         $telegramAccount->update([
             'status' => 'not_connected',
             'telegram_name' => null,
@@ -169,9 +182,15 @@ class IntegrationController extends Controller
 
     public function destroy(TelegramAccount $telegramAccount): RedirectResponse
     {
-        File::deleteDirectory(dirname($telegramAccount->sessionPath()));
+        $this->ensureLegacyAccount($telegramAccount);
+        $this->telegramSessions->purge($telegramAccount);
         $telegramAccount->delete();
 
         return back()->with('status', 'Telegram API и локальная сессия удалены.');
+    }
+
+    private function ensureLegacyAccount(TelegramAccount $telegramAccount): void
+    {
+        abort_if($telegramAccount->telegram_app_id !== null, 404);
     }
 }

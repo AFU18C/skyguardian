@@ -11,8 +11,8 @@
             <x-icon name="chevron" :size="14" class="back-link-icon"/>
             Назад к настройкам
         </a>
-        <h1>{{ $editing ? 'Редактировать Telegram API и технический аккаунт' : 'Добавить Telegram API и технический аккаунт' }}</h1>
-        <p>Заполните данные подключения для раздела «Новости».</p>
+        <h1>{{ $editing ? 'Редактировать Telegram App' : 'Добавить Telegram App' }}</h1>
+        <p>Укажите API ID и API Hash, созданные на my.telegram.org.</p>
     </div>
 </div>
 
@@ -20,12 +20,16 @@
     <x-ui.alert>{{ $errors->first() }}</x-ui.alert>
 @endif
 
+@if(session('status'))
+    <x-ui.alert type="success">{{ session('status') }}</x-ui.alert>
+@endif
+
 <section class="panel settings-form-card">
     <form
+        id="telegram-app-form"
         class="panel-body settings-form"
         method="POST"
-        action="{{ $editing ? route('news.settings.update', $account) : route('news.settings.store') }}"
-        x-data="{ loginMethod: @js(old('login_method', $account?->login_method ?? 'phone')) }"
+        action="{{ $editing ? route('news.settings.update', $telegramApp) : route('news.settings.store') }}"
     >
         @csrf
         @if($editing)
@@ -34,58 +38,69 @@
 
         <div class="settings-form-grid">
             <label class="field settings-form-wide">
-                <span class="field-label">Название API</span>
-                <input class="input" name="name" type="text" value="{{ old('name', $account?->name) }}" placeholder="Основной аккаунт" autocomplete="off" required>
+                <span class="field-label">Название Telegram App *</span>
+                <input class="input" name="name" type="text" value="{{ old('name', $telegramApp?->name) }}" placeholder="Например: Новости — основной API" autocomplete="off" required>
             </label>
 
             <label class="field">
-                <span class="field-label">API ID</span>
-                <input class="input" name="api_id" type="text" value="{{ old('api_id', $account?->api_id) }}" inputmode="numeric" autocomplete="off" required>
+                <span class="field-label">API ID *</span>
+                <input class="input" name="api_id" type="text" value="{{ old('api_id', $telegramApp?->api_id) }}" inputmode="numeric" autocomplete="off" required>
             </label>
 
             <label class="field">
-                <span class="field-label">API Hash</span>
+                <span class="field-label">API Hash *</span>
                 <input class="input" name="api_hash" type="text" autocomplete="off" @required(! $editing)>
                 @if($editing)
                     <span class="field-hint">Оставьте пустым, чтобы не менять API Hash.</span>
                 @endif
             </label>
-
-            <label class="field">
-                <span class="field-label">Способ входа</span>
-                <select class="input" name="login_method" x-model="loginMethod" required>
-                    <option value="phone">Телефон</option>
-                    <option value="qr">QR-код</option>
-                </select>
-            </label>
-
-            <label class="field" x-show="loginMethod === 'phone'">
-                <span class="field-label">Номер телефона</span>
-                <input class="input" name="phone" type="tel" value="{{ old('phone', $account?->phone) }}" placeholder="+380..." autocomplete="off">
-            </label>
-
-            <div class="field" x-cloak x-show="loginMethod === 'qr'">
-                <span class="field-label">QR-код</span>
-                <div class="qr-placeholder">
-                    <x-icon name="settings" :size="24"/>
-                    <span>QR-код появится здесь после сохранения</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="settings-form-actions">
-            <x-ui.button type="submit" variant="primary">
-                {{ $editing ? 'Сохранить' : 'Добавить' }}
-            </x-ui.button>
         </div>
     </form>
 
+    <div class="settings-form-actions panel-form-actions">
+        <x-ui.button type="submit" variant="primary" form="telegram-app-form">
+            {{ $editing ? 'Сохранить' : 'Продолжить' }}
+        </x-ui.button>
+
+        @if($editing)
+            <x-ui.button variant="ghost" :href="route('news.accounts.create', $telegramApp)">
+                <x-icon name="plus" :size="14"/>
+                Добавить техаккаунт
+            </x-ui.button>
+        @endif
+    </div>
+
     @if($editing)
-        <form class="danger-form" method="POST" action="{{ route('news.settings.destroy', $account) }}" onsubmit="return confirm('Удалить эту настройку?')">
+        <form class="danger-form" method="POST" action="{{ route('news.settings.destroy', $telegramApp) }}" onsubmit="return confirm('Удалить Telegram App? Сначала необходимо удалить его техаккаунты.')">
             @csrf
             @method('DELETE')
-            <x-ui.button type="submit" variant="danger">Удалить</x-ui.button>
+            <x-ui.button type="submit" variant="danger">Удалить Telegram App</x-ui.button>
         </form>
     @endif
 </section>
+
+@if($editing)
+    <section class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Технические аккаунты</div>
+                <div class="panel-copy">Подключите хотя бы один аккаунт, чтобы добавлять каналы данных.</div>
+            </div>
+        </div>
+        <div class="panel-body compact-list">
+            @forelse($telegramApp->accounts as $account)
+                <a class="compact-list-row" href="{{ route('news.accounts.edit', [$telegramApp, $account]) }}">
+                    <span><x-icon name="account" :size="18"/></span>
+                    <strong>{{ $account->name }}</strong>
+                    <small>{{ $account->telegram_name ?: 'Не подключён' }}</small>
+                    <x-icon name="chevron" :size="16"/>
+                </a>
+            @empty
+                <div class="technical-account-empty">
+                    Техаккаунты ещё не добавлены. Нажмите «Добавить техаккаунт».
+                </div>
+            @endforelse
+        </div>
+    </section>
+@endif
 @endsection

@@ -52,7 +52,7 @@
             <label class="field settings-form-wide">
                 <span class="field-label">Технический аккаунт *</span>
                 <select class="input" name="telegram_account_id" required>
-                    <option value="">Выберите технический аккаунт</option>
+                    <option value="">{{ $channel && ! $channel->telegram_account_id ? 'Техаккаунт удалён — выберите новый' : 'Выберите технический аккаунт' }}</option>
                     @foreach($accounts as $accountOption)
                         <option
                             value="{{ $accountOption->id }}"
@@ -62,6 +62,7 @@
                         </option>
                     @endforeach
                 </select>
+                <span class="field-hint">Доступны только подключённые и включённые техаккаунты.</span>
             </label>
 
             <label class="field settings-form-wide">
@@ -113,11 +114,6 @@
                 <div x-cloak x-show="appendCustomText" x-transition class="field custom-text-editor">
                     <span class="field-label">Свой текст</span>
                     <div class="editor-shell">
-                        <div class="editor-toolbar" aria-label="Панель форматирования">
-                            <button type="button" title="Жирный"><strong>B</strong></button>
-                            <button type="button" title="Курсив"><em>I</em></button>
-                            <button type="button" title="Ссылка">Ссылка</button>
-                        </div>
                         <textarea
                             class="editor-area"
                             name="custom_text"
@@ -147,6 +143,7 @@
                     </select>
                 </div>
                 <span class="field-hint">Допустимый интервал — от 3 секунд до 12 часов.</span>
+                <span class="field-hint">Перед сохранением система проверит чтение источника и право публикации. Старые сообщения при первом запуске публиковаться не будут.</span>
             </div>
         </div>
     </form>

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'telegram' => [
+        'runtime_path' => env('TELEGRAM_RUNTIME_PATH'),
+    ],
+
 ];

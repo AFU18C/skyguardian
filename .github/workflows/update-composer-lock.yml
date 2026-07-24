@@ -1,0 +1,57 @@
+name: Update Composer Lock
+
+on:
+  push:
+    branches: [agent/news-implementation]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.event.head_commit.message != 'Update Composer lock'
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve dependencies
+        run: composer update danog/madelineproto --with-all-dependencies --no-interaction
+
+      - name: Verify implementation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          cp .env.example .env
+          sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i 's|^DB_DATABASE=.*|DB_DATABASE=:memory:|' .env
+          sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=array/' .env
+          sed -i 's/^CACHE_STORE=.*/CACHE_STORE=array/' .env
+          sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
+
+          php artisan key:generate --force
+          php artisan view:cache
+          php artisan test
+          npm ci
+          npm run build
+
+      - name: Commit lock file
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add composer.lock
+
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+
+          git commit -m 'Update Composer lock'
+          git push origin HEAD:agent/news-implementation

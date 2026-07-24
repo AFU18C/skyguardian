@@ -12,9 +12,32 @@ concurrency:
 jobs:
   deploy:
     runs-on: self-hosted
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
+      - name: Checkout release
+        uses: actions/checkout@v4
+
+      - name: Verify release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          cp .env.example .env
+          sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i 's|^DB_DATABASE=.*|DB_DATABASE=:memory:|' .env
+          sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=array/' .env
+          sed -i 's/^CACHE_STORE=.*/CACHE_STORE=array/' .env
+          sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
+
+          composer install --prefer-dist --no-interaction
+          php artisan key:generate --force
+          php artisan view:cache
+          php artisan test
+          npm ci
+          npm run build
+
       - name: Deploy application
         shell: bash
         run: |
@@ -22,6 +45,9 @@ jobs:
 
           DEPLOY_PATH=/var/www/skyguardian
           REPOSITORY_URL=https://github.com/AFU18C/skyguardian.git
+
+          systemctl stop skyguardian-news-worker.service skyguardian-queue.service 2>/dev/null || true
+          trap 'systemctl start skyguardian-news-worker.service skyguardian-queue.service 2>/dev/null || true' ERR
 
           if [ -d "$DEPLOY_PATH/.git" ]; then
             git -C "$DEPLOY_PATH" fetch origin main
@@ -37,8 +63,23 @@ jobs:
             cp .env.example .env
             sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=file/' .env
             sed -i 's/^CACHE_STORE=.*/CACHE_STORE=file/' .env
-            sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
           fi
+
+          set_env() {
+            local key="$1"
+            local value="$2"
+
+            if grep -q "^${key}=" .env; then
+              sed -i "s|^${key}=.*|${key}=${value}|" .env
+            else
+              printf '\n%s=%s\n' "$key" "$value" >> .env
+            fi
+          }
+
+          set_env QUEUE_CONNECTION database
+          set_env DB_QUEUE_RETRY_AFTER 360
+          set_env CACHE_STORE database
+          set_env TELEGRAM_RUNTIME_PATH /dev/shm/skyguardian-telegram
 
           if ! grep -Eq '^DB_PASSWORD=.+$' .env; then
             DB_PASSWORD="$(openssl rand -hex 32)"
@@ -62,6 +103,7 @@ jobs:
           fi
 
           mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+          install -d -m 0700 -o www-data -g www-data /dev/shm/skyguardian-telegram
           chown -R www-data:www-data storage bootstrap/cache
           chmod -R ug+rwX storage bootstrap/cache
 
@@ -81,9 +123,60 @@ jobs:
           chown -R www-data:www-data storage bootstrap/cache
           chmod -R ug+rwX storage bootstrap/cache
 
+          cat >/etc/systemd/system/skyguardian-news-worker.service <<'UNIT'
+          [Unit]
+          Description=SkyGuardian Telegram news polling worker
+          After=network-online.target postgresql.service
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=www-data
+          Group=www-data
+          WorkingDirectory=/var/www/skyguardian
+          ExecStart=/usr/bin/php artisan news:work --sleep=1
+          Restart=always
+          RestartSec=3
+          KillSignal=SIGTERM
+          TimeoutStopSec=45
+          UMask=0077
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          cat >/etc/systemd/system/skyguardian-queue.service <<'UNIT'
+          [Unit]
+          Description=SkyGuardian publication queue worker
+          After=network-online.target postgresql.service
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=www-data
+          Group=www-data
+          WorkingDirectory=/var/www/skyguardian
+          ExecStart=/usr/bin/php artisan queue:work database --queue=news,default --sleep=1 --tries=5 --timeout=300 --max-time=3600
+          Restart=always
+          RestartSec=3
+          KillSignal=SIGTERM
+          TimeoutStopSec=330
+          UMask=0077
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+
+          systemctl daemon-reload
+          systemctl enable skyguardian-news-worker.service skyguardian-queue.service
+          systemctl restart skyguardian-news-worker.service skyguardian-queue.service
+
           systemctl reload php8.3-fpm 2>/dev/null || true
           nginx -t
           systemctl reload nginx
 
           curl --fail --silent --show-error --max-time 15 -H 'Host: skyguardian.pp.ua' http://127.0.0.1/ >/dev/null
+          systemctl is-active --quiet skyguardian-news-worker.service
+          systemctl is-active --quiet skyguardian-queue.service
+          trap - ERR
           echo 'SkyGuardian deployed successfully.'

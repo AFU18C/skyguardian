@@ -1142,6 +1142,17 @@
         box-shadow: 0 18px 42px rgba(0, 0, 0, .14);
     }
 
+    .resource-card-stacked {
+        display: block;
+    }
+
+    .resource-card-main {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 17px;
+    }
+
     .resource-card-icon {
         display: grid;
         width: 48px;
@@ -1210,6 +1221,10 @@
         margin: 0;
     }
 
+    .resource-error {
+        color: #fca5a5 !important;
+    }
+
     .resource-switch {
         position: relative;
         display: inline-flex;
@@ -1253,6 +1268,11 @@
         background: #5ee3b5;
     }
 
+    .resource-switch:has(input:disabled) {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+
     .status-pill-working {
         border-color: rgba(52, 211, 153, .16);
         background: rgba(16, 185, 129, .08);
@@ -1275,6 +1295,17 @@
         box-shadow: 0 0 0 4px rgba(248, 113, 113, .08);
     }
 
+    .status-pill-waiting {
+        border-color: rgba(251, 191, 36, .2);
+        background: rgba(180, 83, 9, .1);
+        color: #fcd34d;
+    }
+
+    .status-pill-waiting::before {
+        background: #fbbf24;
+        box-shadow: 0 0 0 4px rgba(251, 191, 36, .08);
+    }
+
     .status-pill-off {
         border-color: rgba(148, 163, 184, .16);
         background: rgba(100, 116, 139, .09);
@@ -1284,6 +1315,197 @@
     .status-pill-off::before {
         background: #64748b;
         box-shadow: 0 0 0 4px rgba(100, 116, 139, .08);
+    }
+
+    .technical-accounts {
+        margin-top: 18px;
+        padding-top: 17px;
+        border-top: 1px solid rgba(148, 163, 184, .1);
+    }
+
+    .technical-accounts-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+
+    .technical-accounts-heading > div,
+    .technical-account-copy,
+    .connected-account > div:last-child {
+        display: grid;
+        gap: 4px;
+    }
+
+    .technical-accounts-heading strong,
+    .technical-account-copy strong,
+    .connected-account strong {
+        color: #dce6f1;
+        font-size: 12px;
+    }
+
+    .technical-accounts-heading span,
+    .technical-account-copy small,
+    .connected-account span {
+        color: #64748b;
+        font-size: 10px;
+        line-height: 1.5;
+    }
+
+    .technical-account-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-top: 1px solid rgba(148, 163, 184, .07);
+    }
+
+    .technical-account-icon {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        place-items: center;
+        border-radius: 10px;
+        background: rgba(37, 99, 235, .09);
+        color: #73aefc;
+    }
+
+    .technical-account-copy > div {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .technical-account-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .technical-account-actions form {
+        display: flex;
+        margin: 0;
+    }
+
+    .technical-account-empty {
+        padding: 15px;
+        border: 1px dashed rgba(148, 163, 184, .13);
+        border-radius: 11px;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.6;
+    }
+
+    .compact-list {
+        display: grid;
+        gap: 8px;
+    }
+
+    .compact-list-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) minmax(120px, auto) auto;
+        align-items: center;
+        gap: 11px;
+        padding: 12px;
+        border: 1px solid rgba(148, 163, 184, .1);
+        border-radius: 10px;
+        color: #718198;
+        text-decoration: none;
+    }
+
+    .compact-list-row:hover {
+        border-color: rgba(96, 165, 250, .24);
+        background: rgba(30, 41, 59, .35);
+    }
+
+    .compact-list-row strong {
+        color: #dce6f1;
+        font-size: 12px;
+    }
+
+    .compact-list-row small {
+        color: #64748b;
+        font-size: 10px;
+        text-align: right;
+    }
+
+    .authorization-card {
+        margin-top: 15px;
+    }
+
+    .authorization-body {
+        display: grid;
+        gap: 16px;
+    }
+
+    .connected-account {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .inline-auth-form {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 15px;
+        border: 1px solid rgba(148, 163, 184, .1);
+        border-radius: 12px;
+        background: rgba(7, 13, 24, .32);
+    }
+
+    .inline-auth-form > div:first-child {
+        display: grid;
+        gap: 4px;
+    }
+
+    .inline-auth-form strong {
+        color: #dce6f1;
+        font-size: 12px;
+    }
+
+    .inline-auth-form span {
+        color: #64748b;
+        font-size: 11px;
+    }
+
+    .inline-auth-form .field {
+        min-width: min(100%, 360px);
+        flex: 1;
+    }
+
+    .qr-login {
+        display: grid;
+        justify-items: start;
+        gap: 12px;
+    }
+
+    .qr-login p {
+        margin: 0;
+        color: #718198;
+        font-size: 11px;
+    }
+
+    .qr-live {
+        overflow: hidden;
+        padding: 10px;
+        border-radius: 14px;
+        background: #fff;
+        line-height: 0;
+    }
+
+    .qr-live svg {
+        width: min(280px, 100%);
+        height: auto;
+    }
+
+    .standalone-danger-form {
+        margin-top: 15px;
+        padding: 0;
     }
 
     .alert-success {
@@ -1566,6 +1788,16 @@
             padding: 17px;
         }
 
+        .resource-card-main {
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: start;
+            gap: 14px;
+        }
+
+        .resource-card-main .resource-card-actions {
+            grid-column: 1 / -1;
+        }
+
         .resource-card-icon {
             width: 44px;
             height: 44px;
@@ -1581,6 +1813,29 @@
         .resource-card-details {
             display: grid;
             gap: 4px;
+        }
+
+        .technical-accounts-heading,
+        .inline-auth-form {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .technical-account-row {
+            grid-template-columns: auto minmax(0, 1fr);
+        }
+
+        .technical-account-actions {
+            grid-column: 1 / -1;
+            justify-content: flex-end;
+        }
+
+        .compact-list-row {
+            grid-template-columns: auto minmax(0, 1fr) auto;
+        }
+
+        .compact-list-row small {
+            display: none;
         }
 
         .button {

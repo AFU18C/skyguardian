@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\NewsChannelsController;
 use App\Http\Controllers\NewsSettingsController;
+use App\Http\Controllers\NewsTechnicalAccountsController;
 use App\Http\Controllers\SourceController;
 use App\Http\Controllers\TelegramDialogController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,10 @@ Route::middleware('auth')->group(function (): void {
         ->name('news.channels.update');
     Route::patch('/admin/news/channels/{channel}/toggle', [NewsChannelsController::class, 'toggle'])
         ->name('news.channels.toggle');
+    Route::post('/admin/news/channels/{channel}/check-access', [NewsChannelsController::class, 'checkAccess'])
+        ->name('news.channels.check-access');
+    Route::post('/admin/news/channels/{channel}/check-now', [NewsChannelsController::class, 'checkNow'])
+        ->name('news.channels.check-now');
     Route::delete('/admin/news/channels/{channel}', [NewsChannelsController::class, 'destroy'])
         ->name('news.channels.destroy');
 
@@ -39,14 +44,37 @@ Route::middleware('auth')->group(function (): void {
         ->name('news.settings.create');
     Route::post('/admin/news/settings', [NewsSettingsController::class, 'store'])
         ->name('news.settings.store');
-    Route::get('/admin/news/settings/{account}/edit', [NewsSettingsController::class, 'edit'])
+    Route::get('/admin/news/settings/{telegramApp}/edit', [NewsSettingsController::class, 'edit'])
         ->name('news.settings.edit');
-    Route::put('/admin/news/settings/{account}', [NewsSettingsController::class, 'update'])
+    Route::put('/admin/news/settings/{telegramApp}', [NewsSettingsController::class, 'update'])
         ->name('news.settings.update');
-    Route::patch('/admin/news/settings/{account}/toggle', [NewsSettingsController::class, 'toggle'])
+    Route::patch('/admin/news/settings/{telegramApp}/toggle', [NewsSettingsController::class, 'toggle'])
         ->name('news.settings.toggle');
-    Route::delete('/admin/news/settings/{account}', [NewsSettingsController::class, 'destroy'])
+    Route::delete('/admin/news/settings/{telegramApp}', [NewsSettingsController::class, 'destroy'])
         ->name('news.settings.destroy');
+
+    Route::get('/admin/news/settings/{telegramApp}/accounts/create', [NewsTechnicalAccountsController::class, 'create'])
+        ->name('news.accounts.create');
+    Route::post('/admin/news/settings/{telegramApp}/accounts', [NewsTechnicalAccountsController::class, 'store'])
+        ->name('news.accounts.store');
+    Route::get('/admin/news/settings/{telegramApp}/accounts/{account}/edit', [NewsTechnicalAccountsController::class, 'edit'])
+        ->name('news.accounts.edit');
+    Route::put('/admin/news/settings/{telegramApp}/accounts/{account}', [NewsTechnicalAccountsController::class, 'update'])
+        ->name('news.accounts.update');
+    Route::post('/admin/news/settings/{telegramApp}/accounts/{account}/phone/start', [NewsTechnicalAccountsController::class, 'startPhone'])
+        ->name('news.accounts.phone.start');
+    Route::post('/admin/news/settings/{telegramApp}/accounts/{account}/phone/complete', [NewsTechnicalAccountsController::class, 'completePhone'])
+        ->name('news.accounts.phone.complete');
+    Route::post('/admin/news/settings/{telegramApp}/accounts/{account}/password', [NewsTechnicalAccountsController::class, 'completePassword'])
+        ->name('news.accounts.password');
+    Route::post('/admin/news/settings/{telegramApp}/accounts/{account}/qr', [NewsTechnicalAccountsController::class, 'qr'])
+        ->name('news.accounts.qr');
+    Route::patch('/admin/news/settings/{telegramApp}/accounts/{account}/toggle', [NewsTechnicalAccountsController::class, 'toggle'])
+        ->name('news.accounts.toggle');
+    Route::post('/admin/news/settings/{telegramApp}/accounts/{account}/disconnect', [NewsTechnicalAccountsController::class, 'disconnect'])
+        ->name('news.accounts.disconnect');
+    Route::delete('/admin/news/settings/{telegramApp}/accounts/{account}', [NewsTechnicalAccountsController::class, 'destroy'])
+        ->name('news.accounts.destroy');
 
     Route::view('/admin/alerts/channels', 'admin.section', [
         'group' => 'Воздушная тревога',
