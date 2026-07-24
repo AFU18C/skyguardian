@@ -2,24 +2,12 @@ name: Cleanup Server Modules
 
 on:
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: "Введите DELETE для подтверждения"
-        required: true
-        type: string
 
 jobs:
   cleanup-modules:
     runs-on: self-hosted
 
     steps:
-      - name: Verify confirmation
-        shell: bash
-        env:
-          CONFIRM: ${{ inputs.confirm }}
-        run: |
-          [ "$CONFIRM" = "DELETE" ] || { echo "Confirmation failed"; exit 1; }
-
       - name: Remove project modules and caches
         shell: bash
         run: |
