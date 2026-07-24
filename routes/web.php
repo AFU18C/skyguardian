@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\SourceController;
+use App\Http\Controllers\TelegramDialogController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -30,6 +31,10 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/integrations/telegram/{telegramAccount}/qr', [IntegrationController::class, 'qr'])->name('integrations.telegram.qr');
     Route::post('/integrations/telegram/{telegramAccount}/disconnect', [IntegrationController::class, 'disconnect'])->name('integrations.telegram.disconnect');
     Route::delete('/integrations/telegram/{telegramAccount}', [IntegrationController::class, 'destroy'])->name('integrations.telegram.destroy');
+
+    Route::get('/integrations/telegram/{telegramAccount}/dialogs', [TelegramDialogController::class, 'index'])->name('integrations.telegram.dialogs');
+    Route::post('/integrations/telegram/{telegramAccount}/dialogs/source', [TelegramDialogController::class, 'store'])->name('integrations.telegram.dialogs.store');
+    Route::get('/integrations/telegram/{telegramAccount}/messages', [TelegramDialogController::class, 'messages'])->name('integrations.telegram.messages');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
 });
