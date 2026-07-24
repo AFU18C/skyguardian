@@ -1,0 +1,44 @@
+name: Server Cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Введите DELETE для подтверждения"
+        required: true
+        type: string
+
+jobs:
+  cleanup:
+    runs-on: self-hosted
+
+    steps:
+      - name: Verify confirmation
+        shell: bash
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "DELETE" ] || { echo "Confirmation failed"; exit 1; }
+
+      - name: Clean server and preserve access
+        shell: bash
+        run: |
+          set -e
+
+          docker system prune -af --volumes 2>/dev/null || true
+
+          rm -rf /var/www/*
+          rm -rf /srv/*
+          rm -rf /opt/*
+          rm -rf /tmp/*
+          rm -rf /var/tmp/*
+
+          find /home/runner -mindepth 1 -maxdepth 1 \
+            ! -name actions-runner \
+            ! -name .ssh \
+            -exec rm -rf {} +
+
+          apt-get clean
+          journalctl --vacuum-time=1d || true
+
+          systemctl restart actions.runner.AFU18C-skyguardian.bigxaos.service
