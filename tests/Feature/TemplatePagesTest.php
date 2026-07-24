@@ -59,27 +59,17 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Страница не найдена');
     }
 
-    public function test_news_settings_opens_separate_add_form_page(): void
+    public function test_news_settings_shows_next_stage_placeholder(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->get(route('news.settings'))
             ->assertOk()
-            ->assertSee('Telegram API и технические аккаунты новостей.')
-            ->assertSee(route('news.settings.create'))
-            ->assertSee('Настройки ещё не добавлены')
-            ->assertDontSee('Название API');
-
-        $this->actingAs($user)
-            ->get(route('news.settings.create'))
-            ->assertOk()
-            ->assertSee('Добавить Telegram API и технический аккаунт')
-            ->assertSee('Название API')
-            ->assertSee('API ID')
-            ->assertSee('API Hash')
-            ->assertSee('Номер телефона')
-            ->assertSee('QR-код');
+            ->assertSee('Данные ещё не добавлены')
+            ->assertSee('Форма добавления и рабочая логика будут подключены на следующем этапе.')
+            ->assertDontSee('Добавить')
+            ->assertDontSee('Telegram API и технические аккаунты новостей.');
     }
 
     public function test_news_settings_edit_form_contains_save_and_delete_buttons(): void
@@ -93,29 +83,6 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Редактировать Telegram API и технический аккаунт')
             ->assertSee('Сохранить')
             ->assertSee('Удалить');
-    }
-
-    public function test_news_settings_supports_legacy_plaintext_api_credentials(): void
-    {
-        $user = User::factory()->create();
-        $account = $this->telegramAccount();
-
-        DB::table('telegram_accounts')
-            ->where('id', $account->id)
-            ->update([
-                'api_id' => '33042494',
-                'api_hash' => str_repeat('a', 32),
-            ]);
-
-        $this->actingAs($user)
-            ->get(route('news.settings'))
-            ->assertOk()
-            ->assertSee('API ID: 33042494');
-
-        $this->actingAs($user)
-            ->get(route('news.settings.edit', $account))
-            ->assertOk()
-            ->assertSee('value="33042494"', false);
     }
 
     public function test_news_channels_opens_separate_add_form_page(): void
@@ -198,10 +165,9 @@ class TemplatePagesTest extends TestCase
         $this->actingAs($user)
             ->get(route('news.settings'))
             ->assertOk()
-            ->assertSee($account->name)
-            ->assertSee('Работает')
-            ->assertSee(route('news.settings.edit', $account))
-            ->assertDontSee('Настройки ещё не добавлены');
+            ->assertSee('Данные ещё не добавлены')
+            ->assertDontSee($account->name)
+            ->assertDontSee(route('news.settings.edit', $account));
 
         $this->actingAs($user)
             ->get(route('news.channels'))
@@ -246,7 +212,8 @@ class TemplatePagesTest extends TestCase
         $this->actingAs($user)
             ->get(route('news.settings'))
             ->assertOk()
-            ->assertSee($newsAccount->name)
+            ->assertSee('Данные ещё не добавлены')
+            ->assertDontSee($newsAccount->name)
             ->assertDontSee($alertAccount->name);
 
         $this->actingAs($user)
