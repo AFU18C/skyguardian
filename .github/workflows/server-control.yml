@@ -1,41 +1,21 @@
-name: Server Control
+name: Server Command
 
 on:
   workflow_dispatch:
     inputs:
-      action:
-        description: "Выбери действие"
+      command:
+        description: "Команда для сервера"
         required: true
-        type: choice
-        options:
-          - check-runner
-          - restart-runner
-          - server-info
+        type: string
 
 jobs:
-  control:
+  execute:
     runs-on: self-hosted
 
     steps:
-      - name: Execute action
+      - name: Run command
         shell: bash
+        env:
+          SERVER_COMMAND: ${{ inputs.command }}
         run: |
-          case "${{ inputs.action }}" in
-            check-runner)
-              systemctl status 'actions.runner*' --no-pager
-              ;;
-            restart-runner)
-              systemctl restart 'actions.runner*'
-              systemctl status 'actions.runner*' --no-pager
-              ;;
-            server-info)
-              whoami
-              hostname
-              uptime
-              df -h
-              ;;
-            *)
-              echo "Неизвестное действие"
-              exit 1
-              ;;
-          esac
+          bash -lc "$SERVER_COMMAND"
