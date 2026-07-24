@@ -6,7 +6,7 @@ use App\Http\Controllers\SourceController;
 use App\Http\Controllers\TelegramDialogController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/dashboard');
+Route::view('/', 'welcome')->name('home');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
@@ -15,6 +15,39 @@ Route::middleware('guest')->group(function (): void {
 
 Route::middleware('auth')->group(function (): void {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
+
+    Route::view('/admin/news/channels', 'admin.section', [
+        'group' => 'Новости',
+        'title' => 'Каналы данных',
+        'description' => 'Раздел подготовлен для добавления источников новостей.',
+    ])->name('news.channels');
+    Route::view('/admin/news/settings', 'admin.section', [
+        'group' => 'Новости',
+        'title' => 'Настройка',
+        'description' => 'Раздел подготовлен для Telegram API и технических аккаунтов новостей.',
+    ])->name('news.settings');
+
+    Route::view('/admin/alerts/channels', 'admin.section', [
+        'group' => 'Воздушная тревога',
+        'title' => 'Каналы данных',
+        'description' => 'Раздел подготовлен для добавления источников воздушной тревоги.',
+    ])->name('alerts.channels');
+    Route::view('/admin/alerts/settings', 'admin.section', [
+        'group' => 'Воздушная тревога',
+        'title' => 'Настройка',
+        'description' => 'Раздел подготовлен для Telegram API и технических аккаунтов воздушной тревоги.',
+    ])->name('alerts.settings');
+
+    Route::view('/admin/settings/groups', 'admin.section', [
+        'group' => 'Общие настройки',
+        'title' => 'Управление группой',
+        'description' => 'Раздел управления группой подготовлен к следующему этапу.',
+    ])->name('settings.groups');
+    Route::view('/admin/settings/site', 'admin.section', [
+        'group' => 'Общие настройки',
+        'title' => 'Управление сайтом',
+        'description' => 'Раздел управления сайтом подготовлен к следующему этапу.',
+    ])->name('settings.site');
 
     Route::get('/sources', [SourceController::class, 'index'])->name('sources.index');
     Route::post('/sources', [SourceController::class, 'store'])->name('sources.store');
