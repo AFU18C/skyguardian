@@ -1,12 +1,16 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BootstrapAdminController;
 use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\SourceController;
 use App\Http\Controllers\TelegramDialogController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+Route::get('/setup-admin/{token}', [BootstrapAdminController::class, 'create'])->name('bootstrap-admin.create');
+Route::post('/setup-admin/{token}', [BootstrapAdminController::class, 'store'])->name('bootstrap-admin.store');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'create'])->name('login');
