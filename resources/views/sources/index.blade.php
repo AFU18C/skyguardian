@@ -21,7 +21,7 @@
         <a class="nav-item" href="#">Новости</a>
         <a class="nav-item" href="#">Оповещения</a>
         <div class="nav-title">Система</div>
-        <a class="nav-item" href="#">Интеграции</a>
+        <a class="nav-item" href="{{ route('integrations.index') }}">Интеграции</a>
         <a class="nav-item" href="#">Настройки</a>
     </aside>
 
