@@ -1,0 +1,41 @@
+name: Server Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Выбери действие"
+        required: true
+        type: choice
+        options:
+          - check-runner
+          - restart-runner
+          - server-info
+
+jobs:
+  control:
+    runs-on: self-hosted
+
+    steps:
+      - name: Execute action
+        shell: bash
+        run: |
+          case "${{ inputs.action }}" in
+            check-runner)
+              systemctl status 'actions.runner*' --no-pager
+              ;;
+            restart-runner)
+              systemctl restart 'actions.runner*'
+              systemctl status 'actions.runner*' --no-pager
+              ;;
+            server-info)
+              whoami
+              hostname
+              uptime
+              df -h
+              ;;
+            *)
+              echo "Неизвестное действие"
+              exit 1
+              ;;
+          esac
