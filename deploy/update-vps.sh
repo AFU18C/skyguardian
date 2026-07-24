@@ -51,6 +51,11 @@ if ! grep -q 'technical-accounts-runtime.js' public/index.php; then
 else
   sed -i -E "s#assets/technical-accounts-runtime\.js\?v=[^\"']+#assets/technical-accounts-runtime.js?v=${asset_version}#" public/index.php
 fi
+if ! grep -q 'data-channels-runtime.js' public/index.php; then
+  sed -i "/technical-accounts-runtime.js/a\\<script src=\"assets/data-channels-runtime.js?v=${asset_version}\" defer></script>" public/index.php
+else
+  sed -i -E "s#assets/data-channels-runtime\.js\?v=[^\"']+#assets/data-channels-runtime.js?v=${asset_version}#" public/index.php
+fi
 
 mkdir -p \
   storage/backups \
@@ -79,6 +84,7 @@ rm -f public/MadelineProto.log
 install -o www-data -g www-data -m 0660 /dev/null storage/madeline-runtime/MadelineProto.log
 
 # Verify permissions as the actual PHP-FPM user, not as root.
+runuser -u www-data -- test -w storage
 runuser -u www-data -- test -w storage/madeline-runtime
 runuser -u www-data -- test -w storage/telegram-sessions
 runuser -u www-data -- test -w storage/technical-accounts
@@ -114,5 +120,7 @@ curl --fail --silent --show-error \
   }
 
 grep -q "technical-accounts-runtime.js?v=${asset_version}" public/index.php
+grep -q "data-channels-runtime.js?v=${asset_version}" public/index.php
+test -f public/data-channels.php
 
 echo "SkyGuardian update completed successfully. Runtime snapshot: $snapshot"

@@ -40,18 +40,28 @@ $readFile = static function (string $path): array {
     return is_array($decoded) ? array_values(array_filter($decoded, 'is_array')) : [];
 };
 
-$mergeItems = static function (array $groups): array {
+$identity = static function (array $item): string {
+    $telegramId = trim((string) ($item['telegram_id'] ?? ''));
+    if ($telegramId !== '') return 'tg:' . $telegramId;
+    $apiId = trim((string) ($item['api_id'] ?? ''));
+    $apiHash = strtolower(trim((string) ($item['api_hash'] ?? '')));
+    if ($apiId !== '' && $apiHash !== '') return 'api:' . $apiId . ':' . $apiHash;
+    return 'id:' . trim((string) ($item['id'] ?? ''));
+};
+
+$mergeItems = static function (array $groups) use ($identity): array {
     $merged = [];
     foreach ($groups as $items) {
         foreach ($items as $item) {
             $id = (string) ($item['id'] ?? '');
             if ($id === '') continue;
-            if (!isset($merged[$id])) {
-                $merged[$id] = $item;
+            $key = $identity($item);
+            if (!isset($merged[$key])) {
+                $merged[$key] = $item;
                 continue;
             }
             // Prefer connected and more complete data over old browser-only rows.
-            $existing = $merged[$id];
+            $existing = $merged[$key];
             $candidateScore = (!empty($item['connected']) ? 100 : 0)
                 + (!empty($item['telegram_id']) ? 20 : 0)
                 + (!empty($item['phone']) ? 10 : 0)
@@ -60,7 +70,7 @@ $mergeItems = static function (array $groups): array {
                 + (!empty($existing['telegram_id']) ? 20 : 0)
                 + (!empty($existing['phone']) ? 10 : 0)
                 + count(array_filter($existing, static fn($value) => $value !== '' && $value !== null));
-            $merged[$id] = $candidateScore >= $existingScore
+            $merged[$key] = $candidateScore >= $existingScore
                 ? array_merge($existing, $item)
                 : array_merge($item, $existing);
         }
@@ -107,6 +117,16 @@ try {
         $reply(419, ['ok' => false, 'message' => 'Сессия устарела. Обновите страницу.']);
     }
 
+    if (isset($_POST['items'])) {
+        $submitted = json_decode((string) $_POST['items'], true);
+        if (!is_array($submitted)) {
+            $reply(422, ['ok' => false, 'message' => 'Некорректные данные аккаунтов.']);
+        }
+        $items = $mergeItems([$submitted]);
+        $writeItems($items);
+        $reply(200, ['ok' => true, 'items' => $items]);
+    }
+
     $item = json_decode((string) ($_POST['item'] ?? ''), true);
     if (!is_array($item) || !preg_match('/^[A-Za-z0-9_-]{8,80}$/', (string) ($item['id'] ?? ''))) {
         $reply(422, ['ok' => false, 'message' => 'Некорректные данные технического аккаунта.']);
@@ -123,8 +143,9 @@ try {
     }
 
     $index = null;
+    $cleanIdentity = $identity($clean);
     foreach ($items as $i => $existing) {
-        if (($existing['id'] ?? null) === $clean['id']) {
+        if (($existing['id'] ?? null) === $clean['id'] || $identity($existing) === $cleanIdentity) {
             $index = $i;
             break;
         }
@@ -132,6 +153,7 @@ try {
     if ($index === null) $items[] = $clean;
     else $items[$index] = array_merge($items[$index], $clean);
 
+    $items = $mergeItems([$items]);
     $writeItems($items);
     $reply(200, ['ok' => true, 'items' => $items]);
 } catch (Throwable $exception) {
