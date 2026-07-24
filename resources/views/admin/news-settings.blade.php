@@ -20,18 +20,36 @@
         </x-ui.button>
     </div>
 
-    <section class="panel">
-        <header class="panel-header">
-            <div>
-                <div class="panel-title">Telegram API и технические аккаунты</div>
-                <div class="panel-copy">Настройки раздела «Новости».</div>
+    <div class="resource-list">
+        <article class="resource-card">
+            <div class="resource-card-icon">
+                <x-icon name="account" :size="23"/>
             </div>
-        </header>
-        <x-ui.empty-state
-            title="API и технические аккаунты ещё не добавлены"
-            description="Нажмите «Добавить», чтобы перейти к форме."
-            icon="settings"
-        />
-    </section>
+
+            <div class="resource-card-content">
+                <div class="resource-card-heading">
+                    <h2>Telegram 33042494</h2>
+                    <span class="status-pill">Включён</span>
+                </div>
+                <div class="resource-card-meta">API ID: 33042494</div>
+                <div class="resource-card-note">Технический аккаунт подключён</div>
+            </div>
+
+            <div class="resource-card-actions">
+                <label class="resource-switch" aria-label="Отключить настройку">
+                    <input type="checkbox" checked>
+                    <span></span>
+                </label>
+                <a
+                    class="icon-button"
+                    href="{{ route('news.settings.edit', ['account' => 1]) }}"
+                    aria-label="Редактировать настройку"
+                    title="Редактировать"
+                >
+                    <x-icon name="edit" :size="18"/>
+                </a>
+            </div>
+        </article>
+    </div>
 </div>
 @endsection
