@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Crypt;
@@ -11,6 +12,7 @@ class TelegramAccount extends Model
 {
     protected $fillable = [
         'name',
+        'purpose',
         'api_id',
         'api_hash',
         'login_method',
@@ -63,6 +65,11 @@ class TelegramAccount extends Model
             },
             set: fn (mixed $value): string => Crypt::encryptString((string) $value),
         );
+    }
+
+    public function scopeForPurpose(Builder $query, string $purpose): Builder
+    {
+        return $query->where('purpose', $purpose);
     }
 
     public function sessionPath(): string
