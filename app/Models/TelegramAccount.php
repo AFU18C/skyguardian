@@ -33,14 +33,14 @@ class TelegramAccount extends Model
     {
         return Attribute::make(
             get: function (mixed $value): string {
+                if (ctype_digit((string) $value)) {
+                    return (string) $value;
+                }
+
                 try {
                     return Crypt::decryptString((string) $value);
-                } catch (DecryptException $exception) {
-                    if (ctype_digit((string) $value)) {
-                        return (string) $value;
-                    }
-
-                    throw $exception;
+                } catch (DecryptException) {
+                    return '';
                 }
             },
             set: fn (mixed $value): string => Crypt::encryptString((string) $value),
@@ -51,14 +51,14 @@ class TelegramAccount extends Model
     {
         return Attribute::make(
             get: function (mixed $value): string {
+                if (preg_match('/^[a-f0-9]{32}$/i', (string) $value) === 1) {
+                    return (string) $value;
+                }
+
                 try {
                     return Crypt::decryptString((string) $value);
-                } catch (DecryptException $exception) {
-                    if (preg_match('/^[a-f0-9]{32}$/i', (string) $value) === 1) {
-                        return (string) $value;
-                    }
-
-                    throw $exception;
+                } catch (DecryptException) {
+                    return '';
                 }
             },
             set: fn (mixed $value): string => Crypt::encryptString((string) $value),
