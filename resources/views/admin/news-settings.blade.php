@@ -41,7 +41,9 @@
                         <h2>{{ $account->name }}</h2>
                         <span class="status-pill status-pill-{{ $state }}">{{ $label }}</span>
                     </div>
-                    <div class="resource-card-meta">API ID: {{ $account->api_id }}</div>
+                    <div class="resource-card-meta">
+                        API ID: {{ filled($account->api_id) ? $account->api_id : 'нужно ввести заново' }}
+                    </div>
                     <div class="resource-card-note">
                         {{ $state === 'working' ? 'Технический аккаунт подключён' : ($account->last_error ?: 'Технический аккаунт выключен') }}
                     </div>
