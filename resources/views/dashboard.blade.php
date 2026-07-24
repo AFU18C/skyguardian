@@ -14,7 +14,7 @@
         <div class="brand"><div class="brand-mark">SG</div>SkyGuardian</div>
         <div class="nav-title">Управление</div>
         <a class="nav-item active" href="{{ route('dashboard') }}"><span class="nav-icon">◫</span>Обзор</a>
-        <a class="nav-item" href="#"><span class="nav-icon">◉</span>Источники</a>
+        <a class="nav-item" href="{{ route('sources.index') }}"><span class="nav-icon">◉</span>Источники</a>
         <a class="nav-item" href="#"><span class="nav-icon">≡</span>Новости</a>
         <a class="nav-item" href="#"><span class="nav-icon">△</span>Оповещения</a>
         <div class="nav-title">Система</div>
