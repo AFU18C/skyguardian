@@ -1,0 +1,46 @@
+name: Cleanup Server Modules
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Введите DELETE для подтверждения"
+        required: true
+        type: string
+
+jobs:
+  cleanup-modules:
+    runs-on: self-hosted
+
+    steps:
+      - name: Verify confirmation
+        shell: bash
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "DELETE" ] || { echo "Confirmation failed"; exit 1; }
+
+      - name: Remove project modules and caches
+        shell: bash
+        run: |
+          set -e
+
+          find /var/www /srv /opt /home \
+            -path /home/runner/actions-runner -prune -o \
+            -type d \( \
+              -name node_modules -o \
+              -name vendor -o \
+              -name .venv -o \
+              -name venv -o \
+              -name __pycache__ -o \
+              -name .pytest_cache -o \
+              -name .mypy_cache -o \
+              -name .cache \
+            \) -prune -exec rm -rf {} + 2>/dev/null || true
+
+          npm cache clean --force 2>/dev/null || true
+          composer clear-cache 2>/dev/null || true
+          pip cache purge 2>/dev/null || true
+          apt-get clean
+
+          echo "Modules and caches removed. GitHub runner preserved."
