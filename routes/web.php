@@ -24,6 +24,11 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
     Route::post('/integrations/telegram', [IntegrationController::class, 'store'])->name('integrations.telegram.store');
     Route::put('/integrations/telegram/{telegramAccount}', [IntegrationController::class, 'update'])->name('integrations.telegram.update');
+    Route::post('/integrations/telegram/{telegramAccount}/phone/start', [IntegrationController::class, 'startPhone'])->name('integrations.telegram.phone.start');
+    Route::post('/integrations/telegram/{telegramAccount}/phone/complete', [IntegrationController::class, 'completePhone'])->name('integrations.telegram.phone.complete');
+    Route::post('/integrations/telegram/{telegramAccount}/password', [IntegrationController::class, 'completePassword'])->name('integrations.telegram.password');
+    Route::get('/integrations/telegram/{telegramAccount}/qr', [IntegrationController::class, 'qr'])->name('integrations.telegram.qr');
+    Route::post('/integrations/telegram/{telegramAccount}/disconnect', [IntegrationController::class, 'disconnect'])->name('integrations.telegram.disconnect');
     Route::delete('/integrations/telegram/{telegramAccount}', [IntegrationController::class, 'destroy'])->name('integrations.telegram.destroy');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
