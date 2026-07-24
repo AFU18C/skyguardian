@@ -23,6 +23,12 @@ Route::middleware('auth')->group(function (): void {
     ])->name('news.channels');
     Route::view('/admin/news/settings', 'admin.news-settings')
         ->name('news.settings');
+    Route::view('/admin/news/settings/create', 'admin.news-setting-form', [
+        'editing' => false,
+    ])->name('news.settings.create');
+    Route::view('/admin/news/settings/{account}/edit', 'admin.news-setting-form', [
+        'editing' => true,
+    ])->name('news.settings.edit');
 
     Route::view('/admin/alerts/channels', 'admin.section', [
         'group' => 'Воздушная тревога',
