@@ -22,6 +22,9 @@ Route::middleware('auth')->group(function (): void {
     Route::delete('/sources/{source}', [SourceController::class, 'destroy'])->name('sources.destroy');
 
     Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
+    Route::post('/integrations/telegram', [IntegrationController::class, 'store'])->name('integrations.telegram.store');
+    Route::put('/integrations/telegram/{telegramAccount}', [IntegrationController::class, 'update'])->name('integrations.telegram.update');
+    Route::delete('/integrations/telegram/{telegramAccount}', [IntegrationController::class, 'destroy'])->name('integrations.telegram.destroy');
 
     Route::post('/logout', [AuthController::class, 'destroy'])->name('logout');
 });
