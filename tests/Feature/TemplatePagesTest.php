@@ -65,6 +65,10 @@ class TemplatePagesTest extends TestCase
             ->assertOk()
             ->assertSee('Telegram API и технические аккаунты новостей.')
             ->assertSee(route('news.settings.create'))
+            ->assertSee(route('news.settings.edit', ['account' => 1]))
+            ->assertSee('Telegram 33042494')
+            ->assertSee('API ID: 33042494')
+            ->assertSee('Технический аккаунт подключён')
             ->assertDontSee('Название API');
 
         $this->actingAs($user)
@@ -99,6 +103,10 @@ class TemplatePagesTest extends TestCase
             ->assertOk()
             ->assertSee('Каналы данных')
             ->assertSee(route('news.channels.create'))
+            ->assertSee(route('news.channels.edit', ['channel' => 1]))
+            ->assertSee('Новости города')
+            ->assertSee('@source_channel')
+            ->assertSee('@destination_channel')
             ->assertDontSee('Канал или группа — источник сообщений');
 
         $this->actingAs($user)
