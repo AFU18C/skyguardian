@@ -6,6 +6,7 @@ use App\Models\Source;
 use App\Models\TelegramAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class TemplatePagesTest extends TestCase
@@ -92,6 +93,29 @@ class TemplatePagesTest extends TestCase
             ->assertSee('Редактировать Telegram API и технический аккаунт')
             ->assertSee('Сохранить')
             ->assertSee('Удалить');
+    }
+
+    public function test_news_settings_supports_legacy_plaintext_api_credentials(): void
+    {
+        $user = User::factory()->create();
+        $account = $this->telegramAccount();
+
+        DB::table('telegram_accounts')
+            ->where('id', $account->id)
+            ->update([
+                'api_id' => '33042494',
+                'api_hash' => str_repeat('a', 32),
+            ]);
+
+        $this->actingAs($user)
+            ->get(route('news.settings'))
+            ->assertOk()
+            ->assertSee('API ID: 33042494');
+
+        $this->actingAs($user)
+            ->get(route('news.settings.edit', $account))
+            ->assertOk()
+            ->assertSee('value="33042494"', false);
     }
 
     public function test_news_channels_opens_separate_add_form_page(): void
