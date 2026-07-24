@@ -25,9 +25,6 @@ if (($_SESSION['admin_authenticated'] ?? false) !== true) {
     $reply(401, ['ok' => false, 'message' => 'Требуется авторизация администратора.']);
 }
 
-// Technical Telegram accounts are global runtime state. They must not be split
-// by page (news-settings, alerts-settings, etc.), otherwise each browser sees a
-// different list and an account connected on desktop disappears on mobile.
 $storageDir = dirname(__DIR__) . '/storage/technical-accounts';
 if (!is_dir($storageDir) && !mkdir($storageDir, 0770, true) && !is_dir($storageDir)) {
     $reply(503, ['ok' => false, 'message' => 'Не удалось подготовить хранилище аккаунтов.']);
@@ -43,9 +40,6 @@ $readFile = static function (string $path): array {
 $identity = static function (array $item): string {
     $telegramId = trim((string) ($item['telegram_id'] ?? ''));
     if ($telegramId !== '') return 'tg:' . $telegramId;
-    $apiId = trim((string) ($item['api_id'] ?? ''));
-    $apiHash = strtolower(trim((string) ($item['api_hash'] ?? '')));
-    if ($apiId !== '' && $apiHash !== '') return 'api:' . $apiId . ':' . $apiHash;
     return 'id:' . trim((string) ($item['id'] ?? ''));
 };
 
@@ -53,14 +47,13 @@ $mergeItems = static function (array $groups) use ($identity): array {
     $merged = [];
     foreach ($groups as $items) {
         foreach ($items as $item) {
-            $id = (string) ($item['id'] ?? '');
+            $id = trim((string) ($item['id'] ?? ''));
             if ($id === '') continue;
             $key = $identity($item);
             if (!isset($merged[$key])) {
                 $merged[$key] = $item;
                 continue;
             }
-            // Prefer connected and more complete data over old browser-only rows.
             $existing = $merged[$key];
             $candidateScore = (!empty($item['connected']) ? 100 : 0)
                 + (!empty($item['telegram_id']) ? 20 : 0)
@@ -143,9 +136,12 @@ try {
     }
 
     $index = null;
-    $cleanIdentity = $identity($clean);
+    $cleanTelegramId = trim((string) ($clean['telegram_id'] ?? ''));
     foreach ($items as $i => $existing) {
-        if (($existing['id'] ?? null) === $clean['id'] || $identity($existing) === $cleanIdentity) {
+        $sameId = ($existing['id'] ?? null) === $clean['id'];
+        $existingTelegramId = trim((string) ($existing['telegram_id'] ?? ''));
+        $sameTelegram = $cleanTelegramId !== '' && $existingTelegramId !== '' && $existingTelegramId === $cleanTelegramId;
+        if ($sameId || $sameTelegram) {
             $index = $i;
             break;
         }
