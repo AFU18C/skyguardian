@@ -16,11 +16,12 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
 
-    Route::get('/sources', [SourceController::class, 'index'])->name('sources.index');
-    Route::post('/sources', [SourceController::class, 'store'])->name('sources.store');
-    Route::put('/sources/{source}', [SourceController::class, 'update'])->name('sources.update');
-    Route::patch('/sources/{source}/toggle', [SourceController::class, 'toggle'])->name('sources.toggle');
-    Route::delete('/sources/{source}', [SourceController::class, 'destroy'])->name('sources.destroy');
+    Route::get('/news/channels', [SourceController::class, 'news'])->name('news.channels.index');
+    Route::get('/alerts/channels', [SourceController::class, 'alerts'])->name('alerts.channels.index');
+    Route::post('/channels/{section}', [SourceController::class, 'store'])->name('channels.store');
+    Route::put('/channels/{source}', [SourceController::class, 'update'])->name('channels.update');
+    Route::patch('/channels/{source}/toggle', [SourceController::class, 'toggle'])->name('channels.toggle');
+    Route::delete('/channels/{source}', [SourceController::class, 'destroy'])->name('channels.destroy');
 
     Route::get('/integrations', [IntegrationController::class, 'index'])->name('integrations.index');
     Route::post('/integrations/telegram', [IntegrationController::class, 'store'])->name('integrations.telegram.store');
