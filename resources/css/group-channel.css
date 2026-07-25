@@ -1,0 +1,98 @@
+.sg-group-channel-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.sg-group-channel-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 108px;
+    padding: 22px;
+    background: rgba(248,245,233,.94);
+    border: 1px solid var(--sg-line);
+    box-shadow: 0 12px 28px rgba(36,39,31,.09);
+}
+
+.sg-group-channel-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 68px;
+    height: 3px;
+    background: var(--sg-khaki);
+}
+
+.sg-group-channel-mark {
+    width: 52px;
+    height: 52px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: var(--sg-olive-dark);
+    font-size: 20px;
+}
+
+.sg-group-channel-title {
+    min-width: 0;
+    flex: 1;
+}
+
+.sg-group-channel-title h2 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.sg-group-channel-title a,
+.sg-group-channel-title p {
+    display: block;
+    margin: 7px 0 0;
+    color: var(--sg-ink-soft);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.sg-group-channel-actions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.sg-group-channel-action {
+    width: 43px;
+    height: 43px;
+    display: inline-grid;
+    place-items: center;
+    color: var(--sg-ink);
+    background: var(--sg-paper);
+    border: 2px solid var(--sg-ink);
+    border-radius: 4px;
+}
+
+.sg-group-channel-action svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sg-group-channel-action:hover {
+    background: #ece5d2;
+}
+
+@media (max-width: 1100px) {
+    .sg-group-channel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+    .sg-group-channel-grid { grid-template-columns: 1fr; }
+    .sg-group-channel-card { padding: 18px; }
+}

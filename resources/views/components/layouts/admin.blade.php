@@ -10,6 +10,7 @@
         'resources/css/source-copying.css',
         'resources/css/collapsible-cards.css',
         'resources/css/topbar-metrics.css',
+        'resources/css/group-channel.css',
         'resources/js/app.js',
         'resources/js/collapsible-cards.js',
         'resources/js/topbar-metrics.js',
