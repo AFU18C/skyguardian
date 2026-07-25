@@ -23,13 +23,23 @@ ready(() => {
     document.querySelector('[data-sidebar-close]')?.addEventListener('click', closeSidebar);
     overlay?.addEventListener('click', closeSidebar);
 
-    const openModal = (id) => {
+    const openModal = (id, scrollSelector = null) => {
         const modal = document.getElementById(id);
         if (!modal) return;
         modal.hidden = false;
-        requestAnimationFrame(() => modal.classList.add('is-open'));
+        requestAnimationFrame(() => {
+            modal.classList.add('is-open');
+            if (scrollSelector) {
+                window.setTimeout(() => {
+                    const target = modal.querySelector(scrollSelector);
+                    target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                    target?.querySelector('[autofocus], input:not([type="hidden"]), select, textarea, button')?.focus();
+                }, 120);
+            } else {
+                modal.querySelector('input:not([type="hidden"]), select, textarea, button')?.focus();
+            }
+        });
         body.classList.add('sg-modal-open');
-        modal.querySelector('input:not([type="hidden"]), select, textarea, button')?.focus();
     };
 
     const formIsDirty = (modal) => Boolean(modal?.querySelector('[data-dirty-form].is-dirty'));
@@ -201,7 +211,9 @@ ready(() => {
         updatePhoneField();
     });
 
-    document.querySelectorAll('[data-open-modal-on-load]').forEach((element) => openModal(element.dataset.openModalOnLoad));
+    document.querySelectorAll('[data-open-modal-on-load]').forEach((element) => {
+        openModal(element.dataset.openModalOnLoad, element.dataset.modalScrollTo || null);
+    });
 
     const qrTargets = document.querySelectorAll('[data-qr-url]');
     if (qrTargets.length) {

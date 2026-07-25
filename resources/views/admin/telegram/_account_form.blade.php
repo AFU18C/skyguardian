@@ -92,6 +92,6 @@
 
     <div class="sg-form-actions">
         <button type="button" class="sg-button sg-button-secondary" data-modal-close>Отмена</button>
-        <button type="submit" class="sg-button sg-button-primary" data-submit-button>Сохранить</button>
+        <button type="submit" class="sg-button sg-button-primary" data-submit-button>{{ $isEdit ? 'Сохранить' : 'Сохранить и подключить' }}</button>
     </div>
 </form>

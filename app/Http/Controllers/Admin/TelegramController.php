@@ -119,7 +119,7 @@ class TelegramController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($validated): void {
+            $account = DB::transaction(function () use ($validated): TechnicalAccount {
                 $apiId = $validated['telegram_api_id'] ?? null;
 
                 if (! $apiId) {
@@ -132,7 +132,7 @@ class TelegramController extends Controller
                     $apiId = $api->id;
                 }
 
-                TechnicalAccount::query()->create([
+                return TechnicalAccount::query()->create([
                     'telegram_api_id' => $apiId,
                     'name' => $validated['name'],
                     'auth_method' => $validated['auth_method'],
@@ -142,7 +142,8 @@ class TelegramController extends Controller
                 ]);
             });
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Аккаунт добавлен', 'message' => 'Теперь выполните подключение к Telegram.']);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'success', 'title' => 'Аккаунт сохранён', 'message' => 'Теперь завершите подключение к Telegram в форме ниже.']);
         } catch (Throwable $e) {
             report($e);
 
@@ -175,7 +176,8 @@ class TelegramController extends Controller
                 'is_active' => (bool) ($validated['is_active'] ?? false),
             ]);
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Аккаунт обновлён', 'message' => 'Изменения сохранены.']);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'success', 'title' => 'Аккаунт обновлён', 'message' => 'Изменения сохранены. Продолжите подключение ниже.']);
         } catch (Throwable $e) {
             report($e);
 
@@ -223,11 +225,13 @@ class TelegramController extends Controller
         try {
             $service->sendCode($account->load('telegramApi'));
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Код отправлен', 'message' => 'Введите код, полученный в Telegram.']);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'success', 'title' => 'Код отправлен', 'message' => 'Введите код, полученный в Telegram.']);
         } catch (Throwable $e) {
             report($e);
 
-            return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка подключения', 'message' => $this->safeTelegramMessage($e)]);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'error', 'title' => 'Ошибка подключения', 'message' => $this->safeTelegramMessage($e)]);
         }
     }
 
@@ -239,14 +243,17 @@ class TelegramController extends Controller
             $updated = $service->signIn($account->load('telegramApi'), $validated['code']);
 
             if ($updated->status === 'awaiting_password') {
-                return back()->with('toast', ['type' => 'warning', 'title' => 'Требуется пароль', 'message' => 'Введите пароль двухэтапной аутентификации.']);
+                return $this->continueAccountFlow($updated)
+                    ->with('toast', ['type' => 'warning', 'title' => 'Требуется пароль 2FA', 'message' => 'Введите пароль двухэтапной аутентификации.']);
             }
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Telegram подключён', 'message' => 'Авторизация успешно завершена.']);
+            return redirect()->route('admin.telegram.index')
+                ->with('toast', ['type' => 'success', 'title' => 'Telegram подключён', 'message' => 'Авторизация успешно завершена.']);
         } catch (Throwable $e) {
             report($e);
 
-            return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка авторизации', 'message' => $this->safeTelegramMessage($e)]);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'error', 'title' => 'Ошибка авторизации', 'message' => $this->safeTelegramMessage($e)]);
         }
     }
 
@@ -257,30 +264,28 @@ class TelegramController extends Controller
         try {
             $service->signInPassword($account->load('telegramApi'), $validated['password']);
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Telegram подключён', 'message' => 'Двухэтапная авторизация завершена.']);
+            return redirect()->route('admin.telegram.index')
+                ->with('toast', ['type' => 'success', 'title' => 'Telegram подключён', 'message' => 'Двухэтапная авторизация завершена.']);
         } catch (Throwable $e) {
             report($e);
 
-            return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка авторизации', 'message' => $this->safeTelegramMessage($e)]);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'error', 'title' => 'Ошибка авторизации', 'message' => $this->safeTelegramMessage($e)]);
         }
     }
 
     public function startQr(TechnicalAccount $account, TelegramAuthService $service): RedirectResponse
     {
         try {
-            $result = $service->startQr($account->load('telegramApi'));
+            $service->startQr($account->load('telegramApi'));
 
-            return back()
-                ->with('qr_login', [
-                    'account_id' => $account->id,
-                    'url' => $result['url'],
-                    'expires_at' => $result['expires_at']->toIso8601String(),
-                ])
+            return $this->continueAccountFlow($account)
                 ->with('toast', ['type' => 'success', 'title' => 'QR-код создан', 'message' => 'Отсканируйте код в приложении Telegram.']);
         } catch (Throwable $e) {
             report($e);
 
-            return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка QR-входа', 'message' => $this->safeTelegramMessage($e)]);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'error', 'title' => 'Ошибка QR-входа', 'message' => $this->safeTelegramMessage($e)]);
         }
     }
 
@@ -290,16 +295,24 @@ class TelegramController extends Controller
             $result = $service->waitQr($account->load('telegramApi'), 5);
 
             return match ($result['status']) {
-                'connected' => back()->with('toast', ['type' => 'success', 'title' => 'Telegram подключён', 'message' => 'QR-авторизация завершена.']),
-                'awaiting_password' => back()->with('toast', ['type' => 'warning', 'title' => 'Требуется пароль', 'message' => 'Введите пароль двухэтапной аутентификации.']),
-                'expired' => back()->with('toast', ['type' => 'error', 'title' => 'QR-код истёк', 'message' => 'Создайте новый QR-код.']),
-                default => back()->with('toast', ['type' => 'warning', 'title' => 'Ожидание', 'message' => 'QR-код ещё не подтверждён.']),
+                'connected' => redirect()->route('admin.telegram.index')->with('toast', ['type' => 'success', 'title' => 'Telegram подключён', 'message' => 'QR-авторизация завершена.']),
+                'awaiting_password' => $this->continueAccountFlow($account)->with('toast', ['type' => 'warning', 'title' => 'Требуется пароль 2FA', 'message' => 'Введите пароль двухэтапной аутентификации.']),
+                'expired' => $this->continueAccountFlow($account)->with('toast', ['type' => 'error', 'title' => 'QR-код истёк', 'message' => 'Создайте новый QR-код.']),
+                default => $this->continueAccountFlow($account)->with('toast', ['type' => 'warning', 'title' => 'Ожидание', 'message' => 'QR-код ещё не подтверждён.']),
             };
         } catch (Throwable $e) {
             report($e);
 
-            return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка QR-входа', 'message' => $this->safeTelegramMessage($e)]);
+            return $this->continueAccountFlow($account)
+                ->with('toast', ['type' => 'error', 'title' => 'Ошибка QR-входа', 'message' => $this->safeTelegramMessage($e)]);
         }
+    }
+
+    private function continueAccountFlow(TechnicalAccount $account): RedirectResponse
+    {
+        return redirect()->route('admin.telegram.index')
+            ->with('open_account_id', $account->id)
+            ->with('auth_focus', true);
     }
 
     private function safeTelegramMessage(Throwable $e): string
