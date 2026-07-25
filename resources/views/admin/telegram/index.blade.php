@@ -49,7 +49,6 @@
                             <div class="sg-record-icon">API</div>
                             <div class="sg-record-title">
                                 <h3>{{ $api->name }}</h3>
-                                <p>API ID {{ $mask((string) $api->api_id, 4, 0) }}</p>
                             </div>
                             <div class="sg-card-summary-actions">
                                 <span class="sg-status {{ $api->is_active ? 'sg-status-success' : 'sg-status-muted' }}"><span class="sg-status-dot"></span>{{ $api->is_active ? 'Активна' : 'Отключена' }}</span>
@@ -66,8 +65,6 @@
 
                         <div class="sg-card-details" id="{{ $detailsId }}" data-card-details hidden>
                             <dl class="sg-record-data">
-                                <div><dt>API ID</dt><dd>{{ $mask((string) $api->api_id, 4, 0) }}</dd></div>
-                                <div><dt>API Hash</dt><dd>{{ $mask($api->api_hash) }}</dd></div>
                                 <div><dt>Аккаунтов</dt><dd>{{ $api->technical_accounts_count }}</dd></div>
                                 <div><dt>Обновлено</dt><dd>{{ $api->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
                             </dl>
