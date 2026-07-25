@@ -25,13 +25,25 @@ jobs:
           coverage: none
 
       - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Run PHP tests
         run: php artisan test
 
-      - name: Check PHP formatting
-        run: vendor/bin/pint --test
+      - name: Generate Pint formatting patch
+        run: |
+          vendor/bin/pint
+          git diff --binary > pint.patch
+
+      - name: Upload Pint formatting patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: pint-formatting-patch
+          path: pint.patch
+          if-no-files-found: error
+
+      - name: Fail when formatting changes are required
+        run: git diff --exit-code
 
       - name: Check Telethon worker syntax
         run: python3 -m py_compile telethon/worker.py
