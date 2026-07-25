@@ -14,6 +14,10 @@ class TelegramApi extends Model
 
     protected $hidden = ['api_hash'];
 
+    protected $attributes = [
+        'is_active' => true,
+    ];
+
     protected function casts(): array
     {
         return [
