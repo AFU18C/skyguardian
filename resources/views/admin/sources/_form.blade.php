@@ -2,6 +2,9 @@
     $isEdit = isset($source) && $source;
     $context = $isEdit ? 'source-'.$source->id : 'source-create';
     $useOld = old('form_context') === $context;
+    $sourceNamePlaceholder = $type === \App\Models\Source::TYPE_NEWS
+        ? 'Например: Новости региона'
+        : 'Например: Канал воздушных тревог';
     $rulesData = $useOld
         ? old('rules', [])
         : ($isEdit
@@ -26,7 +29,7 @@
             <span>Название источника <b>*</b></span>
             <input type="text" name="name" maxlength="255" required
                    value="{{ $useOld ? old('name') : ($source->name ?? '') }}"
-                   placeholder="Например: Новости региона">
+                   placeholder="{{ $sourceNamePlaceholder }}">
             @if ($useOld) @error('name')<small class="sg-field-error">{{ $message }}</small>@enderror @endif
         </label>
 
