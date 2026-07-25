@@ -41,7 +41,9 @@
         @else
             <div class="sg-api-grid">
                 @foreach ($apis as $api)
-                    @php($detailsId = 'api-card-details-'.$api->id)
+                    @php
+                        $detailsId = 'api-card-details-'.$api->id;
+                    @endphp
                     <article class="sg-api-card sg-collapsible-card" data-collapsible-card>
                         <div class="sg-record-card-top">
                             <div class="sg-record-icon">API</div>
@@ -93,7 +95,9 @@
         @else
             <div class="sg-card-grid">
                 @foreach ($accounts as $account)
-                    @php($detailsId = 'account-card-details-'.$account->id)
+                    @php
+                        $detailsId = 'account-card-details-'.$account->id;
+                    @endphp
                     <article class="sg-record-card sg-collapsible-card" data-collapsible-card>
                         <div class="sg-record-card-top">
                             <div class="sg-record-icon">➤</div>
@@ -194,7 +198,9 @@
         @if ($modal)
             <div data-open-modal-on-load="{{ $modal }}" @if($errorAccountId) data-modal-scroll-to="#account-connection-{{ $errorAccountId }}" @endif></div>
         @endif
-    @elseif ($openAccountId)
+    @endif
+
+    @if (! $errors->any() && $openAccountId)
         <div data-open-modal-on-load="account-edit-{{ $openAccountId }}" data-modal-scroll-to="#account-connection-{{ $openAccountId }}"></div>
     @endif
 
