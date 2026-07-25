@@ -3,7 +3,8 @@
         if (! $value) return 'Не определено';
         $length = mb_strlen($value);
         if ($length <= $start + $end) return mb_substr($value, 0, 2).'••••';
-        return mb_substr($value, 0, $start).'••••••••'.mb_substr($value, -$end);
+        $suffix = $end > 0 ? mb_substr($value, -$end) : '';
+        return mb_substr($value, 0, $start).'••••••••'.$suffix;
     };
     $maskPhone = static function (?string $phone): string {
         if (! $phone) return 'Не определено';
