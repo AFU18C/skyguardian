@@ -8,7 +8,9 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/var/www/skyguardian
-EnvironmentFile=-/var/www/skyguardian/.env
+Environment=SKYGUARDIAN_TELETHON_HOST=127.0.0.1
+Environment=SKYGUARDIAN_TELETHON_PORT=8787
+Environment=SKYGUARDIAN_QR_TTL=120
 ExecStart=/var/www/skyguardian/.venv/bin/python /var/www/skyguardian/telethon/worker.py
 Restart=always
 RestartSec=3
