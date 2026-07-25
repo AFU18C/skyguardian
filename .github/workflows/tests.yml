@@ -1,0 +1,54 @@
+name: SkyGuardian Tests
+
+on:
+  push:
+    branches:
+      - main
+      - tz1-implementation
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Run PHP tests
+        run: php artisan test
+
+      - name: Apply PHP formatting
+        run: vendor/bin/pint
+
+      - name: Commit PHP formatting
+        if: github.event_name == 'push' && github.ref == 'refs/heads/tz1-implementation'
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add --all
+            git commit -m "Apply Pint formatting"
+            git push
+          fi
+
+      - name: Check PHP formatting
+        run: git diff --exit-code
+
+      - name: Check Telethon worker syntax
+        run: python3 -m py_compile telethon/worker.py

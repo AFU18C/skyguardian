@@ -27,6 +27,7 @@ jobs:
             --exclude=".git" \
             --exclude=".github" \
             --exclude=".env" \
+            --exclude=".venv" \
             "$GITHUB_WORKSPACE/" /var/www/skyguardian/
 
           cd /var/www/skyguardian
@@ -46,6 +47,11 @@ jobs:
             --no-interaction \
             --prefer-dist \
             --optimize-autoloader
+
+          if [ ! -d .venv ]; then
+            python3 -m venv .venv
+          fi
+          .venv/bin/pip install --disable-pip-version-check -r telethon/requirements.txt
 
           if [ -f package-lock.json ]; then
             npm ci
@@ -68,6 +74,12 @@ jobs:
           php artisan config:cache
           php artisan view:cache
 
+          sudo cp deploy/systemd/skyguardian-telethon.service /etc/systemd/system/skyguardian-telethon.service
+          sudo cp deploy/systemd/skyguardian-scheduler.service /etc/systemd/system/skyguardian-scheduler.service
+          sudo systemctl daemon-reload
+          sudo systemctl enable skyguardian-telethon.service skyguardian-scheduler.service
+          sudo systemctl restart skyguardian-telethon.service skyguardian-scheduler.service
+
           sudo chown -R www-data:www-data storage bootstrap/cache
           sudo chmod -R ug+rwX storage bootstrap/cache
 
@@ -75,4 +87,5 @@ jobs:
           sudo nginx -t
           sudo systemctl reload nginx
 
+          sudo systemctl --no-pager --full status skyguardian-telethon.service skyguardian-scheduler.service
           echo "SkyGuardian deployed successfully."

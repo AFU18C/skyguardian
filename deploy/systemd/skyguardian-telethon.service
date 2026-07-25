@@ -1,0 +1,21 @@
+[Unit]
+Description=SkyGuardian Telethon daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/skyguardian
+Environment=SKYGUARDIAN_TELETHON_HOST=127.0.0.1
+Environment=SKYGUARDIAN_TELETHON_PORT=8787
+Environment=SKYGUARDIAN_QR_TTL=120
+ExecStart=/var/www/skyguardian/.venv/bin/python /var/www/skyguardian/telethon/worker.py
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
