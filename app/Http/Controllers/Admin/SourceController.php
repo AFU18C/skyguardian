@@ -16,6 +16,15 @@ use Throwable;
 
 class SourceController extends Controller
 {
+    private const RESERVED_RULE_KEYS = [
+        'copy_mode',
+        'strip_links',
+        'strip_hashtags',
+        'strip_mentions',
+        'remove_phrases',
+        'footer_html',
+    ];
+
     public function index(Request $request): View
     {
         $type = $this->type($request);
@@ -44,16 +53,18 @@ class SourceController extends Controller
         try {
             DB::transaction(function () use ($validated, $type): void {
                 $source = Source::query()->create([
-                    ...Arr::except($validated, ['rules']),
+                    ...$this->sourceAttributes($validated),
                     'type' => $type,
                     'is_active' => (bool) ($validated['is_active'] ?? false),
                     'next_check_at' => ($validated['is_active'] ?? false) ? now() : null,
+                    'last_message_id' => null,
+                    'last_success_at' => null,
                 ]);
 
-                $this->saveRules($source, $validated['rules'] ?? []);
+                $this->saveRules($source, $validated);
             });
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Источник добавлен', 'message' => 'Настройки источника сохранены.']);
+            return back()->with('toast', ['type' => 'success', 'title' => 'Источник добавлен', 'message' => 'Будут публиковаться только новые сообщения.']);
         } catch (Throwable $e) {
             report($e);
 
@@ -68,16 +79,26 @@ class SourceController extends Controller
 
         try {
             DB::transaction(function () use ($source, $validated): void {
-                $source->update([
-                    ...Arr::except($validated, ['rules']),
+                $sourcePeerChanged = $source->source_peer !== $validated['source_peer'];
+                $accountChanged = (string) $source->technical_account_id !== (string) ($validated['technical_account_id'] ?? '');
+                $resetCursor = (bool) ($validated['reset_cursor'] ?? false) || $sourcePeerChanged || $accountChanged;
+
+                $attributes = [
+                    ...$this->sourceAttributes($validated),
                     'is_active' => (bool) ($validated['is_active'] ?? false),
                     'next_check_at' => ($validated['is_active'] ?? false) ? now() : null,
-                ]);
+                ];
 
-                $this->saveRules($source, $validated['rules'] ?? []);
+                if ($resetCursor) {
+                    $attributes['last_message_id'] = null;
+                    $attributes['last_success_at'] = null;
+                }
+
+                $source->update($attributes);
+                $this->saveRules($source, $validated);
             });
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Изменения сохранены', 'message' => 'Источник обновлён.']);
+            return back()->with('toast', ['type' => 'success', 'title' => 'Изменения сохранены', 'message' => 'Настройки копирования обновлены.']);
         } catch (Throwable $e) {
             report($e);
 
@@ -125,19 +146,56 @@ class SourceController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'check_interval' => ['required', 'integer', 'min:1', 'max:86400'],
             'check_interval_unit' => ['required', Rule::in(['seconds', 'minutes', 'hours'])],
+            'copy_mode' => ['required', Rule::in(['original', 'text_only'])],
+            'strip_links' => ['nullable', 'boolean'],
+            'strip_hashtags' => ['nullable', 'boolean'],
+            'strip_mentions' => ['nullable', 'boolean'],
+            'remove_phrases' => ['nullable', 'string', 'max:10000'],
+            'footer_html' => ['nullable', 'string', 'max:10000'],
+            'reset_cursor' => ['nullable', 'boolean'],
             'rules' => ['nullable', 'array', 'max:20'],
-            'rules.*.key' => ['required', 'string', 'max:64', 'distinct'],
+            'rules.*.key' => ['required', 'string', 'max:64', 'distinct', Rule::notIn(self::RESERVED_RULE_KEYS)],
             'rules.*.value' => ['nullable', 'string', 'max:5000'],
             'rules.*.is_active' => ['nullable', 'boolean'],
             'rules.*.priority' => ['nullable', 'integer', 'min:0', 'max:10000'],
         ]);
     }
 
-    private function saveRules(Source $source, array $rules): void
+    private function sourceAttributes(array $validated): array
+    {
+        return Arr::only($validated, [
+            'name',
+            'technical_account_id',
+            'source_peer',
+            'destination_peer',
+            'check_interval',
+            'check_interval_unit',
+        ]);
+    }
+
+    private function saveRules(Source $source, array $validated): void
     {
         $source->rules()->delete();
 
-        foreach ($rules as $index => $rule) {
+        $settings = [
+            ['key' => 'copy_mode', 'value' => $validated['copy_mode'], 'priority' => 10],
+            ['key' => 'strip_links', 'value' => (bool) ($validated['strip_links'] ?? false), 'priority' => 20],
+            ['key' => 'strip_hashtags', 'value' => (bool) ($validated['strip_hashtags'] ?? false), 'priority' => 30],
+            ['key' => 'strip_mentions', 'value' => (bool) ($validated['strip_mentions'] ?? false), 'priority' => 40],
+            ['key' => 'remove_phrases', 'value' => trim((string) ($validated['remove_phrases'] ?? '')), 'priority' => 50],
+            ['key' => 'footer_html', 'value' => $this->sanitizeFooterHtml((string) ($validated['footer_html'] ?? '')), 'priority' => 60],
+        ];
+
+        foreach ($settings as $setting) {
+            $source->rules()->create([
+                'key' => $setting['key'],
+                'value' => ['value' => $setting['value']],
+                'is_active' => true,
+                'priority' => $setting['priority'],
+            ]);
+        }
+
+        foreach ($validated['rules'] ?? [] as $index => $rule) {
             $source->rules()->create([
                 'key' => $rule['key'],
                 'value' => ['value' => $rule['value'] ?? ''],
@@ -145,6 +203,39 @@ class SourceController extends Controller
                 'priority' => (int) ($rule['priority'] ?? (($index + 1) * 100)),
             ]);
         }
+    }
+
+    private function sanitizeFooterHtml(string $html): string
+    {
+        $allowedTags = '<b><strong><i><em><u><s><strike><code><pre><blockquote><a><br>';
+        $html = strip_tags($html, $allowedTags);
+
+        $html = preg_replace_callback('/<([a-z0-9]+)\b[^>]*>/iu', static function (array $matches): string {
+            $tag = mb_strtolower($matches[1]);
+
+            if ($tag === 'br') {
+                return '<br>';
+            }
+
+            if ($tag !== 'a') {
+                return '<'.$tag.'>';
+            }
+
+            if (! preg_match('/href\s*=\s*(["\'])(.*?)\1/iu', $matches[0], $hrefMatch)) {
+                return '<a>';
+            }
+
+            $href = trim($hrefMatch[2]);
+            $scheme = mb_strtolower((string) parse_url($href, PHP_URL_SCHEME));
+
+            if (! in_array($scheme, ['http', 'https', 'tg', 'mailto'], true)) {
+                return '<a>';
+            }
+
+            return '<a href="'.e($href, false).'">';
+        }, $html) ?? '';
+
+        return trim($html);
     }
 
     private function type(Request $request): string
