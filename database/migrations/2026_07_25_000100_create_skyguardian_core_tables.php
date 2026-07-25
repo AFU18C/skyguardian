@@ -14,6 +14,7 @@ return new class extends Migration {
             $table->text('api_hash');
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+            $table->unique('api_id');
         });
 
         Schema::create('technical_accounts', function (Blueprint $table) {
@@ -27,6 +28,8 @@ return new class extends Migration {
             $table->string('first_name')->nullable();
             $table->string('last_name')->nullable();
             $table->longText('session')->nullable();
+            $table->text('auth_data')->nullable();
+            $table->timestamp('auth_expires_at')->nullable();
             $table->string('status', 32)->default('not_checked');
             $table->text('last_error')->nullable();
             $table->timestamp('last_manual_check_at')->nullable();
@@ -34,6 +37,7 @@ return new class extends Migration {
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->index(['status', 'is_active']);
+            $table->index('telegram_user_id');
         });
 
         Schema::create('sources', function (Blueprint $table) {
