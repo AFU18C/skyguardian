@@ -5,15 +5,30 @@
     $sourceNamePlaceholder = $type === \App\Models\Source::TYPE_NEWS
         ? 'Например: Новости региона'
         : 'Например: Канал воздушных тревог';
+    $reservedRuleKeys = ['copy_mode', 'strip_links', 'strip_hashtags', 'strip_mentions', 'remove_phrases', 'footer_html'];
+    $storedRules = $isEdit ? $source->rules->keyBy('key') : collect();
+    $setting = static function (string $key, mixed $default = null) use ($useOld, $isEdit, $storedRules): mixed {
+        if ($useOld) {
+            return old($key, $default);
+        }
+
+        return $isEdit
+            ? data_get($storedRules->get($key)?->value, 'value', $default)
+            : $default;
+    };
+    $copyMode = (string) $setting('copy_mode', 'original');
+    $footerHtml = (string) $setting('footer_html', '');
     $rulesData = $useOld
         ? old('rules', [])
         : ($isEdit
-            ? $source->rules->map(fn ($rule) => [
-                'key' => $rule->key,
-                'value' => data_get($rule->value, 'value', ''),
-                'is_active' => $rule->is_active,
-                'priority' => $rule->priority,
-            ])->values()->all()
+            ? $source->rules
+                ->reject(fn ($rule) => in_array($rule->key, $reservedRuleKeys, true))
+                ->map(fn ($rule) => [
+                    'key' => $rule->key,
+                    'value' => data_get($rule->value, 'value', ''),
+                    'is_active' => $rule->is_active,
+                    'priority' => $rule->priority,
+                ])->values()->all()
             : []);
 @endphp
 
@@ -90,11 +105,89 @@
         <input type="checkbox" name="is_active" value="1" @checked((bool) ($useOld ? old('is_active') : ($source->is_active ?? false)))>
     </label>
 
+    <section class="sg-copy-settings">
+        <div class="sg-section-heading">
+            <div>
+                <p class="sg-eyebrow">Публикация</p>
+                <h3>Копирование сообщений</h3>
+                <p>Сообщение публикуется от имени канала назначения без отметки «Переслано».</p>
+            </div>
+        </div>
+
+        <div class="sg-choice-grid sg-copy-mode-grid">
+            <label class="sg-choice-card">
+                <input type="radio" name="copy_mode" value="original" @checked($copyMode === 'original')>
+                <span class="sg-choice-icon">▣</span>
+                <span><strong>Оригинал</strong><small>Копировать текст, фото, видео, документы и альбомы.</small></span>
+            </label>
+            <label class="sg-choice-card">
+                <input type="radio" name="copy_mode" value="text_only" @checked($copyMode === 'text_only')>
+                <span class="sg-choice-icon">T</span>
+                <span><strong>Только текст</strong><small>Публиковать текст и подпись без медиафайлов.</small></span>
+            </label>
+        </div>
+        @if ($useOld) @error('copy_mode')<p class="sg-field-error">{{ $message }}</p>@enderror @endif
+
+        <div class="sg-copy-toggle-grid">
+            <label class="sg-switch-row">
+                <span><strong>Удалять ссылки</strong><small>HTTP-ссылки и ссылки Telegram не попадут в публикацию.</small></span>
+                <input type="hidden" name="strip_links" value="0">
+                <input type="checkbox" name="strip_links" value="1" @checked((bool) $setting('strip_links', false))>
+            </label>
+            <label class="sg-switch-row">
+                <span><strong>Удалять хештеги</strong><small>Из текста будут удалены слова, начинающиеся с #.</small></span>
+                <input type="hidden" name="strip_hashtags" value="0">
+                <input type="checkbox" name="strip_hashtags" value="1" @checked((bool) $setting('strip_hashtags', false))>
+            </label>
+            <label class="sg-switch-row">
+                <span><strong>Удалять @упоминания</strong><small>Из текста будут удалены Telegram-username.</small></span>
+                <input type="hidden" name="strip_mentions" value="0">
+                <input type="checkbox" name="strip_mentions" value="1" @checked((bool) $setting('strip_mentions', false))>
+            </label>
+        </div>
+
+        <label class="sg-field">
+            <span>Удалить из текста слова или фразы</span>
+            <textarea name="remove_phrases" maxlength="10000" placeholder="Каждое слово или фраза с новой строки">{{ $setting('remove_phrases', '') }}</textarea>
+            <small>Совпадения удаляются без учёта регистра. Каждую фразу указывай с новой строки.</small>
+            @if ($useOld) @error('remove_phrases')<small class="sg-field-error">{{ $message }}</small>@enderror @endif
+        </label>
+
+        <div class="sg-field">
+            <span>Свой текст внизу публикации</span>
+            <div class="sg-rich-editor" data-rich-editor>
+                <div class="sg-rich-editor-toolbar" role="toolbar" aria-label="Форматирование текста">
+                    <button type="button" data-editor-command="bold" title="Жирный"><b>B</b></button>
+                    <button type="button" data-editor-command="italic" title="Курсив"><i>I</i></button>
+                    <button type="button" data-editor-command="underline" title="Подчёркнутый"><u>U</u></button>
+                    <button type="button" data-editor-command="strikeThrough" title="Зачёркнутый"><s>S</s></button>
+                    <button type="button" data-editor-link title="Добавить ссылку">Ссылка</button>
+                    <button type="button" data-editor-command="removeFormat" title="Очистить форматирование">Очистить</button>
+                </div>
+                <div class="sg-rich-editor-surface" contenteditable="true" data-editor-surface data-placeholder="Например: Подписаться на канал…"></div>
+                <textarea name="footer_html" data-editor-input hidden>{{ $footerHtml }}</textarea>
+            </div>
+            <small>Этот блок добавляется после скопированного текста. Поддерживаются жирный, курсив, подчёркивание, зачёркивание и ссылки.</small>
+            @if ($useOld) @error('footer_html')<small class="sg-field-error">{{ $message }}</small>@enderror @endif
+        </div>
+
+        @if ($isEdit)
+            <label class="sg-switch-row sg-reset-cursor-row">
+                <span>
+                    <strong>Начать только с новых сообщений</strong>
+                    <small>После сохранения текущая история будет пропущена, а следующая публикация начнётся с новых сообщений.</small>
+                </span>
+                <input type="hidden" name="reset_cursor" value="0">
+                <input type="checkbox" name="reset_cursor" value="1" @checked((bool) ($useOld ? old('reset_cursor') : false))>
+            </label>
+        @endif
+    </section>
+
     <section class="sg-rules" data-rule-repeater>
         <div class="sg-section-heading">
             <div>
-                <h3>Правила источника</h3>
-                <p>Правила сохраняются в таблице source_rules и применяются обработчиком.</p>
+                <h3>Дополнительные правила</h3>
+                <p>Необязательные технические правила для последующих обработчиков.</p>
             </div>
             <button class="sg-button sg-button-secondary sg-button-small" type="button" data-add-rule>Добавить правило</button>
         </div>
