@@ -1,0 +1,60 @@
+.sg-vps-metrics {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 0 20px;
+}
+
+.sg-vps-metric {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--sg-olive-dark);
+    font-variant-numeric: tabular-nums;
+}
+
+.sg-vps-metric svg {
+    width: 23px;
+    height: 23px;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sg-vps-metric strong {
+    min-width: 42px;
+    font-size: 15px;
+    font-weight: 900;
+    text-align: left;
+}
+
+.sg-vps-metric.is-warning { color: var(--sg-warning); }
+.sg-vps-metric.is-critical { color: var(--sg-error); }
+.sg-vps-metric.is-unavailable { color: #8a8a7f; }
+
+@media (max-width: 900px) {
+    .sg-vps-metrics {
+        justify-content: flex-start;
+        gap: 14px;
+        padding: 0 10px;
+    }
+}
+
+@media (max-width: 700px) {
+    .sg-vps-metrics { gap: 10px; }
+    .sg-vps-metric { gap: 4px; }
+    .sg-vps-metric svg { width: 19px; height: 19px; }
+    .sg-vps-metric strong { min-width: 34px; font-size: 13px; }
+}
+
+@media (max-width: 460px) {
+    .sg-vps-metrics { gap: 7px; padding-inline: 4px; }
+    .sg-vps-metric svg { width: 17px; height: 17px; }
+    .sg-vps-metric strong { min-width: 30px; font-size: 12px; }
+}
