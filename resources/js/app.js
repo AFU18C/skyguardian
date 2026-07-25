@@ -143,6 +143,36 @@ ready(() => {
         renumber();
     });
 
+    document.querySelectorAll('[data-rich-editor]').forEach((editor) => {
+        const surface = editor.querySelector('[data-editor-surface]');
+        const input = editor.querySelector('[data-editor-input]');
+        const form = editor.closest('form');
+        if (!surface || !input) return;
+
+        surface.innerHTML = input.value || '';
+
+        const sync = () => {
+            input.value = surface.innerHTML.trim();
+        };
+
+        surface.addEventListener('input', sync);
+        editor.querySelectorAll('[data-editor-command]').forEach((button) => {
+            button.addEventListener('click', () => {
+                surface.focus();
+                document.execCommand(button.dataset.editorCommand, false);
+                sync();
+            });
+        });
+        editor.querySelector('[data-editor-link]')?.addEventListener('click', () => {
+            const url = window.prompt('Введите ссылку, начиная с https://');
+            if (!url) return;
+            surface.focus();
+            document.execCommand('createLink', false, url.trim());
+            sync();
+        });
+        form?.addEventListener('submit', sync);
+    });
+
     document.querySelectorAll('[data-account-form]').forEach((form) => {
         const apiSelect = form.querySelector('[data-api-select]');
         const newApiFields = form.querySelector('[data-new-api-fields]');
