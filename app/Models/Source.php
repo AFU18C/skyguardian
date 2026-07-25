@@ -22,6 +22,13 @@ class Source extends Model
         'last_message_id', 'status', 'last_error', 'last_manual_check_at', 'last_success_at',
     ];
 
+    protected $attributes = [
+        'is_active' => false,
+        'check_interval' => 60,
+        'check_interval_unit' => 'seconds',
+        'status' => 'not_checked',
+    ];
+
     protected static function booted(): void
     {
         static::creating(function (Source $source): void {
