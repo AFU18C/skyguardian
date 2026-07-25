@@ -149,10 +149,15 @@ class SourceController extends Controller
 
     private function type(Request $request): string
     {
-        $type = (string) $request->route('sourceType');
-        abort_unless(in_array($type, [Source::TYPE_NEWS, Source::TYPE_AIR_ALERT], true), 404);
+        if ($request->routeIs('admin.news.*')) {
+            return Source::TYPE_NEWS;
+        }
 
-        return $type;
+        if ($request->routeIs('admin.air-alert.*')) {
+            return Source::TYPE_AIR_ALERT;
+        }
+
+        abort(404);
     }
 
     private function ensureType(Request $request, Source $source): void
