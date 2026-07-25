@@ -6,7 +6,13 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/css/source-copying.css', 'resources/js/app.js'],
+            input: [
+                'resources/css/app.css',
+                'resources/css/source-copying.css',
+                'resources/css/collapsible-cards.css',
+                'resources/js/app.js',
+                'resources/js/collapsible-cards.js',
+            ],
             refresh: true,
             fonts: [
                 bunny('Instrument Sans', {
