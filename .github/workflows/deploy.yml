@@ -1,0 +1,73 @@
+name: Deploy SkyGuardian
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy Laravel application
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          sudo mkdir -p /var/www/skyguardian
+
+          sudo rsync -a --delete \
+            --exclude=".git" \
+            --exclude=".github" \
+            --exclude=".env" \
+            "$GITHUB_WORKSPACE/" /var/www/skyguardian/
+
+          cd /var/www/skyguardian
+
+          sudo mkdir -p \
+            storage/framework/cache \
+            storage/framework/sessions \
+            storage/framework/views \
+            storage/logs \
+            bootstrap/cache
+
+          sudo chown -R github-runner:www-data /var/www/skyguardian
+          sudo chmod -R ug+rwX storage bootstrap/cache
+
+          composer install \
+            --no-dev \
+            --no-interaction \
+            --prefer-dist \
+            --optimize-autoloader
+
+          npm ci
+          npm run build
+
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
+          if ! grep -Eq '^APP_KEY=base64:.+' .env; then
+            php artisan key:generate --force
+          fi
+
+          php artisan optimize:clear
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan view:cache
+
+          sudo chown -R www-data:www-data storage bootstrap/cache
+          sudo chmod -R ug+rwX storage bootstrap/cache
+
+          sudo systemctl reload php8.3-fpm
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+          echo "SkyGuardian deployed successfully."
