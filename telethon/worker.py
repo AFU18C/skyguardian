@@ -60,41 +60,58 @@ async def require_authorized(client: TelegramClient) -> None:
         raise RuntimeError("Технический аккаунт не авторизован в Telegram.")
 
 
+async def finish_qr_flow(token: str) -> None:
+    flow = qr_flows.pop(token, None)
+    if flow is not None:
+        await flow.client.disconnect()
+
+
+async def process_qr_wait(payload: dict[str, Any]) -> dict[str, Any]:
+    token = str(payload.get("token", ""))
+    flow = qr_flows.get(token)
+
+    if flow is None:
+        raise RuntimeError("QR-сессия не найдена или уже завершена.")
+
+    if flow.expires_at <= time.time():
+        await finish_qr_flow(token)
+        return {"ok": True, "status": "expired"}
+
+    try:
+        timeout = min(max(int(payload.get("timeout", 20)), 1), 45)
+        await asyncio.wait_for(flow.login.wait(), timeout=timeout)
+    except asyncio.TimeoutError:
+        return {"ok": True, "status": "pending"}
+    except AuthTokenExpiredError:
+        await finish_qr_flow(token)
+        return {"ok": True, "status": "expired"}
+    except SessionPasswordNeededError:
+        session = flow.client.session.save()
+        await finish_qr_flow(token)
+        return {
+            "ok": True,
+            "status": "awaiting_password",
+            "session": session,
+        }
+
+    me = await flow.client.get_me()
+    response = {
+        "ok": True,
+        "status": "connected",
+        "session": flow.client.session.save(),
+        "user": user_payload(me),
+    }
+    await finish_qr_flow(token)
+    return response
+
+
 async def process_request(request: dict[str, Any]) -> dict[str, Any]:
     action = request.get("action")
     phone = request.get("phone")
     payload = request.get("payload") or {}
 
     if action == "qr_wait":
-        token = str(payload.get("token", ""))
-        flow = qr_flows.get(token)
-        if flow is None:
-            raise RuntimeError("QR-сессия не найдена или уже завершена.")
-        if flow.expires_at <= time.time():
-            await flow.client.disconnect()
-            qr_flows.pop(token, None)
-            return {"ok": True, "status": "expired"}
-
-        try:
-            timeout = min(max(int(payload.get("timeout", 20)), 1), 45)
-            await asyncio.wait_for(flow.login.wait(), timeout=timeout)
-        except asyncio.TimeoutError:
-            return {"ok": True, "status": "pending"}
-        except AuthTokenExpiredError:
-            await flow.client.disconnect()
-            qr_flows.pop(token, None)
-            return {"ok": True, "status": "expired"}
-
-        me = await flow.client.get_me()
-        response = {
-            "ok": True,
-            "status": "connected",
-            "session": flow.client.session.save(),
-            "user": user_payload(me),
-        }
-        await flow.client.disconnect()
-        qr_flows.pop(token, None)
-        return response
+        return await process_qr_wait(payload)
 
     client = await build_client(request)
     keep_client = False
@@ -223,9 +240,7 @@ async def cleanup_qr_flows() -> None:
         now = time.time()
         expired = [token for token, flow in qr_flows.items() if flow.expires_at <= now]
         for token in expired:
-            flow = qr_flows.pop(token, None)
-            if flow is not None:
-                await flow.client.disconnect()
+            await finish_qr_flow(token)
 
 
 async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
