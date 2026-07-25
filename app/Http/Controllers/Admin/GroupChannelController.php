@@ -26,32 +26,47 @@ class GroupChannelController extends Controller
         $data = $this->validated($request);
         GroupChannelBot::query()->create($data);
 
-        return back()->with('toast', ['type' => 'success', 'title' => 'Добавлено', 'message' => 'Бот и группа/канал сохранены.']);
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => 'Добавлено',
+            'message' => 'Бот и группа/канал сохранены.',
+        ]);
     }
 
     public function update(Request $request, GroupChannelBot $groupChannelBot): RedirectResponse
     {
         $data = $this->validated($request, $groupChannelBot);
+
         if (empty($data['bot_token'])) {
             unset($data['bot_token']);
         }
+
         $groupChannelBot->update($data);
 
-        return back()->with('toast', ['type' => 'success', 'title' => 'Сохранено', 'message' => 'Настройки обновлены.']);
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => 'Сохранено',
+            'message' => 'Настройки обновлены.',
+        ]);
     }
 
     public function destroy(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         $groupChannelBot->delete();
 
-        return back()->with('toast', ['type' => 'success', 'title' => 'Удалено', 'message' => 'Запись удалена.']);
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => 'Удалено',
+            'message' => 'Запись удалена.',
+        ]);
     }
 
     public function check(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         try {
             $api = Http::baseUrl('https://api.telegram.org/bot'.$groupChannelBot->bot_token)
-                ->acceptJson()->timeout(15);
+                ->acceptJson()
+                ->timeout(15);
             $me = $this->telegram($api, 'getMe');
             $chatRef = $this->chatReference($groupChannelBot->group_link);
             $chat = $this->telegram($api, 'getChat', ['chat_id' => $chatRef]);
@@ -89,6 +104,7 @@ class GroupChannelController extends Controller
             ]);
         } catch (Throwable $e) {
             report($e);
+
             $message = $e->getMessage();
             $groupChannelBot->update([
                 'status' => 'error',
@@ -124,6 +140,7 @@ class GroupChannelController extends Controller
     private function telegram(PendingRequest $api, string $method, array $payload = []): array
     {
         $response = $api->post($method, $payload)->throw()->json();
+
         if (! ($response['ok'] ?? false)) {
             throw new \RuntimeException($response['description'] ?? 'Ошибка Telegram API');
         }
@@ -134,6 +151,7 @@ class GroupChannelController extends Controller
     private function chatReference(string $link): string
     {
         $path = trim((string) parse_url($link, PHP_URL_PATH), '/');
+
         if ($path === '' || str_starts_with($path, '+') || str_starts_with($path, 'joinchat/')) {
             throw new \RuntimeException('Для ручной проверки нужна публичная ссылка вида https://t.me/username.');
         }
