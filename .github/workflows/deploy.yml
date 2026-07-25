@@ -47,7 +47,12 @@ jobs:
             --prefer-dist \
             --optimize-autoloader
 
-          npm ci
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
           npm run build
 
           if [ ! -f .env ]; then
