@@ -39,37 +39,50 @@
                 @php
                     $copyMode = data_get($source->rules->firstWhere('key', 'copy_mode')?->value, 'value', 'original');
                     $additionalRulesCount = $source->rules->reject(fn ($rule) => in_array($rule->key, $reservedRuleKeys, true))->count();
+                    $detailsId = 'source-card-details-'.$source->id;
                 @endphp
-                <article class="sg-record-card">
+                <article class="sg-record-card sg-collapsible-card" data-collapsible-card>
                     <div class="sg-record-card-top">
                         <div class="sg-record-icon">{{ $type === 'news' ? '▤' : '▲' }}</div>
                         <div class="sg-record-title">
                             <h2>{{ $source->name }}</h2>
                             <p>{{ $source->source_peer }}</p>
                         </div>
-                        <x-status-badge :status="$source->is_active ? $source->status : 'disabled'" />
+                        <div class="sg-card-summary-actions">
+                            <x-status-badge :status="$source->is_active ? $source->status : 'disabled'" />
+                            <button
+                                class="sg-card-toggle"
+                                type="button"
+                                aria-expanded="false"
+                                aria-controls="{{ $detailsId }}"
+                                aria-label="Развернуть карточку источника {{ $source->name }}"
+                                data-card-toggle
+                            ><span aria-hidden="true"></span></button>
+                        </div>
                     </div>
 
-                    <dl class="sg-record-data">
-                        <div><dt>Назначение</dt><dd>{{ $source->destination_peer ?: 'Не задано' }}</dd></div>
-                        <div><dt>Технический аккаунт</dt><dd>{{ $source->technicalAccount?->name ?: 'Не выбран' }}</dd></div>
-                        <div><dt>Интервал</dt><dd>{{ $source->check_interval }} {{ match ($source->check_interval_unit) { 'minutes' => 'мин.', 'hours' => 'ч.', default => 'сек.' } }}</dd></div>
-                        <div><dt>Режим копирования</dt><dd>{{ $copyMode === 'text_only' ? 'Только текст' : 'Оригинал с медиа' }}</dd></div>
-                        <div><dt>Доп. правила</dt><dd>{{ $additionalRulesCount }}</dd></div>
-                        <div><dt>Последняя ручная проверка</dt><dd>{{ $source->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
-                        <div><dt>Обновлено</dt><dd>{{ $source->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
-                    </dl>
+                    <div class="sg-card-details" id="{{ $detailsId }}" data-card-details hidden>
+                        <dl class="sg-record-data">
+                            <div><dt>Назначение</dt><dd>{{ $source->destination_peer ?: 'Не задано' }}</dd></div>
+                            <div><dt>Технический аккаунт</dt><dd>{{ $source->technicalAccount?->name ?: 'Не выбран' }}</dd></div>
+                            <div><dt>Интервал</dt><dd>{{ $source->check_interval }} {{ match ($source->check_interval_unit) { 'minutes' => 'мин.', 'hours' => 'ч.', default => 'сек.' } }}</dd></div>
+                            <div><dt>Режим копирования</dt><dd>{{ $copyMode === 'text_only' ? 'Только текст' : 'Оригинал с медиа' }}</dd></div>
+                            <div><dt>Доп. правила</dt><dd>{{ $additionalRulesCount }}</dd></div>
+                            <div><dt>Последняя ручная проверка</dt><dd>{{ $source->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
+                            <div><dt>Обновлено</dt><dd>{{ $source->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
+                        </dl>
 
-                    @if ($source->last_error)
-                        <div class="sg-inline-error" title="{{ $source->last_error }}">{{ \Illuminate\Support\Str::limit($source->last_error, 120) }}</div>
-                    @endif
+                        @if ($source->last_error)
+                            <div class="sg-inline-error" title="{{ $source->last_error }}">{{ \Illuminate\Support\Str::limit($source->last_error, 120) }}</div>
+                        @endif
 
-                    <div class="sg-record-actions">
-                        <form method="POST" action="{{ route($routePrefix.'.check', $source) }}">
-                            @csrf
-                            <button class="sg-button sg-button-secondary sg-button-small" type="submit" data-submit-button>Проверить сейчас</button>
-                        </form>
-                        <button class="sg-button sg-button-primary sg-button-small" type="button" data-modal-open="source-edit-{{ $source->id }}">Открыть</button>
+                        <div class="sg-record-actions">
+                            <form method="POST" action="{{ route($routePrefix.'.check', $source) }}">
+                                @csrf
+                                <button class="sg-button sg-button-secondary sg-button-small" type="submit" data-submit-button>Проверить сейчас</button>
+                            </form>
+                            <button class="sg-button sg-button-primary sg-button-small" type="button" data-modal-open="source-edit-{{ $source->id }}">Открыть</button>
+                        </div>
                     </div>
                 </article>
             @endforeach
