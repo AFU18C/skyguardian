@@ -60,9 +60,7 @@
         <main class="sg-main">
             <div class="sg-page-header">
                 <div>
-                    <p class="sg-eyebrow">SkyGuardian / Панель управления</p>
                     <h1>{{ $title ?? 'Админка' }}</h1>
-                    @isset($description)<p>{{ $description }}</p>@endisset
                 </div>
                 @isset($actions)<div class="sg-page-actions">{{ $actions }}</div>@endisset
             </div>
