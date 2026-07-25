@@ -45,4 +45,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/telegram/accounts/{account}/password', [TelegramController::class, 'signInPassword'])->name('telegram.accounts.password');
     Route::post('/telegram/accounts/{account}/qr/start', [TelegramController::class, 'startQr'])->name('telegram.accounts.qr.start');
     Route::post('/telegram/accounts/{account}/qr/wait', [TelegramController::class, 'waitQr'])->name('telegram.accounts.qr.wait');
+
+    Route::view('/site-settings', 'admin.site-settings')->name('site-settings');
+    Route::view('/group-channel', 'admin.group-channel')->name('group-channel');
 });
