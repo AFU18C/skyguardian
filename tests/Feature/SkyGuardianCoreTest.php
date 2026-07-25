@@ -106,7 +106,32 @@ class SkyGuardianCoreTest extends TestCase
         $this->assertNotNull($result->last_manual_check_at);
     }
 
-    public function test_automatic_processing_does_not_change_manual_status_or_check_time(): void
+    public function test_first_automatic_processing_sets_latest_message_as_baseline_without_copying_history(): void
+    {
+        $account = $this->createAccount($this->createApi());
+        $source = Source::query()->create([
+            'technical_account_id' => $account->id,
+            'type' => Source::TYPE_NEWS,
+            'name' => 'Новости',
+            'source_peer' => '@source',
+            'destination_peer' => '@destination',
+            'is_active' => true,
+            'last_message_id' => null,
+        ]);
+
+        $telethon = Mockery::mock(TelethonClient::class);
+        $telethon->shouldReceive('call')->once()->with('latest_message_id', Mockery::type(TechnicalAccount::class), [
+            'peer' => '@source',
+        ])->andReturn(['latest_message_id' => 500]);
+
+        $result = (new SourceProcessor($telethon, new OperationGate, new SourceScheduler))->process($source);
+
+        $this->assertTrue($result['initialized']);
+        $this->assertSame(0, $result['messages_copied']);
+        $this->assertSame(500, $source->fresh()->last_message_id);
+    }
+
+    public function test_automatic_processing_copies_new_messages_without_changing_manual_status(): void
     {
         $manualTime = now()->subHour()->startOfSecond();
         $account = $this->createAccount($this->createApi());
@@ -121,6 +146,14 @@ class SkyGuardianCoreTest extends TestCase
             'status' => 'available',
             'last_manual_check_at' => $manualTime,
         ]);
+        $source->rules()->createMany([
+            ['key' => 'copy_mode', 'value' => ['value' => 'text_only'], 'is_active' => true, 'priority' => 10],
+            ['key' => 'strip_links', 'value' => ['value' => true], 'is_active' => true, 'priority' => 20],
+            ['key' => 'strip_hashtags', 'value' => ['value' => true], 'is_active' => true, 'priority' => 30],
+            ['key' => 'strip_mentions', 'value' => ['value' => false], 'is_active' => true, 'priority' => 40],
+            ['key' => 'remove_phrases', 'value' => ['value' => "реклама\nлишнее"], 'is_active' => true, 'priority' => 50],
+            ['key' => 'footer_html', 'value' => ['value' => '<b>SkyGuardian</b>'], 'is_active' => true, 'priority' => 60],
+        ]);
 
         $telethon = Mockery::mock(TelethonClient::class);
         $telethon->shouldReceive('call')->once()->with('fetch_messages', Mockery::type(TechnicalAccount::class), [
@@ -133,16 +166,26 @@ class SkyGuardianCoreTest extends TestCase
                 ['id' => 12, 'text' => 'two'],
             ],
         ]);
-        $telethon->shouldReceive('call')->once()->with('relay_messages', Mockery::type(TechnicalAccount::class), [
+        $telethon->shouldReceive('call')->once()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
             'source_peer' => '@source',
             'destination_peer' => '@destination',
             'message_ids' => [11, 12],
-        ])->andReturn(['forwarded_ids' => [11, 12]]);
+            'settings' => [
+                'copy_mode' => 'text_only',
+                'strip_links' => true,
+                'strip_hashtags' => true,
+                'strip_mentions' => false,
+                'remove_phrases' => ['реклама', 'лишнее'],
+                'footer_html' => '<b>SkyGuardian</b>',
+            ],
+        ])->andReturn(['copied_count' => 2]);
 
         $processor = new SourceProcessor($telethon, new OperationGate, new SourceScheduler);
-        $processor->process($source);
+        $result = $processor->process($source);
         $source->refresh();
 
+        $this->assertFalse($result['initialized']);
+        $this->assertSame(2, $result['messages_copied']);
         $this->assertSame('available', $source->status);
         $this->assertTrue($source->last_manual_check_at->equalTo($manualTime));
         $this->assertSame(12, $source->last_message_id);
