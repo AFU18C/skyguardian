@@ -21,7 +21,7 @@
 @endphp
 
 <x-layouts.admin title="Настройки Telegram">
-    <x-slot:description>Telegram API, технические аккаунты и пошаговая авторизация через функции ТЗ №1.</x-slot:description>
+    <x-slot:description>Telegram API и технические аккаунты.</x-slot:description>
     <x-slot:actions>
         <button class="sg-button sg-button-secondary" type="button" data-modal-open="api-create">Добавить Telegram API</button>
         <button class="sg-button sg-button-primary" type="button" data-modal-open="account-create" @disabled($accountLimitReached)>+ Добавить аккаунт</button>
@@ -33,7 +33,7 @@
 
     <section class="sg-section-block">
         <div class="sg-section-heading">
-            <div><p class="sg-eyebrow">Конфигурации</p><h2>Telegram API</h2><p>API Hash хранится зашифрованно и отображается только частично.</p></div>
+            <div><p class="sg-eyebrow">Конфигурации</p><h2>Telegram API</h2></div>
         </div>
 
         @if ($apis->isEmpty())
@@ -41,19 +41,38 @@
         @else
             <div class="sg-api-grid">
                 @foreach ($apis as $api)
-                    <article class="sg-api-card">
+                    @php($detailsId = 'api-card-details-'.$api->id)
+                    <article class="sg-api-card sg-collapsible-card" data-collapsible-card>
                         <div class="sg-record-card-top">
                             <div class="sg-record-icon">API</div>
-                            <div class="sg-record-title"><h3>{{ $api->name }}</h3><p>{{ $api->is_active ? 'Активна' : 'Отключена' }}</p></div>
-                            <span class="sg-status {{ $api->is_active ? 'sg-status-success' : 'sg-status-muted' }}"><span class="sg-status-dot"></span>{{ $api->is_active ? 'Активна' : 'Отключена' }}</span>
+                            <div class="sg-record-title">
+                                <h3>{{ $api->name }}</h3>
+                                <p>API ID {{ $mask((string) $api->api_id, 4, 0) }}</p>
+                            </div>
+                            <div class="sg-card-summary-actions">
+                                <span class="sg-status {{ $api->is_active ? 'sg-status-success' : 'sg-status-muted' }}"><span class="sg-status-dot"></span>{{ $api->is_active ? 'Активна' : 'Отключена' }}</span>
+                                <button
+                                    class="sg-card-toggle"
+                                    type="button"
+                                    aria-expanded="false"
+                                    aria-controls="{{ $detailsId }}"
+                                    aria-label="Развернуть Telegram API {{ $api->name }}"
+                                    data-card-toggle
+                                ><span aria-hidden="true"></span></button>
+                            </div>
                         </div>
-                        <dl class="sg-record-data">
-                            <div><dt>API ID</dt><dd>{{ $mask((string) $api->api_id, 4, 0) }}</dd></div>
-                            <div><dt>API Hash</dt><dd>{{ $mask($api->api_hash) }}</dd></div>
-                            <div><dt>Аккаунтов</dt><dd>{{ $api->technical_accounts_count }}</dd></div>
-                            <div><dt>Обновлено</dt><dd>{{ $api->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
-                        </dl>
-                        <button class="sg-button sg-button-secondary sg-button-small" type="button" data-modal-open="api-edit-{{ $api->id }}">Настроить</button>
+
+                        <div class="sg-card-details" id="{{ $detailsId }}" data-card-details hidden>
+                            <dl class="sg-record-data">
+                                <div><dt>API ID</dt><dd>{{ $mask((string) $api->api_id, 4, 0) }}</dd></div>
+                                <div><dt>API Hash</dt><dd>{{ $mask($api->api_hash) }}</dd></div>
+                                <div><dt>Аккаунтов</dt><dd>{{ $api->technical_accounts_count }}</dd></div>
+                                <div><dt>Обновлено</dt><dd>{{ $api->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
+                            </dl>
+                            <div class="sg-record-actions">
+                                <button class="sg-button sg-button-secondary sg-button-small" type="button" data-modal-open="api-edit-{{ $api->id }}">Настроить</button>
+                            </div>
+                        </div>
                     </article>
                 @endforeach
             </div>
@@ -62,7 +81,7 @@
 
     <section class="sg-section-block">
         <div class="sg-section-heading">
-            <div><p class="sg-eyebrow">Подключения</p><h2>Технические аккаунты</h2><p>Создание, код Telegram, пароль 2FA и QR-вход проходят как единый сценарий.</p></div>
+            <div><p class="sg-eyebrow">Подключения</p><h2>Технические аккаунты</h2></div>
         </div>
 
         @if ($accounts->isEmpty())
@@ -74,26 +93,40 @@
         @else
             <div class="sg-card-grid">
                 @foreach ($accounts as $account)
-                    <article class="sg-record-card">
+                    @php($detailsId = 'account-card-details-'.$account->id)
+                    <article class="sg-record-card sg-collapsible-card" data-collapsible-card>
                         <div class="sg-record-card-top">
                             <div class="sg-record-icon">➤</div>
-                            <div class="sg-record-title"><h2>{{ $account->name }}</h2><p>{{ $account->username ? '@'.$account->username : 'Username не определён' }}</p></div>
-                            <x-status-badge :status="$account->is_active ? $account->status : 'disabled'" />
+                            <div class="sg-record-title"><h2>{{ $account->name }}</h2><p>{{ $account->username ? '@'.$account->username : $maskPhone($account->phone) }}</p></div>
+                            <div class="sg-card-summary-actions">
+                                <x-status-badge :status="$account->is_active ? $account->status : 'disabled'" />
+                                <button
+                                    class="sg-card-toggle"
+                                    type="button"
+                                    aria-expanded="false"
+                                    aria-controls="{{ $detailsId }}"
+                                    aria-label="Развернуть технический аккаунт {{ $account->name }}"
+                                    data-card-toggle
+                                ><span aria-hidden="true"></span></button>
+                            </div>
                         </div>
-                        <dl class="sg-record-data">
-                            <div><dt>Телефон</dt><dd>{{ $maskPhone($account->phone) }}</dd></div>
-                            <div><dt>Telegram User ID</dt><dd>{{ $account->telegram_user_id ?: 'Не определено' }}</dd></div>
-                            <div><dt>Профиль</dt><dd>{{ trim(($account->first_name ?? '').' '.($account->last_name ?? '')) ?: 'Не определено' }}</dd></div>
-                            <div><dt>Telegram API</dt><dd>{{ $account->telegramApi?->name ?? 'Не определено' }}</dd></div>
-                            <div><dt>Способ подключения</dt><dd>{{ $account->auth_method === 'qr' ? 'QR-код' : 'Номер телефона' }}</dd></div>
-                            <div><dt>Источников</dt><dd>{{ $account->sources->count() }}</dd></div>
-                            <div><dt>Последняя проверка</dt><dd>{{ $account->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
-                            <div><dt>Обновлено</dt><dd>{{ $account->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
-                        </dl>
-                        @if ($account->last_error)<div class="sg-inline-error" title="{{ $account->last_error }}">{{ \Illuminate\Support\Str::limit($account->last_error, 120) }}</div>@endif
-                        <div class="sg-record-actions">
-                            <form method="POST" action="{{ route('admin.telegram.accounts.check', $account) }}">@csrf<button class="sg-button sg-button-secondary sg-button-small" type="submit" data-submit-button>Проверить сейчас</button></form>
-                            <button class="sg-button sg-button-primary sg-button-small" type="button" data-modal-open="account-edit-{{ $account->id }}">Открыть</button>
+
+                        <div class="sg-card-details" id="{{ $detailsId }}" data-card-details hidden>
+                            <dl class="sg-record-data">
+                                <div><dt>Телефон</dt><dd>{{ $maskPhone($account->phone) }}</dd></div>
+                                <div><dt>Telegram User ID</dt><dd>{{ $account->telegram_user_id ?: 'Не определено' }}</dd></div>
+                                <div><dt>Профиль</dt><dd>{{ trim(($account->first_name ?? '').' '.($account->last_name ?? '')) ?: 'Не определено' }}</dd></div>
+                                <div><dt>Telegram API</dt><dd>{{ $account->telegramApi?->name ?? 'Не определено' }}</dd></div>
+                                <div><dt>Способ подключения</dt><dd>{{ $account->auth_method === 'qr' ? 'QR-код' : 'Номер телефона' }}</dd></div>
+                                <div><dt>Источников</dt><dd>{{ $account->sources->count() }}</dd></div>
+                                <div><dt>Последняя проверка</dt><dd>{{ $account->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
+                                <div><dt>Обновлено</dt><dd>{{ $account->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
+                            </dl>
+                            @if ($account->last_error)<div class="sg-inline-error" title="{{ $account->last_error }}">{{ \Illuminate\Support\Str::limit($account->last_error, 120) }}</div>@endif
+                            <div class="sg-record-actions">
+                                <form method="POST" action="{{ route('admin.telegram.accounts.check', $account) }}">@csrf<button class="sg-button sg-button-secondary sg-button-small" type="submit" data-submit-button>Проверить сейчас</button></form>
+                                <button class="sg-button sg-button-primary sg-button-small" type="button" data-modal-open="account-edit-{{ $account->id }}">Открыть</button>
+                            </div>
                         </div>
                     </article>
                 @endforeach
