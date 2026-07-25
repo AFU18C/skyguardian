@@ -1,0 +1,107 @@
+.sg-copy-settings {
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+    background: #ebe5d4;
+    border: 1px solid #cfc5a9;
+    box-shadow: inset 4px 0 0 var(--sg-khaki);
+}
+
+.sg-copy-settings .sg-section-heading {
+    margin-bottom: 0;
+}
+
+.sg-copy-mode-grid {
+    margin-bottom: 0;
+}
+
+.sg-copy-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.sg-copy-toggle-grid .sg-switch-row {
+    min-height: 94px;
+}
+
+.sg-reset-cursor-row {
+    background: #f5ecd4;
+    border-color: #d8c393;
+}
+
+.sg-rich-editor {
+    overflow: hidden;
+    background: #fffdf6;
+    border: 1px solid #bfb69e;
+}
+
+.sg-rich-editor:focus-within {
+    border-color: var(--sg-olive);
+    box-shadow: 0 0 0 3px rgba(104, 112, 82, .13);
+}
+
+.sg-rich-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    padding: 8px;
+    background: #e7e0cc;
+    border-bottom: 1px solid #cfc5aa;
+}
+
+.sg-rich-editor-toolbar button {
+    min-width: 34px;
+    min-height: 32px;
+    padding: 5px 9px;
+    color: var(--sg-ink);
+    background: #fffdf6;
+    border: 1px solid #bfb69e;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.sg-rich-editor-toolbar button:hover {
+    background: #f3eddc;
+    border-color: var(--sg-olive);
+}
+
+.sg-rich-editor-surface {
+    min-height: 150px;
+    padding: 13px;
+    outline: none;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.sg-rich-editor-surface:empty::before {
+    content: attr(data-placeholder);
+    color: #8a897d;
+    pointer-events: none;
+}
+
+.sg-rich-editor-surface a {
+    color: #416a7b;
+    text-decoration: underline;
+}
+
+@media (max-width: 1000px) {
+    .sg-copy-toggle-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sg-copy-toggle-grid .sg-switch-row {
+        min-height: auto;
+    }
+}
+
+@media (max-width: 700px) {
+    .sg-copy-settings {
+        padding: 14px;
+    }
+
+    .sg-rich-editor-toolbar button {
+        flex: 1 0 auto;
+    }
+}

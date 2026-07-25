@@ -3,6 +3,7 @@
     $emptyText = $type === \App\Models\Source::TYPE_NEWS
         ? 'Источники новостей ещё не добавлены.'
         : 'Источники воздушной тревоги ещё не добавлены.';
+    $reservedRuleKeys = ['copy_mode', 'strip_links', 'strip_hashtags', 'strip_mentions', 'remove_phrases', 'footer_html'];
 @endphp
 
 <x-layouts.admin :title="$title">
@@ -35,6 +36,10 @@
     @else
         <section class="sg-card-grid">
             @foreach ($sources as $source)
+                @php
+                    $copyMode = data_get($source->rules->firstWhere('key', 'copy_mode')?->value, 'value', 'original');
+                    $additionalRulesCount = $source->rules->reject(fn ($rule) => in_array($rule->key, $reservedRuleKeys, true))->count();
+                @endphp
                 <article class="sg-record-card">
                     <div class="sg-record-card-top">
                         <div class="sg-record-icon">{{ $type === 'news' ? '▤' : '▲' }}</div>
@@ -49,7 +54,8 @@
                         <div><dt>Назначение</dt><dd>{{ $source->destination_peer ?: 'Не задано' }}</dd></div>
                         <div><dt>Технический аккаунт</dt><dd>{{ $source->technicalAccount?->name ?: 'Не выбран' }}</dd></div>
                         <div><dt>Интервал</dt><dd>{{ $source->check_interval }} {{ match ($source->check_interval_unit) { 'minutes' => 'мин.', 'hours' => 'ч.', default => 'сек.' } }}</dd></div>
-                        <div><dt>Правила</dt><dd>{{ $source->rules->count() }}</dd></div>
+                        <div><dt>Режим копирования</dt><dd>{{ $copyMode === 'text_only' ? 'Только текст' : 'Оригинал с медиа' }}</dd></div>
+                        <div><dt>Доп. правила</dt><dd>{{ $additionalRulesCount }}</dd></div>
                         <div><dt>Последняя ручная проверка</dt><dd>{{ $source->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
                         <div><dt>Обновлено</dt><dd>{{ $source->updated_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }}</dd></div>
                     </dl>
