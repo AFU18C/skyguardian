@@ -25,12 +25,19 @@
             <span class="sg-nav-icon">➤</span>
             <span>Настройки Telegram</span>
         </a>
+        <a href="{{ route('admin.site-settings') }}" @class(['is-active' => request()->routeIs('admin.site-settings')])>
+            <span class="sg-nav-icon">⚙</span>
+            <span>Настройки сайта</span>
+        </a>
+        <a href="{{ route('admin.group-channel') }}" @class(['is-active' => request()->routeIs('admin.group-channel')])>
+            <span class="sg-nav-icon">⇄</span>
+            <span>Группа-Канал</span>
+        </a>
     </nav>
 
     <div class="sg-sidebar-status">
         <span>Часовой пояс</span>
         <strong>Europe/Kyiv</strong>
-        <small>Все даты отображаются по Киеву</small>
     </div>
 
     <div class="sg-sidebar-footer">
