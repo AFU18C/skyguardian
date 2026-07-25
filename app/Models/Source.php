@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use RuntimeException;
 
 class Source extends Model
 {
@@ -20,6 +21,19 @@ class Source extends Model
         'is_active', 'check_interval', 'check_interval_unit', 'next_check_at',
         'last_message_id', 'status', 'last_error', 'last_manual_check_at', 'last_success_at',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Source $source): void {
+            if (static::query()->count() >= config('skyguardian.limits.sources', 40)) {
+                throw new RuntimeException('Достигнут лимит источников.');
+            }
+
+            if (! in_array($source->type, [self::TYPE_NEWS, self::TYPE_AIR_ALERT], true)) {
+                throw new RuntimeException('Недопустимый тип источника.');
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -47,6 +61,7 @@ class Source extends Model
     {
         return $query->where('is_active', true)
             ->whereNotNull('technical_account_id')
+            ->whereHas('technicalAccount', fn (Builder $q) => $q->where('is_active', true))
             ->where(fn (Builder $q) => $q->whereNull('next_check_at')->orWhere('next_check_at', '<=', now()));
     }
 }
