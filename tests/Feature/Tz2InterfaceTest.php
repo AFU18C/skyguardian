@@ -14,12 +14,6 @@ class Tz2InterfaceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->withoutVite();
-    }
-
     public function test_public_page_and_login_page_are_available(): void
     {
         $this->get('/')
@@ -86,9 +80,12 @@ class Tz2InterfaceTest extends TestCase
             ->assertOk()
             ->assertSee('Новости региона');
 
-        $this->actingAs($user)->get(route('admin.air-alert.index'))
-            ->assertOk()
-            ->assertDontSee('Новости региона');
+        $airAlertResponse = $this->actingAs($user)->get(route('admin.air-alert.index'));
+        $airAlertResponse->assertOk();
+        $content = $airAlertResponse->getContent();
+        $position = mb_strpos($content, 'Новости региона');
+        $context = $position === false ? '' : mb_substr($content, max(0, $position - 220), 500);
+        $this->assertFalse($position !== false, "Новостной источник попал в раздел тревог. Контекст: {$context}");
 
         $this->actingAs($user)->put(route('admin.news.update', $source), [
             'form_context' => 'source-'.$source->id,
