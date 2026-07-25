@@ -1,0 +1,29 @@
+
+  [30;42;1m PASS [39;49;22m[39m Tests\Unit\ExampleTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthat true is true[39m
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\ExampleTest[39m
+  [33;1m![39;22m[90m [39m[90mthe application returns a successful response[39m[90m [39m[33m→ file_get_contents(/[39m[90m…[39m [90m0.12s[39m  
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\SkyGuardianCoreTest[39m
+  [33;1m![39;22m[90m [39m[90msensitive telegram values are encrypted[39m[90m [39m[33m→ file_get_contents(/home/r[39m[90m…[39m [90m0.07s[39m  
+  [33;1m![39;22m[90m [39m[90moperation gate enforces per account limit[39m[90m [39m[33m→ file_get_contents(/home[39m[90m…[39m [90m0.01s[39m  
+  [33;1m![39;22m[90m [39m[90moperation gate enforces global limit[39m[90m [39m[33m→ file_get_contents(/home/runn[39m[90m…[39m [90m0.01s[39m  
+  [33;1m![39;22m[90m [39m[90mmanual account check updates only account health data[39m[90m [39m[33m→ file_get_co[39m[90m…[39m [90m0.01s[39m  
+  [33;1m![39;22m[90m [39m[90mmanual source check does not change last message id[39m[90m [39m[33m→ file_get_cont[39m[90m…[39m [90m0.01s[39m  
+  [33;1m![39;22m[90m [39m[90mautomatic processing does not change manual status or check time[39m[90m [39m[33m→[39m[90m… [39m [90m0.01s[39m  
+  [33;1m![39;22m[90m [39m[90maccount and source limits are enforced[39m[90m [39m[33m→ file_get_contents(/home/ru[39m[90m…[39m [90m0.01s[39m  
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\TelegramAuthServiceTest[39m
+  [33;1m![39;22m[90m [39m[90mphone authorization supports code and two factor password[39m[90m [39m[33m→ file_ge[39m[90m…[39m [90m0.02s[39m  
+  [33;1m![39;22m[90m [39m[90mqr authorization stores temporary state and completes[39m[90m [39m[33m→ file_get_co[39m[90m…[39m [90m0.01s[39m  
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\Tz2InterfaceTest[39m
+  [33;1m![39;22m[90m [39m[90mpublic page and login page are available[39m[90m [39m[33m→ file_get_contents(/home/[39m[90m…[39m [90m0.01s[39m  
+  [33;1m![39;22m[90m [39m[90madmin authentication is working[39m[90m [39m[33m→ file_get_contents(/home/runner/wo[39m[90m…[39m [90m0.35s[39m  
+  [33;1m![39;22m[90m [39m[90mnews and air alert sources are separated and crud works[39m[90m [39m[33m→ file_get_[39m[90m…[39m [90m0.03s[39m  
+  [33;1m![39;22m[90m [39m[90mtelegram configuration and account crud are connected[39m[90m [39m[33m→ file_get_co[39m[90m…[39m [90m0.03s[39m  
+
+  [90mTests:[39m    [33;1m14 warnings[39;22m[90m,[39m[39m [39m[32;1m1 passed[39;22m[90m (86 assertions)[39m
+  [90mDuration:[39m [39m0.79s[39m
+
