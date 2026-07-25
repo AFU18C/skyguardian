@@ -104,7 +104,8 @@ class TelegramAuthService
 
     public function waitQr(TechnicalAccount $account, int $timeout = 20): array
     {
-        $qrToken = $account->auth_data['qr_token'] ?? null;
+        $qrToken = ($account->auth_data ?? [])['qr_token'] ?? null;
+
         if (! $qrToken) {
             throw new RuntimeException('QR-сессия не найдена.');
         }
@@ -121,6 +122,14 @@ class TelegramAuthService
 
             if ($status === 'connected') {
                 $this->completeAuthorization($account, $result);
+            } elseif ($status === 'awaiting_password') {
+                $account->forceFill([
+                    'session' => $result['session'] ?? $account->session,
+                    'status' => 'awaiting_password',
+                    'auth_data' => null,
+                    'auth_expires_at' => null,
+                    'last_error' => null,
+                ])->save();
             } elseif ($status === 'expired') {
                 $account->forceFill([
                     'status' => 'qr_expired',
