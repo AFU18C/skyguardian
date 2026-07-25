@@ -1,0 +1,41 @@
+name: Bootstrap Laravel
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    name: Create clean Laravel project
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Laravel application
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          TEMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEMP_DIR"' EXIT
+
+          composer create-project laravel/laravel "$TEMP_DIR/laravel" --no-interaction
+
+          rsync -a \
+            --exclude=".git" \
+            --exclude=".github" \
+            "$TEMP_DIR/laravel/" "$GITHUB_WORKSPACE/"
+
+          cd "$GITHUB_WORKSPACE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .
+          git commit -m "Initialize Laravel application"
+          git push origin HEAD:main
