@@ -32,7 +32,23 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Run PHP tests
-        run: php artisan test
+        id: php-tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          php artisan test 2>&1 | tee test-output.txt
+
+      - name: Upload PHP test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: php-test-output
+          path: test-output.txt
+
+      - name: Fail when PHP tests fail
+        if: steps.php-tests.outcome == 'failure'
+        run: exit 1
 
       - name: Apply PHP formatting
         run: vendor/bin/pint
