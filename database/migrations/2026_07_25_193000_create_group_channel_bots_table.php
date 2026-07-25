@@ -15,8 +15,17 @@ return new class extends Migration
             $table->string('admin_id');
             $table->string('group_name');
             $table->string('group_link');
+            $table->string('chat_type')->default('group');
+            $table->string('chat_id')->nullable()->index();
+            $table->string('bot_username')->nullable();
+            $table->string('status')->default('not_checked')->index();
+            $table->json('permissions')->nullable();
+            $table->text('last_error')->nullable();
+            $table->timestamp('last_manual_check_at')->nullable();
             $table->boolean('is_active')->default(true)->index();
             $table->timestamps();
+
+            $table->unique(['bot_name', 'group_link']);
         });
     }
 
