@@ -12,11 +12,16 @@
         if (mb_strlen($digits) < 6) return mb_substr($phone, 0, 2).'••••';
         return '+'.mb_substr($digits, 0, 3).' '.mb_substr($digits, 3, 2).' ••• •• '.mb_substr($digits, -2);
     };
-    $qrLogin = session('qr_login');
+    $openAccountId = (int) session('open_account_id', 0);
+    $hasQrCode = $accounts->getCollection()->contains(
+        fn ($account) => $account->status === 'awaiting_qr'
+            && data_get($account->auth_data, 'qr_url')
+            && $account->auth_expires_at?->isFuture()
+    );
 @endphp
 
 <x-layouts.admin title="Настройки Telegram">
-    <x-slot:description>Telegram API, технические аккаунты и рабочая авторизация через функции ТЗ №1.</x-slot:description>
+    <x-slot:description>Telegram API, технические аккаунты и пошаговая авторизация через функции ТЗ №1.</x-slot:description>
     <x-slot:actions>
         <button class="sg-button sg-button-secondary" type="button" data-modal-open="api-create">Добавить Telegram API</button>
         <button class="sg-button sg-button-primary" type="button" data-modal-open="account-create" @disabled($accountLimitReached)>+ Добавить аккаунт</button>
@@ -57,7 +62,7 @@
 
     <section class="sg-section-block">
         <div class="sg-section-heading">
-            <div><p class="sg-eyebrow">Подключения</p><h2>Технические аккаунты</h2><p>Каждое действие подключено к сервисам Telegram из ТЗ №1.</p></div>
+            <div><p class="sg-eyebrow">Подключения</p><h2>Технические аккаунты</h2><p>Создание, код Telegram, пароль 2FA и QR-вход проходят как единый сценарий.</p></div>
         </div>
 
         @if ($accounts->isEmpty())
@@ -129,33 +134,7 @@
                 </div>
 
                 @include('admin.telegram._account_form', ['account' => $account, 'apis' => $apis, 'action' => route('admin.telegram.accounts.update', $account)])
-
-                <section class="sg-connection-panel">
-                    <div class="sg-section-heading"><div><h3>Подключение Telegram</h3><p>Действия выполняются через Telethon daemon.</p></div><x-status-badge :status="$account->status" /></div>
-
-                    @if ($account->auth_method === 'phone')
-                        <div class="sg-action-grid">
-                            <form method="POST" action="{{ route('admin.telegram.accounts.send-code', $account) }}" class="sg-action-card">@csrf<h4>1. Запросить код</h4><p>Telegram отправит код на подключённый номер.</p><button class="sg-button sg-button-secondary" type="submit" data-submit-button>Отправить код</button></form>
-                            <form method="POST" action="{{ route('admin.telegram.accounts.sign-in', $account) }}" class="sg-action-card">@csrf<h4>2. Ввести код</h4><label class="sg-field"><span>Код Telegram</span><input type="text" name="code" maxlength="16" required autocomplete="one-time-code"></label><button class="sg-button sg-button-secondary" type="submit" data-submit-button>Подтвердить код</button></form>
-                            <form method="POST" action="{{ route('admin.telegram.accounts.password', $account) }}" class="sg-action-card">@csrf<h4>3. Пароль 2FA</h4><label class="sg-field"><span>Пароль</span><input type="password" name="password" required autocomplete="current-password"></label><button class="sg-button sg-button-secondary" type="submit" data-submit-button>Подтвердить пароль</button></form>
-                        </div>
-                    @else
-                        <div class="sg-qr-panel">
-                            <div>
-                                <h4>QR-авторизация</h4>
-                                <p>Откройте Telegram → Настройки → Устройства → Подключить устройство и отсканируйте QR-код.</p>
-                                <form method="POST" action="{{ route('admin.telegram.accounts.qr.start', $account) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Создать QR-код</button></form>
-                            </div>
-                            @if ($qrLogin && (int) $qrLogin['account_id'] === $account->id)
-                                <div class="sg-qr-code-wrap">
-                                    <div class="sg-qr-code" data-qr-url="{{ $qrLogin['url'] }}"></div>
-                                    <small>Действует до {{ \Carbon\Carbon::parse($qrLogin['expires_at'])->timezone('Europe/Kyiv')->format('H:i:s') }}</small>
-                                    <form method="POST" action="{{ route('admin.telegram.accounts.qr.wait', $account) }}">@csrf<button class="sg-button sg-button-primary" type="submit" data-submit-button>Проверить подключение</button></form>
-                                </div>
-                            @endif
-                        </div>
-                    @endif
-                </section>
+                @include('admin.telegram._connection_panel', ['account' => $account])
 
                 <div class="sg-danger-zone">
                     <div><strong>Удаление технического аккаунта</strong><p>Связанные источники сохранятся, но будут отключены.</p></div>
@@ -175,14 +154,19 @@
                 str_starts_with($context, 'account-') => 'account-edit-'.str_replace('account-', '', $context),
                 default => null,
             };
+            $errorAccountId = str_starts_with($context, 'account-') && $context !== 'account-create'
+                ? (int) str_replace('account-', '', $context)
+                : 0;
         @endphp
-        @if ($modal)<div data-open-modal-on-load="{{ $modal }}"></div>@endif
+        @if ($modal)
+            <div data-open-modal-on-load="{{ $modal }}" @if($errorAccountId) data-modal-scroll-to="#account-connection-{{ $errorAccountId }}" @endif></div>
+        @endif
+    @elseif ($openAccountId)
+        <div data-open-modal-on-load="account-edit-{{ $openAccountId }}" data-modal-scroll-to="#account-connection-{{ $openAccountId }}"></div>
     @endif
 
-    @if ($qrLogin)<div data-open-modal-on-load="account-edit-{{ $qrLogin['account_id'] }}"></div>@endif
-
     @push('scripts')
-        @if ($qrLogin)
+        @if ($hasQrCode)
             <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
         @endif
     @endpush
