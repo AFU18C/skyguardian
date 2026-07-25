@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\TechnicalAccount;
+use RuntimeException;
 use Throwable;
 
 class TechnicalAccountService
@@ -14,6 +15,10 @@ class TechnicalAccountService
 
     public function manualCheck(TechnicalAccount $account): TechnicalAccount
     {
+        if (! $account->is_active) {
+            throw new RuntimeException('Технический аккаунт отключён.');
+        }
+
         $token = $this->gate->acquire('technical-account.manual-check', $account);
 
         try {
@@ -22,6 +27,7 @@ class TechnicalAccountService
 
             $account->forceFill([
                 'session' => $result['session'] ?? $account->session,
+                'phone' => $user['phone'] ?? $account->phone,
                 'telegram_user_id' => $user['id'] ?? null,
                 'username' => $user['username'] ?? null,
                 'first_name' => $user['first_name'] ?? null,
