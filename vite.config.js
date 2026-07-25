@@ -10,8 +10,10 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/css/source-copying.css',
                 'resources/css/collapsible-cards.css',
+                'resources/css/topbar-metrics.css',
                 'resources/js/app.js',
                 'resources/js/collapsible-cards.js',
+                'resources/js/topbar-metrics.js',
             ],
             refresh: true,
             fonts: [
