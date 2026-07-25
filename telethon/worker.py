@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import asyncio
+import html
 import json
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlparse
 
 from telethon import TelegramClient
 from telethon.errors import AuthTokenExpiredError, SessionPasswordNeededError
@@ -14,6 +18,12 @@ from telethon.sessions import StringSession
 HOST = os.getenv("SKYGUARDIAN_TELETHON_HOST", "127.0.0.1")
 PORT = int(os.getenv("SKYGUARDIAN_TELETHON_PORT", "8787"))
 QR_TTL_SECONDS = int(os.getenv("SKYGUARDIAN_QR_TTL", "120"))
+
+URL_PATTERN = re.compile(
+    r"(?i)(?:https?://|www\.)\S+|(?:t\.me|telegram\.me)/\S+"
+)
+HASHTAG_PATTERN = re.compile(r"(?<!\w)#[\w_]+", re.UNICODE)
+MENTION_PATTERN = re.compile(r"(?<![\w@])@[A-Za-z0-9_]{5,}")
 
 
 @dataclass
@@ -24,6 +34,161 @@ class QrFlow:
 
 
 qr_flows: dict[str, QrFlow] = {}
+
+
+class TelegramHtmlSanitizer(HTMLParser):
+    allowed_tags = {
+        "b": "b",
+        "strong": "b",
+        "i": "i",
+        "em": "i",
+        "u": "u",
+        "s": "s",
+        "strike": "s",
+        "code": "code",
+        "pre": "pre",
+        "blockquote": "blockquote",
+        "a": "a",
+        "br": "br",
+    }
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized = self.allowed_tags.get(tag.lower())
+        if normalized is None:
+            return
+        if normalized == "br":
+            self.parts.append("\n")
+            return
+        if normalized == "a":
+            href = next((value for name, value in attrs if name.lower() == "href"), None)
+            if href and safe_link(href):
+                self.parts.append(f'<a href="{html.escape(href, quote=True)}">')
+            else:
+                self.parts.append("<a>")
+            return
+        self.parts.append(f"<{normalized}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized = self.allowed_tags.get(tag.lower())
+        if normalized and normalized != "br":
+            self.parts.append(f"</{normalized}>")
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(html.escape(data))
+
+    def value(self) -> str:
+        return "".join(self.parts).strip()
+
+
+def safe_link(value: str) -> bool:
+    parsed = urlparse(value.strip())
+    return parsed.scheme.lower() in {"http", "https", "tg", "mailto"}
+
+
+def sanitize_footer_html(value: Any) -> str:
+    if not value:
+        return ""
+    parser = TelegramHtmlSanitizer()
+    parser.feed(str(value))
+    parser.close()
+    return parser.value()
+
+
+def cleaned_source_text(value: Any, settings: dict[str, Any]) -> str:
+    text = str(value or "")
+    if settings.get("strip_links"):
+        text = URL_PATTERN.sub("", text)
+    if settings.get("strip_hashtags"):
+        text = HASHTAG_PATTERN.sub("", text)
+    if settings.get("strip_mentions"):
+        text = MENTION_PATTERN.sub("", text)
+
+    for phrase in settings.get("remove_phrases") or []:
+        phrase = str(phrase).strip()
+        if phrase:
+            text = re.sub(re.escape(phrase), "", text, flags=re.IGNORECASE)
+
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
+def build_html_text(messages: list[Any], settings: dict[str, Any]) -> str:
+    source_parts = [
+        cleaned_source_text(getattr(message, "message", None), settings)
+        for message in messages
+    ]
+    source_text = "\n\n".join(part for part in source_parts if part)
+    footer = sanitize_footer_html(settings.get("footer_html"))
+    parts: list[str] = []
+    if source_text:
+        parts.append(html.escape(source_text))
+    if footer:
+        parts.append(footer)
+    return "\n\n".join(parts).strip()
+
+
+def visible_text_length(value: str) -> int:
+    return len(html.unescape(re.sub(r"<[^>]+>", "", value)))
+
+
+def has_file_media(message: Any) -> bool:
+    return getattr(message, "photo", None) is not None or getattr(message, "document", None) is not None
+
+
+def group_messages(messages: list[Any]) -> list[list[Any]]:
+    grouped: list[list[Any]] = []
+    positions: dict[int, int] = {}
+    for message in sorted((item for item in messages if item is not None), key=lambda item: item.id):
+        grouped_id = getattr(message, "grouped_id", None)
+        if grouped_id:
+            key = int(grouped_id)
+            if key in positions:
+                grouped[positions[key]].append(message)
+            else:
+                positions[key] = len(grouped)
+                grouped.append([message])
+        else:
+            grouped.append([message])
+    return grouped
+
+
+async def send_text(client: TelegramClient, destination_peer: Any, text: str) -> bool:
+    if not text:
+        return False
+    await client.send_message(destination_peer, text, parse_mode="html", link_preview=False)
+    return True
+
+
+async def copy_message_group(
+    client: TelegramClient,
+    destination_peer: Any,
+    messages: list[Any],
+    settings: dict[str, Any],
+) -> int:
+    text = build_html_text(messages, settings)
+    if settings.get("copy_mode") == "text_only":
+        return len(messages) if await send_text(client, destination_peer, text) else 0
+
+    media = [message.media for message in messages if has_file_media(message)]
+    if not media:
+        return len(messages) if await send_text(client, destination_peer, text) else 0
+
+    caption = text if text and visible_text_length(text) <= 1000 else None
+    await client.send_file(
+        destination_peer,
+        media if len(media) > 1 else media[0],
+        caption=caption,
+        parse_mode="html",
+    )
+    if text and caption is None:
+        await send_text(client, destination_peer, text)
+    return len(messages)
 
 
 def user_payload(user: Any) -> dict[str, Any]:
@@ -195,6 +360,18 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
                 "peer": entity_payload(entity),
             }
 
+        if action == "latest_message_id":
+            peer = payload.get("peer")
+            if not peer:
+                raise RuntimeError("Не указан Telegram-источник.")
+            messages = await client.get_messages(peer, limit=1)
+            latest_id = int(messages[0].id) if messages else 0
+            return {
+                "ok": True,
+                "session": client.session.save(),
+                "latest_message_id": latest_id,
+            }
+
         if action == "fetch_messages":
             peer = payload.get("peer")
             if not peer:
@@ -215,17 +392,27 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
                 "messages": messages,
             }
 
-        if action == "relay_messages":
+        if action == "copy_messages":
             source_peer = payload.get("source_peer")
             destination_peer = payload.get("destination_peer")
-            message_ids = [int(value) for value in payload.get("message_ids", [])]
+            message_ids = sorted({int(value) for value in payload.get("message_ids", [])})
+            settings = payload.get("settings") or {}
             if not source_peer or not destination_peer or not message_ids:
-                raise RuntimeError("Недостаточно данных для пересылки сообщений.")
-            await client.forward_messages(destination_peer, message_ids, source_peer)
+                raise RuntimeError("Недостаточно данных для копирования сообщений.")
+
+            messages = await client.get_messages(source_peer, ids=message_ids)
+            copied_count = 0
+            for message_group in group_messages(list(messages)):
+                copied_count += await copy_message_group(
+                    client,
+                    destination_peer,
+                    message_group,
+                    settings,
+                )
             return {
                 "ok": True,
                 "session": client.session.save(),
-                "forwarded_ids": message_ids,
+                "copied_count": copied_count,
             }
 
         raise RuntimeError(f"Неизвестное действие: {action}")
@@ -261,9 +448,13 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
 
 async def main() -> None:
     server = await asyncio.start_server(handle_connection, HOST, PORT)
-    asyncio.create_task(cleanup_qr_flows())
-    async with server:
-        await server.serve_forever()
+    cleanup_task = asyncio.create_task(cleanup_qr_flows())
+    try:
+        async with server:
+            await server.serve_forever()
+    finally:
+        cleanup_task.cancel()
+        await asyncio.gather(cleanup_task, return_exceptions=True)
 
 
 if __name__ == "__main__":
