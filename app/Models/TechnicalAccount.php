@@ -20,6 +20,12 @@ class TechnicalAccount extends Model
 
     protected $hidden = ['session', 'auth_data'];
 
+    protected $attributes = [
+        'auth_method' => 'phone',
+        'status' => 'not_checked',
+        'is_active' => true,
+    ];
+
     protected static function booted(): void
     {
         static::creating(function (): void {
