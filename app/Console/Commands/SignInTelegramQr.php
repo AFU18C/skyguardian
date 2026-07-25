@@ -30,6 +30,13 @@ class SignInTelegramQr extends Command
                     return self::SUCCESS;
                 }
 
+                if ($wait['status'] === 'awaiting_password') {
+                    $password = (string) $this->secret('Пароль двухэтапной аутентификации');
+                    $service->signInPassword($account->refresh(), $password);
+                    $this->info('Telegram-аккаунт подключён.');
+                    return self::SUCCESS;
+                }
+
                 if ($wait['status'] === 'expired') {
                     $this->error('Срок действия QR-кода истёк.');
                     return self::FAILURE;
