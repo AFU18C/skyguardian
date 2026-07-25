@@ -10,37 +10,23 @@
             <button class="sg-button sg-button-primary" type="button" data-modal-open="group-channel-create">Добавить</button>
         </section>
     @else
-        <div class="sg-card-grid">
+        <div class="sg-group-channel-grid">
             @foreach ($bots as $bot)
-                @php $detailsId = 'group-channel-details-'.$bot->id; @endphp
-                <article class="sg-record-card sg-collapsible-card" data-collapsible-card>
-                    <div class="sg-record-card-top">
-                        <div class="sg-record-icon">BOT</div>
-                        <div class="sg-record-title">
-                            <h2>{{ $bot->bot_name }}</h2>
-                            <p>{{ $bot->group_name }}</p>
-                        </div>
-                        <div class="sg-card-summary-actions">
-                            <span class="sg-status {{ $bot->status === 'connected' ? 'sg-status-success' : ($bot->status === 'error' ? 'sg-status-error' : 'sg-status-muted') }}">
-                                <span class="sg-status-dot"></span>{{ match($bot->status) {'connected' => 'Подключён', 'limited' => 'Ограничен', 'error' => 'Ошибка', default => 'Не проверен'} }}
-                            </span>
-                            <button class="sg-card-toggle" type="button" aria-expanded="false" aria-controls="{{ $detailsId }}" data-card-toggle><span aria-hidden="true"></span></button>
-                        </div>
+                <article class="sg-group-channel-card">
+                    <div class="sg-group-channel-mark" aria-hidden="true">▲</div>
+                    <div class="sg-group-channel-title">
+                        <h2>{{ $bot->group_name }}</h2>
+                        <a href="{{ $bot->group_link }}" target="_blank" rel="noopener">
+                            {{ $bot->bot_username ? '@'.$bot->bot_username : $bot->bot_name }}
+                        </a>
                     </div>
-                    <div class="sg-card-details" id="{{ $detailsId }}" data-card-details hidden>
-                        <dl class="sg-record-data">
-                            <div><dt>Тип</dt><dd>{{ $bot->chat_type === 'channel' ? 'Канал' : 'Группа' }}</dd></div>
-                            <div><dt>ID администратора</dt><dd>{{ $bot->admin_id }}</dd></div>
-                            <div><dt>Ссылка</dt><dd><a href="{{ $bot->group_link }}" target="_blank" rel="noopener">{{ $bot->group_link }}</a></dd></div>
-                            <div><dt>Chat ID</dt><dd>{{ $bot->chat_id ?: 'Не определён' }}</dd></div>
-                            <div><dt>Username бота</dt><dd>{{ $bot->bot_username ? '@'.$bot->bot_username : 'Не определён' }}</dd></div>
-                            <div><dt>Последняя проверка</dt><dd>{{ $bot->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
-                        </dl>
-                        @if($bot->last_error)<div class="sg-inline-error">{{ $bot->last_error }}</div>@endif
-                        <div class="sg-record-actions">
-                            <form method="POST" action="{{ route('admin.group-channel.check', $bot) }}">@csrf<button class="sg-button sg-button-secondary sg-button-small" type="submit" data-submit-button>Проверить подключение</button></form>
-                            <button class="sg-button sg-button-primary sg-button-small" type="button" data-modal-open="group-channel-edit-{{ $bot->id }}">Настроить</button>
-                        </div>
+                    <div class="sg-group-channel-actions">
+                        <button class="sg-group-channel-action" type="button" title="Редактировать" aria-label="Редактировать" data-modal-open="group-channel-edit-{{ $bot->id }}">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>
+                        </button>
+                        <button class="sg-group-channel-action" type="button" title="Управление" aria-label="Управление" data-modal-open="group-channel-manage-{{ $bot->id }}">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1v.1h-4v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1-.4h-.1v-4H3A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1v-.1h4V3a1.7 1.7 0 0 0 1.1 1.6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.38.32.6.79.6 1.3v3.4c0 .5-.22.98-.6 1.3Z"></path></svg>
+                        </button>
                     </div>
                 </article>
             @endforeach
@@ -53,8 +39,22 @@
             @include('admin.group-channel-form', ['bot' => null, 'action' => route('admin.group-channel.store')])
         </x-modal>
         @foreach($bots as $bot)
-            <x-modal id="group-channel-edit-{{ $bot->id }}" title="Настройка Группа-Канал" size="lg">
+            <x-modal id="group-channel-edit-{{ $bot->id }}" title="Редактировать Группа-Канал" size="lg">
                 @include('admin.group-channel-form', ['bot' => $bot, 'action' => route('admin.group-channel.update', $bot)])
+            </x-modal>
+            <x-modal id="group-channel-manage-{{ $bot->id }}" title="Управление: {{ $bot->group_name }}" size="lg">
+                <dl class="sg-record-data">
+                    <div><dt>Бот</dt><dd>{{ $bot->bot_name }}</dd></div>
+                    <div><dt>Тип</dt><dd>{{ $bot->chat_type === 'channel' ? 'Канал' : 'Группа' }}</dd></div>
+                    <div><dt>ID администратора</dt><dd>{{ $bot->admin_id }}</dd></div>
+                    <div><dt>Ссылка</dt><dd><a href="{{ $bot->group_link }}" target="_blank" rel="noopener">{{ $bot->group_link }}</a></dd></div>
+                    <div><dt>Chat ID</dt><dd>{{ $bot->chat_id ?: 'Не определён' }}</dd></div>
+                    <div><dt>Последняя проверка</dt><dd>{{ $bot->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
+                </dl>
+                @if($bot->last_error)<div class="sg-inline-error">{{ $bot->last_error }}</div>@endif
+                <div class="sg-record-actions">
+                    <form method="POST" action="{{ route('admin.group-channel.check', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Проверить подключение</button></form>
+                </div>
                 <div class="sg-danger-zone">
                     <div><strong>Удаление</strong><p>Бот и привязка к группе/каналу будут удалены.</p></div>
                     <form method="POST" action="{{ route('admin.group-channel.destroy', $bot) }}" data-confirm="Удалить эту запись?">@csrf @method('DELETE')<button class="sg-button sg-button-danger" type="submit">Удалить</button></form>
