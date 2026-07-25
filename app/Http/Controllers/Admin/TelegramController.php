@@ -59,7 +59,7 @@ class TelegramController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'api_id' => ['required', 'integer', 'min:1', Rule::unique('telegram_apis', 'api_id')->ignore($telegramApi->id)],
+            'api_id' => ['nullable', 'integer', 'min:1', Rule::unique('telegram_apis', 'api_id')->ignore($telegramApi->id)],
             'api_hash' => ['nullable', 'string', 'min:16', 'max:255'],
             'is_active' => ['nullable', 'boolean'],
         ]);
@@ -67,9 +67,12 @@ class TelegramController extends Controller
         try {
             $telegramApi->fill([
                 'name' => $validated['name'],
-                'api_id' => $validated['api_id'],
                 'is_active' => (bool) ($validated['is_active'] ?? false),
             ]);
+
+            if (! empty($validated['api_id'])) {
+                $telegramApi->api_id = $validated['api_id'];
+            }
 
             if (! empty($validated['api_hash'])) {
                 $telegramApi->api_hash = $validated['api_hash'];
@@ -152,14 +155,23 @@ class TelegramController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'auth_method' => ['required', Rule::in(['phone', 'qr'])],
-            'phone' => ['nullable', 'required_if:auth_method,phone', 'string', 'max:32'],
+            'phone' => ['nullable', 'string', 'max:32'],
             'telegram_api_id' => ['required', 'integer', 'exists:telegram_apis,id'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $phone = filled($validated['phone'] ?? null) ? $validated['phone'] : $account->phone;
+
+        if ($validated['auth_method'] === 'phone' && ! $phone) {
+            throw ValidationException::withMessages(['phone' => 'Укажите номер телефона.']);
+        }
+
         try {
             $account->update([
-                ...$validated,
+                'name' => $validated['name'],
+                'auth_method' => $validated['auth_method'],
+                'phone' => $phone,
+                'telegram_api_id' => $validated['telegram_api_id'],
                 'is_active' => (bool) ($validated['is_active'] ?? false),
             ]);
 
