@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Админка' }} — SkyGuardian</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/source-copying.css', 'resources/js/app.js'])
 </head>
 <body class="sg-body">
 <div class="sg-app" data-admin-app>
