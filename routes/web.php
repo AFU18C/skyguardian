@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\GroupChannelController;
 use App\Http\Controllers\Admin\SourceController;
 use App\Http\Controllers\Admin\SystemMetricsController;
 use App\Http\Controllers\Admin\TelegramController;
@@ -47,5 +48,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/telegram/accounts/{account}/qr/wait', [TelegramController::class, 'waitQr'])->name('telegram.accounts.qr.wait');
 
     Route::view('/site-settings', 'admin.site-settings')->name('site-settings');
-    Route::view('/group-channel', 'admin.group-channel')->name('group-channel');
+    Route::get('/group-channel', [GroupChannelController::class, 'index'])->name('group-channel');
+    Route::post('/group-channel', [GroupChannelController::class, 'store'])->name('group-channel.store');
+    Route::put('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'update'])->name('group-channel.update');
+    Route::delete('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'destroy'])->name('group-channel.destroy');
+    Route::post('/group-channel/{groupChannelBot}/check', [GroupChannelController::class, 'check'])->name('group-channel.check');
 });
