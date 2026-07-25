@@ -43,21 +43,7 @@ jobs:
         run: npm run build
 
       - name: Run PHP tests
-        id: php-tests
-        continue-on-error: true
-        run: php artisan test > test-output.txt 2>&1
-
-      - name: Upload PHP test output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: php-test-output
-          path: test-output.txt
-          retention-days: 1
-
-      - name: Fail when PHP tests fail
-        if: steps.php-tests.outcome == 'failure'
-        run: exit 1
+        run: php artisan test
 
       - name: Apply PHP formatting
         run: vendor/bin/pint
