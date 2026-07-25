@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - tz1-implementation
+      - tz2-interface
   pull_request:
     branches:
       - main
@@ -37,7 +38,7 @@ jobs:
         run: vendor/bin/pint
 
       - name: Commit PHP formatting
-        if: github.event_name == 'push' && github.ref == 'refs/heads/tz1-implementation'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/tz1-implementation' || github.ref == 'refs/heads/tz2-interface')
         run: |
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
