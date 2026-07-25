@@ -1,0 +1,43 @@
+name: Runner Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    name: Check SkyGuardian server
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify runner and installed software
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          echo "Runner name: ${RUNNER_NAME}"
+          echo "Machine: $(hostname)"
+          echo "User: $(whoami)"
+          echo "Working directory: $(pwd)"
+
+          php -v
+          composer --version
+          node --version
+          npm --version
+          mysql --version
+          python3 --version
+
+          /opt/skyguardian-telethon/venv/bin/python \
+            -c "import telethon; print('Telethon:', telethon.__version__)"
+
+          systemctl is-active nginx
+          systemctl is-active mysql
+          systemctl is-active php8.3-fpm
+
+          echo "SkyGuardian runner check completed successfully."
