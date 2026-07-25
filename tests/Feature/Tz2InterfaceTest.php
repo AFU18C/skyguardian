@@ -66,6 +66,12 @@ class Tz2InterfaceTest extends TestCase
             'check_interval' => 5,
             'check_interval_unit' => 'minutes',
             'is_active' => '1',
+            'copy_mode' => 'original',
+            'strip_links' => '1',
+            'strip_hashtags' => '1',
+            'strip_mentions' => '1',
+            'remove_phrases' => "реклама\nподписывайтесь на источник",
+            'footer_html' => '<b>SkyGuardian</b><script>alert(1)</script><a href="javascript:alert(1)" onclick="alert(2)">bad</a>',
             'rules' => [
                 ['key' => 'include_keywords', 'value' => 'важно', 'is_active' => '1', 'priority' => 100],
             ],
@@ -74,11 +80,22 @@ class Tz2InterfaceTest extends TestCase
         $source = Source::query()->firstOrFail();
         $this->assertSame(Source::TYPE_NEWS, $source->type);
         $this->assertTrue($source->is_active);
+        $this->assertNull($source->last_message_id);
         $this->assertDatabaseHas('source_rules', ['source_id' => $source->id, 'key' => 'include_keywords']);
+        $this->assertDatabaseHas('source_rules', ['source_id' => $source->id, 'key' => 'copy_mode']);
+        $this->assertDatabaseHas('source_rules', ['source_id' => $source->id, 'key' => 'strip_links']);
+
+        $footer = (string) data_get($source->rules()->where('key', 'footer_html')->firstOrFail()->value, 'value');
+        $this->assertStringContainsString('<b>SkyGuardian</b>', $footer);
+        $this->assertStringNotContainsString('<script', $footer);
+        $this->assertStringNotContainsString('javascript:', $footer);
+        $this->assertStringNotContainsString('onclick', $footer);
 
         $this->actingAs($user)->get(route('admin.news.index'))
             ->assertOk()
-            ->assertSee('Новости региона');
+            ->assertSee('Новости региона')
+            ->assertSee('Копирование сообщений')
+            ->assertSee('Свой текст внизу публикации');
 
         $airAlertResponse = $this->actingAs($user)->get(route('admin.air-alert.index'));
         $airAlertResponse->assertOk();
@@ -86,6 +103,8 @@ class Tz2InterfaceTest extends TestCase
         $position = mb_strpos($content, 'Новости региона');
         $context = $position === false ? '' : mb_substr($content, max(0, $position - 220), 500);
         $this->assertFalse($position !== false, "Новостной источник попал в раздел тревог. Контекст: {$context}");
+
+        $source->forceFill(['last_message_id' => 99])->save();
 
         $this->actingAs($user)->put(route('admin.news.update', $source), [
             'form_context' => 'source-'.$source->id,
@@ -96,10 +115,21 @@ class Tz2InterfaceTest extends TestCase
             'check_interval' => 10,
             'check_interval_unit' => 'minutes',
             'is_active' => '0',
+            'copy_mode' => 'text_only',
+            'strip_links' => '0',
+            'strip_hashtags' => '0',
+            'strip_mentions' => '0',
+            'remove_phrases' => '',
+            'footer_html' => '<i>Обновлено</i>',
+            'reset_cursor' => '1',
             'rules' => [],
         ])->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('sources', ['id' => $source->id, 'name' => 'Обновлённые новости', 'is_active' => false]);
+        $source->refresh();
+        $this->assertSame('Обновлённые новости', $source->name);
+        $this->assertFalse($source->is_active);
+        $this->assertNull($source->last_message_id);
+        $this->assertSame('text_only', data_get($source->rules()->where('key', 'copy_mode')->firstOrFail()->value, 'value'));
 
         $this->actingAs($user)->delete(route('admin.news.destroy', $source));
         $this->assertDatabaseMissing('sources', ['id' => $source->id]);
