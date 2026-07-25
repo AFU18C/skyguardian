@@ -22,9 +22,11 @@ class SignInTelegram extends Command
             $this->info($account->status === 'awaiting_password'
                 ? 'Требуется пароль двухэтапной аутентификации.'
                 : 'Telegram-аккаунт подключён.');
+
             return self::SUCCESS;
         } catch (Throwable $e) {
             $this->error($e->getMessage());
+
             return self::FAILURE;
         }
     }

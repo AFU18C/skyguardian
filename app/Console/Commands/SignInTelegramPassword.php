@@ -21,9 +21,11 @@ class SignInTelegramPassword extends Command
         try {
             $service->signInPassword($account, $password);
             $this->info('Telegram-аккаунт подключён.');
+
             return self::SUCCESS;
         } catch (Throwable $e) {
             $this->error($e->getMessage());
+
             return self::FAILURE;
         }
     }

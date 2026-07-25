@@ -44,7 +44,7 @@ class TelegramAuthServiceTest extends TestCase
             ],
         ]);
 
-        $service = new TelegramAuthService($telethon, new OperationGate());
+        $service = new TelegramAuthService($telethon, new OperationGate);
 
         $account = $service->sendCode($account);
         $this->assertSame('awaiting_code', $account->status);
@@ -87,7 +87,7 @@ class TelegramAuthServiceTest extends TestCase
             ],
         ]);
 
-        $service = new TelegramAuthService($telethon, new OperationGate());
+        $service = new TelegramAuthService($telethon, new OperationGate);
         $started = $service->startQr($account);
 
         $this->assertSame('tg://login?token=test', $started['url']);

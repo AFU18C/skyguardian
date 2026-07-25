@@ -27,6 +27,7 @@ class SignInTelegramQr extends Command
 
                 if ($wait['status'] === 'connected') {
                     $this->info('Telegram-аккаунт подключён.');
+
                     return self::SUCCESS;
                 }
 
@@ -34,11 +35,13 @@ class SignInTelegramQr extends Command
                     $password = (string) $this->secret('Пароль двухэтапной аутентификации');
                     $service->signInPassword($account->refresh(), $password);
                     $this->info('Telegram-аккаунт подключён.');
+
                     return self::SUCCESS;
                 }
 
                 if ($wait['status'] === 'expired') {
                     $this->error('Срок действия QR-кода истёк.');
+
                     return self::FAILURE;
                 }
 
@@ -46,6 +49,7 @@ class SignInTelegramQr extends Command
             }
         } catch (Throwable $e) {
             $this->error($e->getMessage());
+
             return self::FAILURE;
         }
     }

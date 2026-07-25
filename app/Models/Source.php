@@ -14,6 +14,7 @@ class Source extends Model
     use HasFactory;
 
     public const TYPE_NEWS = 'news';
+
     public const TYPE_AIR_ALERT = 'air_alert';
 
     protected $fillable = [

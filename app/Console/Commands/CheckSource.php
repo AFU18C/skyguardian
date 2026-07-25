@@ -20,9 +20,11 @@ class CheckSource extends Command
         try {
             $service->manualCheck($source);
             $this->info('Источник доступен.');
+
             return self::SUCCESS;
         } catch (Throwable $e) {
             $this->error($e->getMessage());
+
             return self::FAILURE;
         }
     }

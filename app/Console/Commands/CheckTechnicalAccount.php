@@ -20,9 +20,11 @@ class CheckTechnicalAccount extends Command
         try {
             $service->manualCheck($account);
             $this->info('Технический аккаунт успешно проверен.');
+
             return self::SUCCESS;
         } catch (Throwable $e) {
             $this->error($e->getMessage());
+
             return self::FAILURE;
         }
     }

@@ -36,7 +36,7 @@ class SkyGuardianCoreTest extends TestCase
     {
         config()->set('skyguardian.limits.account_concurrent_operations', 2);
         $account = $this->createAccount($this->createApi());
-        $gate = new OperationGate();
+        $gate = new OperationGate;
 
         $gate->acquire('one', $account);
         $gate->acquire('two', $account);
@@ -48,7 +48,7 @@ class SkyGuardianCoreTest extends TestCase
     public function test_operation_gate_enforces_global_limit(): void
     {
         config()->set('skyguardian.limits.global_concurrent_operations', 5);
-        $gate = new OperationGate();
+        $gate = new OperationGate;
 
         for ($i = 0; $i < 5; $i++) {
             $gate->acquire('operation-'.$i);
@@ -73,7 +73,7 @@ class SkyGuardianCoreTest extends TestCase
             ],
         ]);
 
-        $result = (new TechnicalAccountService($telethon, new OperationGate()))->manualCheck($account);
+        $result = (new TechnicalAccountService($telethon, new OperationGate))->manualCheck($account);
 
         $this->assertSame('connected', $result->status);
         $this->assertSame(123, $result->telegram_user_id);
@@ -99,7 +99,7 @@ class SkyGuardianCoreTest extends TestCase
             'peer' => '@source',
         ])->andReturn(['peer' => ['id' => 1]]);
 
-        $result = (new SourceService($telethon, new OperationGate()))->manualCheck($source);
+        $result = (new SourceService($telethon, new OperationGate))->manualCheck($source);
 
         $this->assertSame('available', $result->status);
         $this->assertSame(77, $result->last_message_id);
@@ -139,7 +139,7 @@ class SkyGuardianCoreTest extends TestCase
             'message_ids' => [11, 12],
         ])->andReturn(['forwarded_ids' => [11, 12]]);
 
-        $processor = new SourceProcessor($telethon, new OperationGate(), new SourceScheduler());
+        $processor = new SourceProcessor($telethon, new OperationGate, new SourceScheduler);
         $processor->process($source);
         $source->refresh();
 

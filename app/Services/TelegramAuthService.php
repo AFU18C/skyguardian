@@ -55,6 +55,7 @@ class TelegramAuthService
                     'status' => 'awaiting_password',
                     'last_error' => null,
                 ])->save();
+
                 return;
             }
 
@@ -154,6 +155,7 @@ class TelegramAuthService
 
         try {
             $callback();
+
             return $account->refresh();
         } catch (Throwable $e) {
             $this->markError($account, $e);

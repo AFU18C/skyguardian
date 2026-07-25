@@ -20,9 +20,11 @@ class SendTelegramCode extends Command
         try {
             $service->sendCode($account);
             $this->info('Код авторизации отправлен.');
+
             return self::SUCCESS;
         } catch (Throwable $e) {
             $this->error($e->getMessage());
+
             return self::FAILURE;
         }
     }
