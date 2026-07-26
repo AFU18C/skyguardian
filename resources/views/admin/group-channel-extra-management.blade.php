@@ -39,7 +39,7 @@
                 <strong>{{ trim($joinRequest->first_name.' '.$joinRequest->last_name) ?: 'Пользователь '.$joinRequest->telegram_user_id }}</strong>
                 <small>
                     ID: {{ $joinRequest->telegram_user_id }}
-                    @if($joinRequest->username) · @{{ $joinRequest->username }} @endif
+                    @if($joinRequest->username) · {{ '@'.$joinRequest->username }} @endif
                     @if($joinRequest->requested_at) · {{ $joinRequest->requested_at->timezone('Europe/Kyiv')->format('d.m.Y H:i') }} @endif
                 </small>
                 @if($joinRequest->last_error)<div class="sg-inline-error">{{ $joinRequest->last_error }}</div>@endif
