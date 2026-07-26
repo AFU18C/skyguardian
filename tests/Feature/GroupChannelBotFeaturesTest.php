@@ -7,6 +7,7 @@ use App\Models\GroupChannelJoinRequest;
 use App\Models\GroupChannelPublication;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -64,9 +65,58 @@ class GroupChannelBotFeaturesTest extends TestCase
         $publication = GroupChannelPublication::query()->firstOrFail();
         $this->assertSame(GroupChannelPublication::STATUS_SENT, $publication->status);
         $this->assertSame('777', $publication->telegram_message_id);
-        Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/sendMessage')
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/sendMessage')
             && $request['chat_id'] === '-100500'
             && $request['text'] === 'Тестовая публикация');
+    }
+
+    public function test_poll_options_are_sent_as_input_poll_option_objects(): void
+    {
+        $user = User::factory()->create();
+        $bot = $this->botWithModules(['publications', 'polls']);
+
+        Http::fake([
+            '*' => Http::response([
+                'ok' => true,
+                'result' => ['message_id' => 778],
+            ]),
+        ]);
+
+        $this->actingAs($user)->post(route('admin.group-channel.publications.store', $bot), [
+            'type' => GroupChannelPublication::TYPE_POLL,
+            'poll_question' => 'Выберите вариант',
+            'poll_options' => "Первый\nВторой",
+            'poll_type' => 'regular',
+            'poll_is_anonymous' => '1',
+            'action' => 'send',
+        ])->assertRedirect();
+
+        Http::assertSent(function (Request $request): bool {
+            if (! str_ends_with($request->url(), '/sendPoll')) {
+                return false;
+            }
+
+            return json_decode((string) $request['options'], true) === [
+                ['text' => 'Первый'],
+                ['text' => 'Второй'],
+            ];
+        });
+    }
+
+    public function test_webhook_requires_telegram_secret_header(): void
+    {
+        $bot = $this->botWithModules(['antispam']);
+
+        $this->postJson(route('group-channel.webhook', [
+            'fingerprint' => $bot->token_fingerprint,
+            'secret' => $bot->webhook_secret,
+        ]), [
+            'update_id' => 1,
+            'message' => [
+                'message_id' => 1,
+                'chat' => ['id' => -100500, 'type' => 'supergroup'],
+            ],
+        ])->assertForbidden();
     }
 
     public function test_webhook_antispam_deletes_link_and_stores_message(): void
@@ -101,8 +151,52 @@ class GroupChannelBotFeaturesTest extends TestCase
             'has_link' => true,
             'matched_rule' => 'links',
         ]);
-        Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/deleteMessage')
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/deleteMessage')
             && (string) $request['message_id'] === '55');
+    }
+
+    public function test_direct_join_without_required_subscription_is_removed(): void
+    {
+        $bot = $this->botWithModules(['subscription_check', 'welcome'], [
+            'subscription_check' => ['channels' => ['@required_channel']],
+            'welcome' => ['text' => 'Добро пожаловать'],
+        ]);
+
+        Http::fake(function (Request $request) {
+            if (str_ends_with($request->url(), '/getChatMember')) {
+                return Http::response(['ok' => true, 'result' => ['status' => 'left']]);
+            }
+
+            return Http::response(['ok' => true, 'result' => true]);
+        });
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson(route('group-channel.webhook', [
+                'fingerprint' => $bot->token_fingerprint,
+                'secret' => $bot->webhook_secret,
+            ]), [
+                'update_id' => 3,
+                'message' => [
+                    'message_id' => 56,
+                    'date' => now()->timestamp,
+                    'chat' => ['id' => -100500, 'type' => 'supergroup'],
+                    'from' => ['id' => 1, 'is_bot' => false],
+                    'new_chat_members' => [[
+                        'id' => 102,
+                        'is_bot' => false,
+                        'first_name' => 'Пётр',
+                    ]],
+                ],
+            ])->assertOk();
+
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/banChatMember')
+            && (string) $request['user_id'] === '102');
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/unbanChatMember')
+            && (string) $request['user_id'] === '102');
+        $this->assertDatabaseMissing('group_channel_user_states', [
+            'group_channel_bot_id' => $bot->id,
+            'telegram_user_id' => '102',
+        ]);
     }
 
     public function test_join_request_can_be_approved_from_admin_panel(): void
@@ -143,7 +237,7 @@ class GroupChannelBotFeaturesTest extends TestCase
             GroupChannelJoinRequest::STATUS_APPROVED,
             $joinRequest->fresh()->status,
         );
-        Http::assertSent(fn ($request): bool => str_ends_with($request->url(), '/approveChatJoinRequest'));
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/approveChatJoinRequest'));
     }
 
     private function botWithModules(array $enabled, array $overrides = []): GroupChannelBot
