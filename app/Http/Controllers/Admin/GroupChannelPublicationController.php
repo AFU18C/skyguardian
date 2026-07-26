@@ -48,16 +48,23 @@ class GroupChannelPublicationController extends Controller
             'delete_after_unit' => ['nullable', Rule::in(['minutes', 'hours'])],
         ]);
 
-        $this->validateActionModules($groupChannelBot, $data['action']);
-        $this->validateContent($data, $request);
+        try {
+            $this->validateActionModules($groupChannelBot, $data['action']);
+            $this->validateContent($groupChannelBot, $data, $request);
 
-        if ($data['action'] === 'schedule' && empty($data['scheduled_at'])) {
-            return back()->withErrors([
-                'scheduled_at' => 'Укажите дату и время отправки.',
-            ])->withInput();
+            if ($data['action'] === 'schedule' && empty($data['scheduled_at'])) {
+                throw new RuntimeException('Укажите дату и время отправки.');
+            }
+
+            $deleteAfterMinutes = $this->deleteAfterMinutes($groupChannelBot, $data);
+        } catch (RuntimeException $e) {
+            return back()->withInput()->with('toast', [
+                'type' => 'error',
+                'title' => 'Проверьте публикацию',
+                'message' => $e->getMessage(),
+            ]);
         }
 
-        $deleteAfterMinutes = $this->deleteAfterMinutes($groupChannelBot, $data);
         $buttons = $this->parseButtons($data['buttons_text'] ?? null);
         $reactions = $this->parseList($data['reactions_text'] ?? null);
         $poll = $data['type'] === GroupChannelPublication::TYPE_POLL
@@ -189,13 +196,23 @@ class GroupChannelPublicationController extends Controller
         }
     }
 
-    private function validateContent(array $data, Request $request): void
+    private function validateContent(GroupChannelBot $bot, array $data, Request $request): void
     {
         $type = $data['type'];
         $files = $request->file('media', []);
+        $text = trim((string) ($data['text'] ?? ''));
 
-        if ($type === GroupChannelPublication::TYPE_TEXT && trim((string) ($data['text'] ?? '')) === '') {
+        if ($type === GroupChannelPublication::TYPE_TEXT && $text === '') {
             throw new RuntimeException('Введите текст публикации.');
+        }
+
+        if (in_array($type, [
+            GroupChannelPublication::TYPE_PHOTO,
+            GroupChannelPublication::TYPE_VIDEO,
+            GroupChannelPublication::TYPE_ALBUM,
+            GroupChannelPublication::TYPE_DOCUMENT,
+        ], true) && mb_strlen($text) > 1024) {
+            throw new RuntimeException('Подпись к медиа не может быть длиннее 1024 символов.');
         }
 
         if (in_array($type, [
@@ -211,6 +228,10 @@ class GroupChannelPublicationController extends Controller
         }
 
         if ($type === GroupChannelPublication::TYPE_POLL) {
+            if (! $bot->moduleEnabled('polls')) {
+                throw new RuntimeException('Сначала включите модуль опросов.');
+            }
+
             $options = $this->parseList($data['poll_options'] ?? null);
             if (trim((string) ($data['poll_question'] ?? '')) === '' || count($options) < 2) {
                 throw new RuntimeException('Укажите вопрос и минимум два варианта ответа.');
