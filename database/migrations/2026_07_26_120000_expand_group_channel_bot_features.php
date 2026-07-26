@@ -48,6 +48,8 @@ return new class extends Migration
             $table->unsignedInteger('warnings')->default(0);
             $table->timestamp('joined_at')->nullable();
             $table->timestamp('verified_at')->nullable();
+            $table->string('verification_answer')->nullable();
+            $table->timestamp('verification_expires_at')->nullable();
             $table->timestamp('muted_until')->nullable();
             $table->timestamp('last_message_at')->nullable();
             $table->timestamp('window_started_at')->nullable();
