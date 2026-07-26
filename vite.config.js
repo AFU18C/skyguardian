@@ -13,6 +13,7 @@ export default defineConfig({
                 'resources/css/topbar-metrics.css',
                 'resources/css/group-channel.css',
                 'resources/js/app.js',
+                'resources/js/group-channel-management.js',
                 'resources/js/collapsible-cards.js',
                 'resources/js/topbar-metrics.js',
             ],

@@ -46,40 +46,8 @@
             <x-modal id="group-channel-manage-{{ $bot->id }}" title="Управление: {{ $bot->group_name }}" size="lg">
                 @include('admin.group-channel-rights', ['bot' => $bot])
                 @include('admin.group-channel-management', ['bot' => $bot])
-                @include('admin.group-channel-extra-management', ['bot' => $bot])
             </x-modal>
         @endforeach
-
-        @if(session('group_channel_check'))
-            @php $check = session('group_channel_check'); @endphp
-            <x-modal id="group-channel-check-result" title="Результат проверки">
-                @if($check['error'] ?? null)
-                    <div class="sg-inline-error">{{ $check['error'] }}</div>
-                @else
-                    <dl class="sg-record-data">
-                        <div><dt>Бот</dt><dd>{{ $check['bot'] }}</dd></div>
-                        <div><dt>Группа/канал</dt><dd>{{ $check['chat'] }}</dd></div>
-                        <div><dt>Chat ID</dt><dd>{{ $check['chat_id'] }}</dd></div>
-                        <div><dt>Username</dt><dd>{{ $check['username'] ? '@'.$check['username'] : 'Нет' }}</dd></div>
-                    </dl>
-                    @foreach([
-                        'is_administrator' => 'Бот является администратором',
-                        'send_messages' => 'Отправка сообщений',
-                        'post_messages' => 'Публикация в канале',
-                        'edit_messages' => 'Редактирование сообщений',
-                        'delete_messages' => 'Удаление сообщений',
-                        'pin_messages' => 'Закрепление сообщений',
-                        'restrict_members' => 'Ограничение пользователей',
-                        'invite_users' => 'Управление приглашениями',
-                        'manage_chat' => 'Управление чатом',
-                        'manage_topics' => 'Управление темами',
-                    ] as $key => $label)
-                        <div class="sg-switch-row"><strong>{{ $label }}</strong><span class="sg-status {{ data_get($check, 'permissions.'.$key) ? 'sg-status-success' : 'sg-status-error' }}"><span class="sg-status-dot"></span>{{ data_get($check, 'permissions.'.$key) ? 'Разрешено' : 'Нет права' }}</span></div>
-                    @endforeach
-                @endif
-            </x-modal>
-            <div data-open-modal-on-load="group-channel-check-result"></div>
-        @endif
 
         @if(session('group_channel_publication_preview'))
             @php $preview = session('group_channel_publication_preview'); @endphp
@@ -115,6 +83,13 @@
             <div data-open-modal-on-load="group-channel-bulk-delete-preview"></div>
         @endif
     @endpush
+
+    @if(session('open_group_channel_manage'))
+        <div
+            data-open-modal-on-load="group-channel-manage-{{ (int) session('open_group_channel_manage') }}"
+            @if(session('open_group_channel_scroll')) data-modal-scroll-to="{{ session('open_group_channel_scroll') }}" @endif
+        ></div>
+    @endif
 
     @if($errors->any() && old('bot_name'))<div data-open-modal-on-load="group-channel-create"></div>@endif
 </x-layouts.admin>

@@ -1,21 +1,26 @@
-<h3>Права бота</h3>
-@foreach([
-    'is_administrator' => 'Бот является администратором',
-    'send_messages' => 'Отправка сообщений',
-    'post_messages' => 'Публикация в канале',
-    'edit_messages' => 'Редактирование сообщений',
-    'delete_messages' => 'Удаление сообщений',
-    'pin_messages' => 'Закрепление сообщений',
-    'restrict_members' => 'Ограничение пользователей',
-    'invite_users' => 'Управление приглашениями',
-    'manage_chat' => 'Управление чатом',
-    'manage_topics' => 'Управление темами',
-] as $key => $label)
-    @php $allowed = (bool) data_get($bot->permissions, $key, false); @endphp
-    <div class="sg-switch-row">
-        <strong>{{ $label }}</strong>
-        <span class="sg-status {{ $allowed ? 'sg-status-success' : 'sg-status-error' }}">
-            <span class="sg-status-dot"></span>{{ $allowed ? 'Разрешено' : 'Нет права' }}
-        </span>
+<section class="sg-bot-rights">
+    <div class="sg-bot-rights-heading">
+        <h3>Права бота</h3>
+        <small>Обновляются кнопкой «Проверить подключение»</small>
     </div>
-@endforeach
+    <div class="sg-bot-rights-grid">
+        @foreach([
+            'is_administrator' => 'Администратор',
+            'send_messages' => 'Отправка сообщений',
+            'post_messages' => 'Публикация в канале',
+            'edit_messages' => 'Редактирование',
+            'delete_messages' => 'Удаление',
+            'pin_messages' => 'Закрепление',
+            'restrict_members' => 'Ограничение участников',
+            'invite_users' => 'Приглашения',
+            'manage_chat' => 'Управление чатом',
+            'manage_topics' => 'Темы',
+        ] as $key => $label)
+            @php $allowed = (bool) data_get($bot->permissions, $key, false); @endphp
+            <div class="sg-bot-right-item {{ $allowed ? 'is-allowed' : 'is-denied' }}">
+                <span>{{ $label }}</span>
+                <strong>{{ $allowed ? 'Да' : 'Нет' }}</strong>
+            </div>
+        @endforeach
+    </div>
+</section>

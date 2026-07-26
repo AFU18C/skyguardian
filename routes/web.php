@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GroupChannelBulkDeleteController;
+use App\Http\Controllers\Admin\GroupChannelCheckController;
 use App\Http\Controllers\Admin\GroupChannelController;
 use App\Http\Controllers\Admin\GroupChannelJoinRequestController;
+use App\Http\Controllers\Admin\GroupChannelModuleSettingsController;
 use App\Http\Controllers\Admin\GroupChannelPublicationController;
 use App\Http\Controllers\Admin\GroupChannelWelcomeController;
 use App\Http\Controllers\Admin\SourceController;
@@ -60,11 +62,11 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/group-channel', [GroupChannelController::class, 'store'])->name('group-channel.store');
     Route::put('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'update'])->name('group-channel.update');
     Route::delete('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'destroy'])->name('group-channel.destroy');
-    Route::post('/group-channel/{groupChannelBot}/check', [GroupChannelController::class, 'check'])->name('group-channel.check');
+    Route::post('/group-channel/{groupChannelBot}/check', GroupChannelCheckController::class)->name('group-channel.check');
     Route::post('/group-channel/{groupChannelBot}/test-message', [GroupChannelController::class, 'sendTestMessage'])->name('group-channel.test-message');
     Route::post('/group-channel/{groupChannelBot}/webhook', [GroupChannelController::class, 'registerWebhook'])->name('group-channel.webhook.register');
     Route::put('/group-channel/{groupChannelBot}/modules', [GroupChannelController::class, 'updateModules'])->name('group-channel.modules.update');
-    Route::put('/group-channel/{groupChannelBot}/module-settings', [GroupChannelController::class, 'updateModuleSettings'])->name('group-channel.module-settings.update');
+    Route::put('/group-channel/{groupChannelBot}/module-settings', GroupChannelModuleSettingsController::class)->name('group-channel.module-settings.update');
     Route::post('/group-channel/{groupChannelBot}/welcome-photo', [GroupChannelWelcomeController::class, 'update'])->name('group-channel.welcome-photo.update');
     Route::delete('/group-channel/{groupChannelBot}/welcome-photo', [GroupChannelWelcomeController::class, 'destroy'])->name('group-channel.welcome-photo.destroy');
     Route::post('/group-channel/{groupChannelBot}/join-requests/{joinRequest}/approve', [GroupChannelJoinRequestController::class, 'approve'])->name('group-channel.join-requests.approve');
