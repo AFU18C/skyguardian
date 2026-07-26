@@ -78,6 +78,9 @@
 
                 @if($configurable)
                     <div class="sg-module-panel" data-module-panel @if(!$expanded) hidden @endif>
+                        @if($module === 'bulk_delete')
+                            @include('admin.group-channel-bulk-delete-note', ['bot' => $bot])
+                        @endif
                         @include('admin.group-channel-module-content', ['bot' => $bot, 'module' => $module])
                     </div>
                 @endif
