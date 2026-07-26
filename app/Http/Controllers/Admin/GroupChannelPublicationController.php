@@ -30,12 +30,28 @@ class GroupChannelPublicationController extends Controller
             'text' => ['required', 'string', 'max:4096'],
             'action' => ['required', Rule::in(['draft', 'schedule', 'send'])],
             'scheduled_at' => ['nullable', 'date', 'after:now'],
+            'delete_after_value' => ['nullable', 'integer', 'min:1', 'max:10080'],
+            'delete_after_unit' => ['nullable', Rule::in(['minutes', 'hours'])],
         ]);
 
         if ($data['action'] === 'schedule' && empty($data['scheduled_at'])) {
             return back()->withErrors([
                 'scheduled_at' => 'Укажите дату и время отправки.',
             ])->withInput();
+        }
+
+        $deleteAfterMinutes = null;
+        if (! empty($data['delete_after_value'])) {
+            if (! $groupChannelBot->moduleEnabled('auto_delete_publications')) {
+                return back()->withErrors([
+                    'delete_after_value' => 'Сначала включите модуль автоудаления публикаций.',
+                ])->withInput();
+            }
+
+            $deleteAfterMinutes = (int) $data['delete_after_value'];
+            if (($data['delete_after_unit'] ?? 'minutes') === 'hours') {
+                $deleteAfterMinutes *= 60;
+            }
         }
 
         $publication = $groupChannelBot->publications()->create([
@@ -45,6 +61,7 @@ class GroupChannelPublicationController extends Controller
                 default => GroupChannelPublication::STATUS_DRAFT,
             },
             'scheduled_at' => $data['action'] === 'schedule' ? $data['scheduled_at'] : null,
+            'delete_after_minutes' => $deleteAfterMinutes,
         ]);
 
         if ($data['action'] === 'send') {
