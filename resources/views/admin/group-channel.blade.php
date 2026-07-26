@@ -45,6 +45,7 @@
             </x-modal>
             <x-modal id="group-channel-manage-{{ $bot->id }}" title="Управление: {{ $bot->group_name }}" size="lg">
                 @include('admin.group-channel-management', ['bot' => $bot])
+                @include('admin.group-channel-extra-management', ['bot' => $bot])
             </x-modal>
         @endforeach
 
@@ -114,5 +115,5 @@
         @endif
     @endpush
 
-    @if($errors->any())<div data-open-modal-on-load="group-channel-create"></div>@endif
+    @if($errors->any() && old('bot_name'))<div data-open-modal-on-load="group-channel-create"></div>@endif
 </x-layouts.admin>
