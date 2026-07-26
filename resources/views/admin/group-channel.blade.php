@@ -44,6 +44,7 @@
                 @include('admin.group-channel-form', ['bot' => $bot, 'action' => route('admin.group-channel.update', $bot)])
             </x-modal>
             <x-modal id="group-channel-manage-{{ $bot->id }}" title="Управление: {{ $bot->group_name }}" size="lg">
+                @include('admin.group-channel-rights', ['bot' => $bot])
                 @include('admin.group-channel-management', ['bot' => $bot])
                 @include('admin.group-channel-extra-management', ['bot' => $bot])
             </x-modal>
