@@ -16,13 +16,16 @@ class GroupChannelWebhookController extends Controller
         string $secret,
         GroupChannelWebhookService $service,
     ): Response {
-        $representative = GroupChannelBot::query()
+        GroupChannelBot::query()
             ->where('token_fingerprint', $fingerprint)
             ->where('webhook_secret', $secret)
             ->firstOrFail();
 
         $headerSecret = $request->header('X-Telegram-Bot-Api-Secret-Token');
-        abort_unless($headerSecret === null || hash_equals($secret, $headerSecret), 403);
+        abort_unless(
+            is_string($headerSecret) && hash_equals($secret, $headerSecret),
+            403,
+        );
 
         $update = $request->all();
         $chatId = $this->chatId($update);
