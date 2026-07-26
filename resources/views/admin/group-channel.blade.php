@@ -77,6 +77,28 @@
                     </div>
                 </form>
 
+                @if($bot->moduleEnabled('publications'))
+                    <hr>
+                    <h3>Редактор публикации</h3>
+                    <form method="POST" action="{{ route('admin.group-channel.publications.store', $bot) }}">
+                        @csrf
+                        <div class="sg-field">
+                            <label for="publication-text-{{ $bot->id }}">Текст</label>
+                            <textarea id="publication-text-{{ $bot->id }}" name="text" rows="8" maxlength="4096" required></textarea>
+                        </div>
+                        <div class="sg-field">
+                            <label for="publication-date-{{ $bot->id }}">Дата и время отложенной отправки</label>
+                            <input id="publication-date-{{ $bot->id }}" name="scheduled_at" type="datetime-local">
+                        </div>
+                        <div class="sg-record-actions">
+                            <button class="sg-button sg-button-secondary" type="submit" name="action" value="draft">Сохранить черновик</button>
+                            <button class="sg-button sg-button-secondary" type="submit" name="action" value="schedule">Запланировать</button>
+                            <button class="sg-button sg-button-primary" type="submit" name="action" value="send" data-submit-button>Отправить сейчас</button>
+                        </div>
+                    </form>
+                    <p>На этом этапе редактор отправляет текст. Фото, видео, альбомы, документы, опросы и кнопки будут добавляться отдельными модулями.</p>
+                @endif
+
                 <div class="sg-danger-zone">
                     <div><strong>Удаление</strong><p>Бот и привязка к группе/каналу будут удалены.</p></div>
                     <form method="POST" action="{{ route('admin.group-channel.destroy', $bot) }}" data-confirm="Удалить эту запись?">@csrf @method('DELETE')<button class="sg-button sg-button-danger" type="submit">Удалить</button></form>
