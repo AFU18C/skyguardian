@@ -18,9 +18,36 @@ class GroupChannelPublication extends Model
 
     public const STATUS_ERROR = 'error';
 
+    public const TYPE_TEXT = 'text';
+
+    public const TYPE_PHOTO = 'photo';
+
+    public const TYPE_VIDEO = 'video';
+
+    public const TYPE_ALBUM = 'album';
+
+    public const TYPE_DOCUMENT = 'document';
+
+    public const TYPE_POLL = 'poll';
+
+    public const TYPES = [
+        self::TYPE_TEXT,
+        self::TYPE_PHOTO,
+        self::TYPE_VIDEO,
+        self::TYPE_ALBUM,
+        self::TYPE_DOCUMENT,
+        self::TYPE_POLL,
+    ];
+
     protected $fillable = [
         'group_channel_bot_id',
+        'type',
         'text',
+        'media_paths',
+        'buttons',
+        'reactions',
+        'poll',
+        'disable_notification',
         'status',
         'scheduled_at',
         'delete_after_minutes',
@@ -28,16 +55,25 @@ class GroupChannelPublication extends Model
         'delete_at',
         'deleted_at_telegram',
         'telegram_message_id',
+        'telegram_message_ids',
         'last_error',
     ];
 
     protected $attributes = [
+        'type' => self::TYPE_TEXT,
         'status' => self::STATUS_DRAFT,
+        'disable_notification' => false,
     ];
 
     protected function casts(): array
     {
         return [
+            'media_paths' => 'array',
+            'buttons' => 'array',
+            'reactions' => 'array',
+            'poll' => 'array',
+            'telegram_message_ids' => 'array',
+            'disable_notification' => 'boolean',
             'scheduled_at' => 'datetime',
             'sent_at' => 'datetime',
             'delete_at' => 'datetime',
