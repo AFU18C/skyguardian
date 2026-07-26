@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GroupChannelController;
+use App\Http\Controllers\Admin\GroupChannelPublicationController;
 use App\Http\Controllers\Admin\SourceController;
 use App\Http\Controllers\Admin\SystemMetricsController;
 use App\Http\Controllers\Admin\TelegramController;
@@ -55,4 +56,5 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/group-channel/{groupChannelBot}/check', [GroupChannelController::class, 'check'])->name('group-channel.check');
     Route::post('/group-channel/{groupChannelBot}/test-message', [GroupChannelController::class, 'sendTestMessage'])->name('group-channel.test-message');
     Route::put('/group-channel/{groupChannelBot}/modules', [GroupChannelController::class, 'updateModules'])->name('group-channel.modules.update');
+    Route::post('/group-channel/{groupChannelBot}/publications', [GroupChannelPublicationController::class, 'store'])->name('group-channel.publications.store');
 });
