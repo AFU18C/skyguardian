@@ -34,24 +34,9 @@ class GroupChannelPublicationService
         try {
             $result = $this->sendByType($publication);
             $messageIds = $this->messageIds($result);
-
-            if ($publication->reactions) {
-                $reaction = collect($publication->reactions)
-                    ->filter(fn (mixed $emoji): bool => is_string($emoji) && $emoji !== '')
-                    ->map(fn (string $emoji): array => ['type' => 'emoji', 'emoji' => $emoji])
-                    ->values()
-                    ->all();
-
-                foreach ($messageIds as $messageId) {
-                    $this->telegram->request($bot, 'setMessageReaction', [
-                        'chat_id' => $bot->chat_id,
-                        'message_id' => $messageId,
-                        'reaction' => $reaction,
-                    ]);
-                }
-            }
-
+            $reactionError = $this->applyReactions($publication, $messageIds);
             $sentAt = now();
+
             $publication->update([
                 'status' => GroupChannelPublication::STATUS_SENT,
                 'sent_at' => $sentAt,
@@ -60,7 +45,7 @@ class GroupChannelPublicationService
                     : null,
                 'telegram_message_id' => isset($messageIds[0]) ? (string) $messageIds[0] : null,
                 'telegram_message_ids' => array_map('strval', $messageIds),
-                'last_error' => null,
+                'last_error' => $reactionError,
             ]);
         } catch (Throwable $e) {
             $publication->update([
@@ -158,6 +143,39 @@ class GroupChannelPublicationService
                 'text' => $publication->text,
             ])),
         };
+    }
+
+    private function applyReactions(GroupChannelPublication $publication, array $messageIds): ?string
+    {
+        if (! $publication->reactions || $messageIds === []) {
+            return null;
+        }
+
+        $reaction = collect($publication->reactions)
+            ->filter(fn (mixed $emoji): bool => is_string($emoji) && $emoji !== '')
+            ->map(fn (string $emoji): array => ['type' => 'emoji', 'emoji' => $emoji])
+            ->values()
+            ->all();
+
+        if ($reaction === []) {
+            return null;
+        }
+
+        try {
+            foreach ($messageIds as $messageId) {
+                $this->telegram->request($publication->bot, 'setMessageReaction', [
+                    'chat_id' => $publication->bot->chat_id,
+                    'message_id' => $messageId,
+                    'reaction' => $reaction,
+                ]);
+            }
+        } catch (Throwable $e) {
+            report($e);
+
+            return 'Публикация отправлена, но реакции не установлены: '.$e->getMessage();
+        }
+
+        return null;
     }
 
     private function pollPayload(array $poll): array
