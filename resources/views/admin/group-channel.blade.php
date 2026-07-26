@@ -38,29 +38,18 @@
         <x-modal id="group-channel-create" title="Добавить Группу-Канал" size="lg">
             @include('admin.group-channel-form', ['bot' => null, 'action' => route('admin.group-channel.store')])
         </x-modal>
+
         @foreach($bots as $bot)
             <x-modal id="group-channel-edit-{{ $bot->id }}" title="Редактировать Группа-Канал" size="lg">
                 @include('admin.group-channel-form', ['bot' => $bot, 'action' => route('admin.group-channel.update', $bot)])
             </x-modal>
             <x-modal id="group-channel-manage-{{ $bot->id }}" title="Управление: {{ $bot->group_name }}" size="lg">
-                <dl class="sg-record-data">
-                    <div><dt>Бот</dt><dd>{{ $bot->bot_name }}</dd></div>
-                    <div><dt>Тип</dt><dd>{{ $bot->chat_type === 'channel' ? 'Канал' : 'Группа' }}</dd></div>
-                    <div><dt>ID администратора</dt><dd>{{ $bot->admin_id }}</dd></div>
-                    <div><dt>Ссылка</dt><dd><a href="{{ $bot->group_link }}" target="_blank" rel="noopener">{{ $bot->group_link }}</a></dd></div>
-                    <div><dt>Chat ID</dt><dd>{{ $bot->chat_id ?: 'Не определён' }}</dd></div>
-                    <div><dt>Последняя проверка</dt><dd>{{ $bot->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
-                </dl>
-                @if($bot->last_error)<div class="sg-inline-error">{{ $bot->last_error }}</div>@endif
-                <div class="sg-record-actions">
-                    <form method="POST" action="{{ route('admin.group-channel.check', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Проверить подключение</button></form>
-                </div>
-                <div class="sg-danger-zone">
-                    <div><strong>Удаление</strong><p>Бот и привязка к группе/каналу будут удалены.</p></div>
-                    <form method="POST" action="{{ route('admin.group-channel.destroy', $bot) }}" data-confirm="Удалить эту запись?">@csrf @method('DELETE')<button class="sg-button sg-button-danger" type="submit">Удалить</button></form>
-                </div>
+                @include('admin.group-channel-rights', ['bot' => $bot])
+                @include('admin.group-channel-management', ['bot' => $bot])
+                @include('admin.group-channel-extra-management', ['bot' => $bot])
             </x-modal>
         @endforeach
+
         @if(session('group_channel_check'))
             @php $check = session('group_channel_check'); @endphp
             <x-modal id="group-channel-check-result" title="Результат проверки">
@@ -76,10 +65,14 @@
                     @foreach([
                         'is_administrator' => 'Бот является администратором',
                         'send_messages' => 'Отправка сообщений',
+                        'post_messages' => 'Публикация в канале',
+                        'edit_messages' => 'Редактирование сообщений',
                         'delete_messages' => 'Удаление сообщений',
                         'pin_messages' => 'Закрепление сообщений',
-                        'restrict_members' => 'Блокировка пользователей',
+                        'restrict_members' => 'Ограничение пользователей',
                         'invite_users' => 'Управление приглашениями',
+                        'manage_chat' => 'Управление чатом',
+                        'manage_topics' => 'Управление темами',
                     ] as $key => $label)
                         <div class="sg-switch-row"><strong>{{ $label }}</strong><span class="sg-status {{ data_get($check, 'permissions.'.$key) ? 'sg-status-success' : 'sg-status-error' }}"><span class="sg-status-dot"></span>{{ data_get($check, 'permissions.'.$key) ? 'Разрешено' : 'Нет права' }}</span></div>
                     @endforeach
@@ -87,7 +80,41 @@
             </x-modal>
             <div data-open-modal-on-load="group-channel-check-result"></div>
         @endif
+
+        @if(session('group_channel_publication_preview'))
+            @php $preview = session('group_channel_publication_preview'); @endphp
+            <x-modal id="group-channel-publication-preview" title="Предпросмотр публикации">
+                <dl class="sg-record-data">
+                    <div><dt>Тип</dt><dd>{{ $preview['type'] }}</dd></div>
+                    <div><dt>Текст</dt><dd>{!! nl2br(e($preview['text'])) !!}</dd></div>
+                    <div><dt>Файлы</dt><dd>{{ implode(', ', $preview['files'] ?? []) ?: 'Нет' }}</dd></div>
+                    <div><dt>Реакции</dt><dd>{{ implode(', ', $preview['reactions'] ?? []) ?: 'Нет' }}</dd></div>
+                </dl>
+                @if($preview['poll'] ?? null)
+                    <h3>{{ data_get($preview, 'poll.question') }}</h3>
+                    <ol>@foreach(data_get($preview, 'poll.options', []) as $option)<li>{{ $option }}</li>@endforeach</ol>
+                @endif
+                @if($preview['buttons'] ?? null)
+                    <div class="sg-record-actions">@foreach($preview['buttons'] as $row)@foreach($row as $button)<span class="sg-button sg-button-secondary">{{ $button['text'] }}</span>@endforeach @endforeach</div>
+                @endif
+            </x-modal>
+            <div data-open-modal-on-load="group-channel-publication-preview"></div>
+        @endif
+
+        @if(session('group_channel_bulk_delete_preview'))
+            @php $bulkPreview = session('group_channel_bulk_delete_preview'); @endphp
+            <x-modal id="group-channel-bulk-delete-preview" title="Подтверждение массового удаления">
+                <p>Найдено сообщений: <strong>{{ $bulkPreview['count'] }}</strong>.</p>
+                <p>После подтверждения бот попробует удалить каждое найденное сообщение из Telegram.</p>
+                <form method="POST" action="{{ route('admin.group-channel.bulk-delete.execute', $bulkPreview['bot_id']) }}" data-confirm="Подтвердить массовое удаление {{ $bulkPreview['count'] }} сообщений?">
+                    @csrf
+                    <input type="hidden" name="token" value="{{ $bulkPreview['token'] }}">
+                    <button class="sg-button sg-button-danger" type="submit">Подтвердить удаление</button>
+                </form>
+            </x-modal>
+            <div data-open-modal-on-load="group-channel-bulk-delete-preview"></div>
+        @endif
     @endpush
 
-    @if($errors->any())<div data-open-modal-on-load="group-channel-create"></div>@endif
+    @if($errors->any() && old('bot_name'))<div data-open-modal-on-load="group-channel-create"></div>@endif
 </x-layouts.admin>
