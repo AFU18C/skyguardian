@@ -74,6 +74,11 @@ class GroupChannelBot extends Model
         return $this->hasMany(GroupChannelUserState::class);
     }
 
+    public function joinRequests(): HasMany
+    {
+        return $this->hasMany(GroupChannelJoinRequest::class);
+    }
+
     public function moduleEnabled(string $module): bool
     {
         return (bool) $this->moduleSetting($module, 'enabled', false);
