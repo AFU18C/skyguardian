@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\GroupChannelBot;
+use App\Models\GroupChannelJoinRequest;
 use App\Models\GroupChannelMessage;
 use App\Models\GroupChannelUserState;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 use Throwable;
 
 class GroupChannelWebhookService
@@ -40,41 +42,8 @@ class GroupChannelWebhookService
         $text = trim((string) ($message['text'] ?? $message['caption'] ?? ''));
         $hasLink = $this->hasLink($text, $message);
 
-        if ($messageId !== '') {
-            GroupChannelMessage::query()->updateOrCreate([
-                'group_channel_bot_id' => $bot->id,
-                'telegram_message_id' => $messageId,
-            ], [
-                'telegram_user_id' => $userId,
-                'username' => $from['username'] ?? null,
-                'text' => $text !== '' ? $text : null,
-                'has_link' => $hasLink,
-                'telegram_created_at' => isset($message['date'])
-                    ? now()->setTimestamp((int) $message['date'])
-                    : now(),
-            ]);
-        }
-
-        foreach ($message['new_chat_members'] ?? [] as $member) {
-            if (! is_array($member) || ! isset($member['id'])) {
-                continue;
-            }
-
-            $state = GroupChannelUserState::query()->updateOrCreate([
-                'group_channel_bot_id' => $bot->id,
-                'telegram_user_id' => (string) $member['id'],
-            ], [
-                'joined_at' => now(),
-                'verified_at' => null,
-                'verification_answer' => null,
-                'verification_expires_at' => null,
-            ]);
-
-            if (! ($member['is_bot'] ?? false)) {
-                $this->sendWelcome($bot, $member);
-                $this->beginVerification($bot, $member, $state);
-            }
-        }
+        $this->storeMessage($bot, $messageId, $userId, $from, $text, $hasLink, $message);
+        $this->handleNewMembers($bot, $message['new_chat_members'] ?? []);
 
         if (! $userId || ($from['is_bot'] ?? false)) {
             return;
@@ -85,7 +54,11 @@ class GroupChannelWebhookService
             'telegram_user_id' => $userId,
         ]);
 
-        if ($bot->moduleEnabled('human_verification') && ! $state->verified_at) {
+        if (
+            $bot->moduleEnabled('human_verification')
+            && ! $state->verified_at
+            && ($state->joined_at || $state->verification_expires_at)
+        ) {
             if ($this->completeVerificationFromMessage($bot, $message, $state, $text)) {
                 return;
             }
@@ -119,6 +92,57 @@ class GroupChannelWebhookService
         ]);
     }
 
+    private function storeMessage(
+        GroupChannelBot $bot,
+        string $messageId,
+        ?string $userId,
+        array $from,
+        string $text,
+        bool $hasLink,
+        array $message,
+    ): void {
+        if ($messageId === '') {
+            return;
+        }
+
+        GroupChannelMessage::query()->updateOrCreate([
+            'group_channel_bot_id' => $bot->id,
+            'telegram_message_id' => $messageId,
+        ], [
+            'telegram_user_id' => $userId,
+            'username' => $from['username'] ?? null,
+            'text' => $text !== '' ? $text : null,
+            'has_link' => $hasLink,
+            'telegram_created_at' => isset($message['date'])
+                ? Carbon::createFromTimestamp((int) $message['date'])
+                : now(),
+        ]);
+    }
+
+    private function handleNewMembers(GroupChannelBot $bot, array $members): void
+    {
+        foreach ($members as $member) {
+            if (! is_array($member) || ! isset($member['id'])) {
+                continue;
+            }
+
+            $state = GroupChannelUserState::query()->updateOrCreate([
+                'group_channel_bot_id' => $bot->id,
+                'telegram_user_id' => (string) $member['id'],
+            ], [
+                'joined_at' => now(),
+                'verified_at' => null,
+                'verification_answer' => null,
+                'verification_expires_at' => null,
+            ]);
+
+            if (! ($member['is_bot'] ?? false)) {
+                $this->sendWelcome($bot, $member);
+                $this->beginVerification($bot, $member, $state);
+            }
+        }
+    }
+
     private function handleJoinRequest(GroupChannelBot $bot, array $request): void
     {
         if (! $bot->moduleEnabled('join_requests')) {
@@ -131,29 +155,58 @@ class GroupChannelWebhookService
             return;
         }
 
+        $joinRequest = GroupChannelJoinRequest::query()->updateOrCreate([
+            'group_channel_bot_id' => $bot->id,
+            'telegram_user_id' => $userId,
+        ], [
+            'username' => $user['username'] ?? null,
+            'first_name' => $user['first_name'] ?? null,
+            'last_name' => $user['last_name'] ?? null,
+            'status' => GroupChannelJoinRequest::STATUS_PENDING,
+            'requested_at' => isset($request['date'])
+                ? Carbon::createFromTimestamp((int) $request['date'])
+                : now(),
+            'actioned_at' => null,
+            'last_error' => null,
+        ]);
+
         if (($user['is_bot'] ?? false) && $bot->moduleSetting('join_requests', 'auto_decline_bots', true)) {
-            $this->telegram->request($bot, 'declineChatJoinRequest', [
-                'chat_id' => $bot->chat_id,
-                'user_id' => $userId,
-            ]);
+            $this->decideJoinRequest($bot, $joinRequest, false);
 
             return;
         }
 
         if ($bot->moduleEnabled('subscription_check') && ! $this->isSubscribed($bot, $userId)) {
-            $this->telegram->request($bot, 'declineChatJoinRequest', [
-                'chat_id' => $bot->chat_id,
-                'user_id' => $userId,
-            ]);
+            $this->decideJoinRequest($bot, $joinRequest, false);
 
             return;
         }
 
         if ($bot->moduleSetting('join_requests', 'auto_approve', false)) {
-            $this->telegram->request($bot, 'approveChatJoinRequest', [
+            $this->decideJoinRequest($bot, $joinRequest, true);
+        }
+    }
+
+    private function decideJoinRequest(
+        GroupChannelBot $bot,
+        GroupChannelJoinRequest $joinRequest,
+        bool $approve,
+    ): void {
+        try {
+            $this->telegram->request($bot, $approve ? 'approveChatJoinRequest' : 'declineChatJoinRequest', [
                 'chat_id' => $bot->chat_id,
-                'user_id' => $userId,
+                'user_id' => $joinRequest->telegram_user_id,
             ]);
+            $joinRequest->update([
+                'status' => $approve
+                    ? GroupChannelJoinRequest::STATUS_APPROVED
+                    : GroupChannelJoinRequest::STATUS_DECLINED,
+                'actioned_at' => now(),
+                'last_error' => null,
+            ]);
+        } catch (Throwable $e) {
+            $joinRequest->update(['last_error' => $e->getMessage()]);
+            throw $e;
         }
     }
 
@@ -265,6 +318,7 @@ class GroupChannelWebhookService
         if (
             $hash
             && $bot->moduleSetting('antispam', 'block_duplicates', false)
+            && $state->last_text_hash
             && hash_equals((string) $state->last_text_hash, $hash)
         ) {
             return 'duplicate';
@@ -321,19 +375,31 @@ class GroupChannelWebhookService
             '{rules}' => (string) $bot->moduleSetting('welcome', 'rules', ''),
         ]);
         $buttons = $bot->moduleSetting('welcome', 'buttons', []);
-        $payload = array_filter([
-            'chat_id' => $bot->chat_id,
-            'text' => $text !== '' ? $text : 'Добро пожаловать!',
-            'reply_markup' => $buttons ? json_encode(['inline_keyboard' => $buttons], JSON_UNESCAPED_UNICODE) : null,
-        ], fn (mixed $value): bool => $value !== null);
-        $result = $this->telegram->request($bot, 'sendMessage', $payload);
-        $deleteAfter = $bot->moduleSetting('welcome', 'delete_after_minutes');
+        $replyMarkup = $buttons
+            ? json_encode(['inline_keyboard' => $buttons], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            : null;
+        $photo = $bot->moduleSetting('welcome', 'photo');
 
+        if ($photo) {
+            $result = $this->telegram->upload($bot, 'sendPhoto', 'photo', (string) $photo, array_filter([
+                'chat_id' => $bot->chat_id,
+                'caption' => mb_substr($text !== '' ? $text : 'Добро пожаловать!', 0, 1024),
+                'reply_markup' => $replyMarkup,
+            ], fn (mixed $value): bool => $value !== null));
+        } else {
+            $result = $this->telegram->request($bot, 'sendMessage', array_filter([
+                'chat_id' => $bot->chat_id,
+                'text' => $text !== '' ? $text : 'Добро пожаловать!',
+                'reply_markup' => $replyMarkup,
+            ], fn (mixed $value): bool => $value !== null));
+        }
+
+        $deleteAfter = $bot->moduleSetting('welcome', 'delete_after_minutes');
         GroupChannelMessage::query()->updateOrCreate([
             'group_channel_bot_id' => $bot->id,
             'telegram_message_id' => (string) ($result['message_id'] ?? ''),
         ], [
-            'text' => $payload['text'],
+            'text' => $text !== '' ? $text : 'Добро пожаловать!',
             'telegram_created_at' => now(),
             'delete_at' => $deleteAfter ? now()->addMinutes((int) $deleteAfter) : null,
         ]);
@@ -368,12 +434,12 @@ class GroupChannelWebhookService
             $replyMarkup = json_encode(['inline_keyboard' => [[[
                 'text' => 'Я человек',
                 'callback_data' => 'sg_verify:'.$bot->id.':'.$member['id'],
-            ]]]], JSON_UNESCAPED_UNICODE);
-
-            $this->restrict($bot, (string) $member['id'], null, false);
+            ]]]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
+        $this->restrict($bot, (string) $member['id'], null, false);
         $state->update([
+            'verified_at' => null,
             'verification_answer' => $answer,
             'verification_expires_at' => now()->addMinutes($timeout),
         ]);
