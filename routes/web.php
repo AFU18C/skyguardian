@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GroupChannelBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelController;
+use App\Http\Controllers\Admin\GroupChannelJoinRequestController;
 use App\Http\Controllers\Admin\GroupChannelPublicationController;
 use App\Http\Controllers\Admin\GroupChannelWelcomeController;
 use App\Http\Controllers\Admin\SourceController;
@@ -66,6 +67,8 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::put('/group-channel/{groupChannelBot}/module-settings', [GroupChannelController::class, 'updateModuleSettings'])->name('group-channel.module-settings.update');
     Route::post('/group-channel/{groupChannelBot}/welcome-photo', [GroupChannelWelcomeController::class, 'update'])->name('group-channel.welcome-photo.update');
     Route::delete('/group-channel/{groupChannelBot}/welcome-photo', [GroupChannelWelcomeController::class, 'destroy'])->name('group-channel.welcome-photo.destroy');
+    Route::post('/group-channel/{groupChannelBot}/join-requests/{joinRequest}/approve', [GroupChannelJoinRequestController::class, 'approve'])->name('group-channel.join-requests.approve');
+    Route::post('/group-channel/{groupChannelBot}/join-requests/{joinRequest}/decline', [GroupChannelJoinRequestController::class, 'decline'])->name('group-channel.join-requests.decline');
     Route::post('/group-channel/{groupChannelBot}/publications', [GroupChannelPublicationController::class, 'store'])->name('group-channel.publications.store');
     Route::post('/group-channel/{groupChannelBot}/publications/{publication}/send', [GroupChannelPublicationController::class, 'send'])->name('group-channel.publications.send');
     Route::delete('/group-channel/{groupChannelBot}/publications/{publication}', [GroupChannelPublicationController::class, 'destroy'])->name('group-channel.publications.destroy');
