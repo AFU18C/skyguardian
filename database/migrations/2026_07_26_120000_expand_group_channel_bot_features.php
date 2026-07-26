@@ -36,6 +36,7 @@ return new class extends Migration
             $table->boolean('has_link')->default(false)->index();
             $table->string('matched_rule')->nullable()->index();
             $table->timestamp('telegram_created_at')->nullable()->index();
+            $table->timestamp('delete_at')->nullable()->index();
             $table->timestamp('deleted_at_telegram')->nullable();
             $table->timestamps();
             $table->unique(['group_channel_bot_id', 'telegram_message_id'], 'group_channel_message_unique');
