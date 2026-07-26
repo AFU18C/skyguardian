@@ -18,18 +18,20 @@ class GroupChannelController extends Controller
     {
         return view('admin.group-channel', [
             'bots' => GroupChannelBot::query()->latest()->paginate(12),
+            'availableModules' => GroupChannelBot::MODULES,
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
+        $data['module_settings'] = $this->disabledModules();
         GroupChannelBot::query()->create($data);
 
         return back()->with('toast', [
             'type' => 'success',
             'title' => 'Добавлено',
-            'message' => 'Бот и группа/канал сохранены.',
+            'message' => 'Бот и группа/канал сохранены. Все функции отключены.',
         ]);
     }
 
@@ -50,6 +52,76 @@ class GroupChannelController extends Controller
         ]);
     }
 
+    public function updateModules(Request $request, GroupChannelBot $groupChannelBot): RedirectResponse
+    {
+        $validated = $request->validate([
+            'modules' => ['nullable', 'array'],
+            'modules.*' => ['string', Rule::in(array_keys(GroupChannelBot::MODULES))],
+        ]);
+        $enabled = array_fill_keys($validated['modules'] ?? [], true);
+        $settings = [];
+
+        foreach (GroupChannelBot::MODULES as $key => $label) {
+            $current = data_get($groupChannelBot->module_settings, $key, []);
+            $settings[$key] = array_merge(is_array($current) ? $current : [], [
+                'enabled' => (bool) ($enabled[$key] ?? false),
+            ]);
+        }
+
+        $groupChannelBot->update(['module_settings' => $settings]);
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => 'Функции сохранены',
+            'message' => 'Для этого чата применён выбранный набор функций.',
+        ]);
+    }
+
+    public function sendTestMessage(GroupChannelBot $groupChannelBot): RedirectResponse
+    {
+        try {
+            $api = $this->api($groupChannelBot);
+            $chatId = $groupChannelBot->chat_id;
+
+            if (! $chatId) {
+                $chat = $this->telegram($api, 'getChat', [
+                    'chat_id' => $this->chatReference($groupChannelBot->group_link),
+                ]);
+                $chatId = (string) $chat['id'];
+                $groupChannelBot->update(['chat_id' => $chatId]);
+            }
+
+            $this->telegram($api, 'sendMessage', [
+                'chat_id' => $chatId,
+                'text' => 'Тестовое сообщение SkyGuardian. Подключение Bot API работает.',
+                'disable_notification' => true,
+            ]);
+
+            $groupChannelBot->update([
+                'last_test_message_at' => now(),
+                'last_test_message_error' => null,
+            ]);
+
+            return back()->with('toast', [
+                'type' => 'success',
+                'title' => 'Сообщение отправлено',
+                'message' => 'Тестовая публикация успешно доставлена.',
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+            $groupChannelBot->update([
+                'last_test_message_at' => now(),
+                'last_test_message_error' => $e->getMessage(),
+            ]);
+
+            return back()->with('toast', [
+                'type' => 'error',
+                'title' => 'Ошибка отправки',
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function destroy(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         $groupChannelBot->delete();
@@ -64,9 +136,7 @@ class GroupChannelController extends Controller
     public function check(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         try {
-            $api = Http::baseUrl('https://api.telegram.org/bot'.$groupChannelBot->bot_token)
-                ->acceptJson()
-                ->timeout(15);
+            $api = $this->api($groupChannelBot);
             $me = $this->telegram($api, 'getMe');
             $chatRef = $this->chatReference($groupChannelBot->group_link);
             $chat = $this->telegram($api, 'getChat', ['chat_id' => $chatRef]);
@@ -81,6 +151,11 @@ class GroupChannelController extends Controller
                 'pin_messages' => (bool) ($member['can_pin_messages'] ?? false),
                 'restrict_members' => (bool) ($member['can_restrict_members'] ?? false),
                 'invite_users' => (bool) ($member['can_invite_users'] ?? false),
+                'manage_chat' => (bool) ($member['can_manage_chat'] ?? false),
+                'manage_topics' => (bool) ($member['can_manage_topics'] ?? false),
+                'manage_video_chats' => (bool) ($member['can_manage_video_chats'] ?? false),
+                'post_messages' => (bool) ($member['can_post_messages'] ?? false),
+                'edit_messages' => (bool) ($member['can_edit_messages'] ?? false),
                 'is_administrator' => in_array($member['status'] ?? '', ['creator', 'administrator'], true),
             ];
 
@@ -137,6 +212,13 @@ class GroupChannelController extends Controller
         return $data;
     }
 
+    private function api(GroupChannelBot $groupChannelBot): PendingRequest
+    {
+        return Http::baseUrl('https://api.telegram.org/bot'.$groupChannelBot->bot_token)
+            ->acceptJson()
+            ->timeout(15);
+    }
+
     private function telegram(PendingRequest $api, string $method, array $payload = []): array
     {
         $response = $api->post($method, $payload)->throw()->json();
@@ -157,5 +239,12 @@ class GroupChannelController extends Controller
         }
 
         return '@'.explode('/', $path)[0];
+    }
+
+    private function disabledModules(): array
+    {
+        return collect(GroupChannelBot::MODULES)
+            ->mapWithKeys(fn (string $label, string $key): array => [$key => ['enabled' => false]])
+            ->all();
     }
 }
