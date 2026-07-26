@@ -4,20 +4,25 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\GroupChannelBot;
-use Illuminate\Http\Client\PendingRequest;
+use App\Services\GroupChannelTelegramService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Throwable;
 
 class GroupChannelController extends Controller
 {
+    public function __construct(private readonly GroupChannelTelegramService $telegram) {}
+
     public function index(): View
     {
         return view('admin.group-channel', [
-            'bots' => GroupChannelBot::query()->latest()->paginate(12),
+            'bots' => GroupChannelBot::query()
+                ->with(['publications' => fn ($query) => $query->latest()->limit(20)])
+                ->latest()
+                ->paginate(12),
             'availableModules' => GroupChannelBot::MODULES,
         ]);
     }
@@ -25,7 +30,8 @@ class GroupChannelController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
-        $data['module_settings'] = $this->disabledModules();
+        $data = array_merge($data, $this->tokenMetadata((string) $data['bot_token']));
+        $data['module_settings'] = GroupChannelBot::defaultModuleSettings();
         GroupChannelBot::query()->create($data);
 
         return back()->with('toast', [
@@ -41,6 +47,10 @@ class GroupChannelController extends Controller
 
         if (empty($data['bot_token'])) {
             unset($data['bot_token']);
+        } else {
+            $data = array_merge($data, $this->tokenMetadata((string) $data['bot_token']));
+            $data['webhook_registered_at'] = null;
+            $data['webhook_last_error'] = null;
         }
 
         $groupChannelBot->update($data);
@@ -59,13 +69,13 @@ class GroupChannelController extends Controller
             'modules.*' => ['string', Rule::in(array_keys(GroupChannelBot::MODULES))],
         ]);
         $enabled = array_fill_keys($validated['modules'] ?? [], true);
-        $settings = [];
+        $settings = array_replace_recursive(
+            GroupChannelBot::defaultModuleSettings(),
+            $groupChannelBot->module_settings ?? [],
+        );
 
         foreach (GroupChannelBot::MODULES as $key => $label) {
-            $current = data_get($groupChannelBot->module_settings, $key, []);
-            $settings[$key] = array_merge(is_array($current) ? $current : [], [
-                'enabled' => (bool) ($enabled[$key] ?? false),
-            ]);
+            $settings[$key]['enabled'] = (bool) ($enabled[$key] ?? false);
         }
 
         $groupChannelBot->update(['module_settings' => $settings]);
@@ -77,21 +87,84 @@ class GroupChannelController extends Controller
         ]);
     }
 
+    public function updateModuleSettings(Request $request, GroupChannelBot $groupChannelBot): RedirectResponse
+    {
+        $data = $request->validate([
+            'settings.antispam.delete_links' => ['nullable', 'boolean'],
+            'settings.antispam.delete_new_member_messages' => ['nullable', 'boolean'],
+            'settings.antispam.new_member_minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
+            'settings.antispam.forbidden_words_text' => ['nullable', 'string', 'max:10000'],
+            'settings.antispam.message_limit' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'settings.antispam.message_limit_period_seconds' => ['nullable', 'integer', 'min:5', 'max:86400'],
+            'settings.antispam.block_duplicates' => ['nullable', 'boolean'],
+            'settings.antispam.max_mentions' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'settings.antispam.delete_short_messages' => ['nullable', 'boolean'],
+            'settings.antispam.min_length' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'settings.antispam.suspicious_symbols' => ['nullable', 'boolean'],
+            'settings.welcome.text' => ['nullable', 'string', 'max:4096'],
+            'settings.welcome.rules' => ['nullable', 'string', 'max:4096'],
+            'settings.welcome.buttons_text' => ['nullable', 'string', 'max:5000'],
+            'settings.welcome.delete_after_minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
+            'settings.subscription_check.channels_text' => ['nullable', 'string', 'max:10000'],
+            'settings.join_requests.auto_approve' => ['nullable', 'boolean'],
+            'settings.join_requests.auto_decline_bots' => ['nullable', 'boolean'],
+            'settings.human_verification.mode' => ['nullable', Rule::in(['button', 'question', 'captcha'])],
+            'settings.human_verification.question' => ['nullable', 'string', 'max:1000'],
+            'settings.human_verification.answer' => ['nullable', 'string', 'max:255'],
+            'settings.human_verification.timeout_minutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
+            'settings.warnings.mute_after' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'settings.warnings.mute_minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
+            'settings.warnings.ban_after' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'settings.newcomer_restrictions.minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
+            'settings.newcomer_restrictions.block_links' => ['nullable', 'boolean'],
+            'settings.newcomer_restrictions.block_files' => ['nullable', 'boolean'],
+            'settings.newcomer_restrictions.block_messages' => ['nullable', 'boolean'],
+            'settings.slow_mode.messages' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'settings.slow_mode.period_seconds' => ['nullable', 'integer', 'min:5', 'max:86400'],
+        ]);
+
+        $incoming = $data['settings'] ?? [];
+        $settings = array_replace_recursive(
+            GroupChannelBot::defaultModuleSettings(),
+            $groupChannelBot->module_settings ?? [],
+            $incoming,
+        );
+        $settings['antispam']['forbidden_words'] = $this->lines(
+            data_get($incoming, 'antispam.forbidden_words_text', ''),
+        );
+        unset($settings['antispam']['forbidden_words_text']);
+        $settings['subscription_check']['channels'] = $this->lines(
+            data_get($incoming, 'subscription_check.channels_text', ''),
+        );
+        unset($settings['subscription_check']['channels_text']);
+        $settings['welcome']['buttons'] = $this->buttons(
+            data_get($incoming, 'welcome.buttons_text', ''),
+        );
+        unset($settings['welcome']['buttons_text']);
+
+        $groupChannelBot->update(['module_settings' => $settings]);
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => 'Настройки сохранены',
+            'message' => 'Параметры функций обновлены только для этого чата.',
+        ]);
+    }
+
     public function sendTestMessage(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         try {
-            $api = $this->api($groupChannelBot);
             $chatId = $groupChannelBot->chat_id;
 
             if (! $chatId) {
-                $chat = $this->telegram($api, 'getChat', [
+                $chat = $this->telegram->request($groupChannelBot, 'getChat', [
                     'chat_id' => $this->chatReference($groupChannelBot->group_link),
                 ]);
                 $chatId = (string) $chat['id'];
                 $groupChannelBot->update(['chat_id' => $chatId]);
             }
 
-            $this->telegram($api, 'sendMessage', [
+            $this->telegram->request($groupChannelBot, 'sendMessage', [
                 'chat_id' => $chatId,
                 'text' => 'Тестовое сообщение SkyGuardian. Подключение Bot API работает.',
                 'disable_notification' => true,
@@ -122,6 +195,49 @@ class GroupChannelController extends Controller
         }
     }
 
+    public function registerWebhook(GroupChannelBot $groupChannelBot): RedirectResponse
+    {
+        try {
+            $url = route('group-channel.webhook', [
+                'fingerprint' => $groupChannelBot->token_fingerprint,
+                'secret' => $groupChannelBot->webhook_secret,
+            ]);
+            $this->telegram->request($groupChannelBot, 'setWebhook', [
+                'url' => $url,
+                'allowed_updates' => json_encode([
+                    'message',
+                    'edited_message',
+                    'chat_join_request',
+                    'callback_query',
+                    'my_chat_member',
+                ]),
+                'drop_pending_updates' => false,
+            ]);
+
+            GroupChannelBot::query()
+                ->where('token_fingerprint', $groupChannelBot->token_fingerprint)
+                ->update([
+                    'webhook_registered_at' => now(),
+                    'webhook_last_error' => null,
+                ]);
+
+            return back()->with('toast', [
+                'type' => 'success',
+                'title' => 'Webhook включён',
+                'message' => 'Бот принимает события для всех добавленных групп и каналов.',
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+            $groupChannelBot->update(['webhook_last_error' => $e->getMessage()]);
+
+            return back()->with('toast', [
+                'type' => 'error',
+                'title' => 'Ошибка webhook',
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function destroy(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         $groupChannelBot->delete();
@@ -136,11 +252,10 @@ class GroupChannelController extends Controller
     public function check(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         try {
-            $api = $this->api($groupChannelBot);
-            $me = $this->telegram($api, 'getMe');
+            $me = $this->telegram->request($groupChannelBot, 'getMe');
             $chatRef = $this->chatReference($groupChannelBot->group_link);
-            $chat = $this->telegram($api, 'getChat', ['chat_id' => $chatRef]);
-            $member = $this->telegram($api, 'getChatMember', [
+            $chat = $this->telegram->request($groupChannelBot, 'getChat', ['chat_id' => $chatRef]);
+            $member = $this->telegram->request($groupChannelBot, 'getChatMember', [
                 'chat_id' => $chat['id'],
                 'user_id' => $me['id'],
             ]);
@@ -212,22 +327,17 @@ class GroupChannelController extends Controller
         return $data;
     }
 
-    private function api(GroupChannelBot $groupChannelBot): PendingRequest
+    private function tokenMetadata(string $token): array
     {
-        return Http::baseUrl('https://api.telegram.org/bot'.$groupChannelBot->bot_token)
-            ->acceptJson()
-            ->timeout(15);
-    }
+        $fingerprint = hash('sha256', $token);
+        $existing = GroupChannelBot::query()
+            ->where('token_fingerprint', $fingerprint)
+            ->first();
 
-    private function telegram(PendingRequest $api, string $method, array $payload = []): array
-    {
-        $response = $api->post($method, $payload)->throw()->json();
-
-        if (! ($response['ok'] ?? false)) {
-            throw new \RuntimeException($response['description'] ?? 'Ошибка Telegram API');
-        }
-
-        return $response['result'] ?? [];
+        return [
+            'token_fingerprint' => $fingerprint,
+            'webhook_secret' => $existing?->webhook_secret ?: Str::random(48),
+        ];
     }
 
     private function chatReference(string $link): string
@@ -241,10 +351,26 @@ class GroupChannelController extends Controller
         return '@'.explode('/', $path)[0];
     }
 
-    private function disabledModules(): array
+    private function lines(?string $value): array
     {
-        return collect(GroupChannelBot::MODULES)
-            ->mapWithKeys(fn (string $label, string $key): array => [$key => ['enabled' => false]])
+        return collect(preg_split('/[\r\n,]+/u', (string) $value))
+            ->map(fn (string $item): string => trim($item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function buttons(?string $value): array
+    {
+        return collect(preg_split('/\R/u', (string) $value))
+            ->map(function (string $line): array {
+                [$text, $url] = array_pad(array_map('trim', explode('|', $line, 2)), 2, '');
+
+                return $text !== '' && $url !== '' ? [['text' => $text, 'url' => $url]] : [];
+            })
+            ->filter()
+            ->values()
             ->all();
     }
 }
