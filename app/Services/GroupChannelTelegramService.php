@@ -12,7 +12,10 @@ class GroupChannelTelegramService
 {
     public function request(GroupChannelBot $bot, string $method, array $payload = []): mixed
     {
-        $response = $this->client($bot)->post($method, $payload)->throw()->json();
+        $response = $this->client($bot)
+            ->post($method, $this->normalizePayload($method, $payload))
+            ->throw()
+            ->json();
 
         if (! ($response['ok'] ?? false)) {
             throw new RuntimeException($response['description'] ?? 'Ошибка Telegram API');
@@ -82,6 +85,32 @@ class GroupChannelTelegramService
         }
 
         return is_array($response['result'] ?? null) ? $response['result'] : [];
+    }
+
+    private function normalizePayload(string $method, array $payload): array
+    {
+        if ($method !== 'sendPoll' || ! isset($payload['options'])) {
+            return $payload;
+        }
+
+        $options = $payload['options'];
+        if (is_string($options)) {
+            $decoded = json_decode($options, true);
+            $options = is_array($decoded) ? $decoded : [];
+        }
+
+        $payload['options'] = json_encode(
+            collect($options)
+                ->map(fn (mixed $option): array => is_array($option)
+                    ? $option
+                    : ['text' => trim((string) $option)])
+                ->filter(fn (array $option): bool => ($option['text'] ?? '') !== '')
+                ->values()
+                ->all(),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        );
+
+        return $payload;
     }
 
     private function client(GroupChannelBot $bot): PendingRequest
