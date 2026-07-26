@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\GroupChannelBot;
+use App\Services\GroupChannelSubscriptionGateService;
 use App\Services\GroupChannelWebhookService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -14,6 +15,7 @@ class GroupChannelWebhookController extends Controller
         Request $request,
         string $fingerprint,
         string $secret,
+        GroupChannelSubscriptionGateService $subscriptionGate,
         GroupChannelWebhookService $service,
     ): Response {
         GroupChannelBot::query()
@@ -44,6 +46,7 @@ class GroupChannelWebhookController extends Controller
         }
 
         try {
+            $update = $subscriptionGate->filterUpdate($bot, $update);
             $service->handle($bot, $update);
             $bot->update([
                 'last_update_at' => now(),
