@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     name: Deploy to VPS
@@ -89,3 +92,9 @@ jobs:
 
           sudo systemctl --no-pager --full status skyguardian-telethon.service skyguardian-scheduler.service
           echo "SkyGuardian deployed successfully."
+
+      - name: Mark deployed revision
+        shell: bash
+        run: |
+          git tag -f deployed "$GITHUB_SHA"
+          git push origin refs/tags/deployed --force
