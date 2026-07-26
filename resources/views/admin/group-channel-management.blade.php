@@ -16,13 +16,13 @@
 <div class="sg-record-actions">
     <form method="POST" action="{{ route('admin.group-channel.check', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Проверить подключение</button></form>
     <form method="POST" action="{{ route('admin.group-channel.test-message', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Отправить тестовое сообщение</button></form>
-    <form method="POST" action="{{ route('admin.group-channel.webhook.register', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Подключить webhook</button></form>
+    <form method="POST" action="{{ route('admin.group-channel.webhook.register', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Переподключить webhook</button></form>
 </div>
 
 <hr>
 <section class="sg-functions-section">
     <h3>Функции этого чата</h3>
-    <p>Отметьте нужные функции. После сохранения у включённых функций появится стрелка для раскрытия настроек.</p>
+    <p>Галочка сохраняется автоматически. При включении функций, которым нужны входящие события Telegram, webhook подключается автоматически.</p>
 
     @php
         $configurableModules = [
@@ -37,14 +37,8 @@
             'newcomer_restrictions',
             'slow_mode',
         ];
-        $moduleFormId = 'group-channel-modules-'.$bot->id;
         $openModule = (string) session('open_group_channel_module');
     @endphp
-
-    <form id="{{ $moduleFormId }}" method="POST" action="{{ route('admin.group-channel.modules.update', $bot) }}">
-        @csrf
-        @method('PUT')
-    </form>
 
     <div class="sg-module-list">
         @foreach($availableModules as $module => $label)
@@ -63,10 +57,10 @@
                         <strong>{{ $label }}</strong>
                         <input
                             type="checkbox"
-                            name="modules[]"
-                            value="{{ $module }}"
-                            form="{{ $moduleFormId }}"
+                            value="1"
                             data-module-checkbox
+                            data-module-url="{{ route('admin.group-channel.modules.toggle', [$bot, $module]) }}"
+                            data-module-label="{{ $label }}"
                             @checked($enabled)
                         >
                     </label>
@@ -89,10 +83,6 @@
                 @endif
             </section>
         @endforeach
-    </div>
-
-    <div class="sg-record-actions sg-module-save-row">
-        <button class="sg-button sg-button-primary" type="submit" form="{{ $moduleFormId }}" data-submit-button>Сохранить функции</button>
     </div>
 </section>
 
