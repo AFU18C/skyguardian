@@ -20,7 +20,7 @@ class GroupChannelController extends Controller
     {
         return view('admin.group-channel', [
             'bots' => GroupChannelBot::query()
-                ->with(['publications' => fn ($query) => $query->latest()->limit(20)])
+                ->with(['publications' => fn ($query) => $query->latest()])
                 ->latest()
                 ->paginate(12),
             'availableModules' => GroupChannelBot::MODULES,
@@ -124,23 +124,54 @@ class GroupChannelController extends Controller
         ]);
 
         $incoming = $data['settings'] ?? [];
+        $booleanSettings = [
+            'antispam' => [
+                'delete_links',
+                'delete_new_member_messages',
+                'block_duplicates',
+                'delete_short_messages',
+                'suspicious_symbols',
+            ],
+            'join_requests' => ['auto_approve', 'auto_decline_bots'],
+            'newcomer_restrictions' => ['block_links', 'block_files', 'block_messages'],
+        ];
+
+        foreach ($booleanSettings as $module => $keys) {
+            if (! $groupChannelBot->moduleEnabled($module)) {
+                continue;
+            }
+
+            foreach ($keys as $key) {
+                data_set($incoming, $module.'.'.$key, $request->boolean("settings.{$module}.{$key}"));
+            }
+        }
+
         $settings = array_replace_recursive(
             GroupChannelBot::defaultModuleSettings(),
             $groupChannelBot->module_settings ?? [],
             $incoming,
         );
-        $settings['antispam']['forbidden_words'] = $this->lines(
-            data_get($incoming, 'antispam.forbidden_words_text', ''),
-        );
-        unset($settings['antispam']['forbidden_words_text']);
-        $settings['subscription_check']['channels'] = $this->lines(
-            data_get($incoming, 'subscription_check.channels_text', ''),
-        );
-        unset($settings['subscription_check']['channels_text']);
-        $settings['welcome']['buttons'] = $this->buttons(
-            data_get($incoming, 'welcome.buttons_text', ''),
-        );
-        unset($settings['welcome']['buttons_text']);
+
+        if ($groupChannelBot->moduleEnabled('antispam')) {
+            $settings['antispam']['forbidden_words'] = $this->lines(
+                data_get($incoming, 'antispam.forbidden_words_text', ''),
+            );
+            unset($settings['antispam']['forbidden_words_text']);
+        }
+
+        if ($groupChannelBot->moduleEnabled('subscription_check')) {
+            $settings['subscription_check']['channels'] = $this->lines(
+                data_get($incoming, 'subscription_check.channels_text', ''),
+            );
+            unset($settings['subscription_check']['channels_text']);
+        }
+
+        if ($groupChannelBot->moduleEnabled('welcome')) {
+            $settings['welcome']['buttons'] = $this->buttons(
+                data_get($incoming, 'welcome.buttons_text', ''),
+            );
+            unset($settings['welcome']['buttons_text']);
+        }
 
         $groupChannelBot->update(['module_settings' => $settings]);
 
@@ -154,6 +185,7 @@ class GroupChannelController extends Controller
     public function sendTestMessage(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         try {
+            $this->ensureTokenMetadata($groupChannelBot);
             $chatId = $groupChannelBot->chat_id;
 
             if (! $chatId) {
@@ -198,12 +230,14 @@ class GroupChannelController extends Controller
     public function registerWebhook(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         try {
+            $this->ensureTokenMetadata($groupChannelBot);
             $url = route('group-channel.webhook', [
                 'fingerprint' => $groupChannelBot->token_fingerprint,
                 'secret' => $groupChannelBot->webhook_secret,
             ]);
             $this->telegram->request($groupChannelBot, 'setWebhook', [
                 'url' => $url,
+                'secret_token' => $groupChannelBot->webhook_secret,
                 'allowed_updates' => json_encode([
                     'message',
                     'edited_message',
@@ -252,6 +286,7 @@ class GroupChannelController extends Controller
     public function check(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         try {
+            $this->ensureTokenMetadata($groupChannelBot);
             $me = $this->telegram->request($groupChannelBot, 'getMe');
             $chatRef = $this->chatReference($groupChannelBot->group_link);
             $chat = $this->telegram->request($groupChannelBot, 'getChat', ['chat_id' => $chatRef]);
@@ -338,6 +373,16 @@ class GroupChannelController extends Controller
             'token_fingerprint' => $fingerprint,
             'webhook_secret' => $existing?->webhook_secret ?: Str::random(48),
         ];
+    }
+
+    private function ensureTokenMetadata(GroupChannelBot $bot): void
+    {
+        if ($bot->token_fingerprint && $bot->webhook_secret) {
+            return;
+        }
+
+        $bot->update($this->tokenMetadata((string) $bot->bot_token));
+        $bot->refresh();
     }
 
     private function chatReference(string $link): string
