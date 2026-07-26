@@ -23,12 +23,20 @@ class GroupChannelBulkDeleteController extends Controller
 
         $data = $request->validate([
             'mode' => ['required', Rule::in(['last', 'period', 'user', 'links', 'forbidden'])],
-            'count' => ['nullable', Rule::in([10, 50, 100])],
+            'count' => ['nullable', Rule::in(['10', '50', '100', 10, 50, 100])],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'user_id' => ['nullable', 'string', 'max:64'],
             'forbidden_word' => ['nullable', 'string', 'max:255'],
         ]);
+
+        if ($data['mode'] === 'user' && empty($data['user_id'])) {
+            return back()->with('toast', [
+                'type' => 'error',
+                'title' => 'Не указан пользователь',
+                'message' => 'Введите Telegram ID пользователя.',
+            ]);
+        }
 
         $query = $groupChannelBot->messages()
             ->whereNull('deleted_at_telegram');
@@ -107,15 +115,22 @@ class GroupChannelBulkDeleteController extends Controller
 
     private function applyForbiddenWords(Builder $query, GroupChannelBot $bot, ?string $word): void
     {
-        $words = $word
+        $words = collect($word
             ? [trim($word)]
-            : $bot->moduleSetting('antispam', 'forbidden_words', []);
+            : $bot->moduleSetting('antispam', 'forbidden_words', []))
+            ->filter(fn (mixed $item): bool => is_string($item) && trim($item) !== '')
+            ->values()
+            ->all();
+
+        if ($words === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
 
         $query->where(function (Builder $builder) use ($words): void {
             foreach ($words as $forbiddenWord) {
-                if ($forbiddenWord !== '') {
-                    $builder->orWhere('text', 'like', '%'.$forbiddenWord.'%');
-                }
+                $builder->orWhere('text', 'like', '%'.$forbiddenWord.'%');
             }
         });
     }
