@@ -1,16 +1,21 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\GroupChannelBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelController;
 use App\Http\Controllers\Admin\GroupChannelPublicationController;
 use App\Http\Controllers\Admin\SourceController;
 use App\Http\Controllers\Admin\SystemMetricsController;
 use App\Http\Controllers\Admin\TelegramController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\GroupChannelWebhookController;
 use App\Models\Source;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'public.home')->name('home');
+Route::post('/telegram/bot-api/webhook/{fingerprint}/{secret}', GroupChannelWebhookController::class)
+    ->where(['fingerprint' => '[a-f0-9]{64}', 'secret' => '[A-Za-z0-9]{40,64}'])
+    ->name('group-channel.webhook');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/admin/login', [AuthenticatedSessionController::class, 'create'])->name('admin.login');
@@ -55,6 +60,12 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::delete('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'destroy'])->name('group-channel.destroy');
     Route::post('/group-channel/{groupChannelBot}/check', [GroupChannelController::class, 'check'])->name('group-channel.check');
     Route::post('/group-channel/{groupChannelBot}/test-message', [GroupChannelController::class, 'sendTestMessage'])->name('group-channel.test-message');
+    Route::post('/group-channel/{groupChannelBot}/webhook', [GroupChannelController::class, 'registerWebhook'])->name('group-channel.webhook.register');
     Route::put('/group-channel/{groupChannelBot}/modules', [GroupChannelController::class, 'updateModules'])->name('group-channel.modules.update');
+    Route::put('/group-channel/{groupChannelBot}/module-settings', [GroupChannelController::class, 'updateModuleSettings'])->name('group-channel.module-settings.update');
     Route::post('/group-channel/{groupChannelBot}/publications', [GroupChannelPublicationController::class, 'store'])->name('group-channel.publications.store');
+    Route::post('/group-channel/{groupChannelBot}/publications/{publication}/send', [GroupChannelPublicationController::class, 'send'])->name('group-channel.publications.send');
+    Route::delete('/group-channel/{groupChannelBot}/publications/{publication}', [GroupChannelPublicationController::class, 'destroy'])->name('group-channel.publications.destroy');
+    Route::post('/group-channel/{groupChannelBot}/bulk-delete/preview', [GroupChannelBulkDeleteController::class, 'preview'])->name('group-channel.bulk-delete.preview');
+    Route::post('/group-channel/{groupChannelBot}/bulk-delete/execute', [GroupChannelBulkDeleteController::class, 'execute'])->name('group-channel.bulk-delete.execute');
 });
