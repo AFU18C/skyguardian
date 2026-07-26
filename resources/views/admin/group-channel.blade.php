@@ -90,13 +90,25 @@
                             <label for="publication-date-{{ $bot->id }}">Дата и время отложенной отправки</label>
                             <input id="publication-date-{{ $bot->id }}" name="scheduled_at" type="datetime-local">
                         </div>
+                        @if($bot->moduleEnabled('auto_delete_publications'))
+                            <div class="sg-field">
+                                <label for="publication-delete-after-{{ $bot->id }}">Удалить после отправки</label>
+                                <div class="sg-record-actions">
+                                    <input id="publication-delete-after-{{ $bot->id }}" name="delete_after_value" type="number" min="1" max="10080" placeholder="Количество">
+                                    <select name="delete_after_unit">
+                                        <option value="minutes">минут</option>
+                                        <option value="hours">часов</option>
+                                    </select>
+                                </div>
+                            </div>
+                        @endif
                         <div class="sg-record-actions">
                             <button class="sg-button sg-button-secondary" type="submit" name="action" value="draft">Сохранить черновик</button>
                             <button class="sg-button sg-button-secondary" type="submit" name="action" value="schedule">Запланировать</button>
                             <button class="sg-button sg-button-primary" type="submit" name="action" value="send" data-submit-button>Отправить сейчас</button>
                         </div>
                     </form>
-                    <p>На этом этапе редактор отправляет текст. Фото, видео, альбомы, документы, опросы и кнопки будут добавляться отдельными модулями.</p>
+                    <p>Редактор поддерживает текст, черновики, отложенную отправку и автоматическое удаление.</p>
                 @endif
 
                 <div class="sg-danger-zone">
