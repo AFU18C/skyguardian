@@ -6,7 +6,6 @@ use App\Models\GroupChannelBot;
 use App\Models\GroupChannelMessage;
 use App\Models\GroupChannelUserState;
 use Illuminate\Support\Arr;
-use RuntimeException;
 use Throwable;
 
 class GroupChannelWebhookService

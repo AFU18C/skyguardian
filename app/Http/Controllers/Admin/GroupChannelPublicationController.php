@@ -256,8 +256,7 @@ class GroupChannelPublicationController extends Controller
 
                 return [[
                     'text' => $text,
-                    str_starts_with($target, 'callback:') ? 'callback_data' : 'url' =>
-                        str_starts_with($target, 'callback:') ? substr($target, 9) : $target,
+                    str_starts_with($target, 'callback:') ? 'callback_data' : 'url' => str_starts_with($target, 'callback:') ? substr($target, 9) : $target,
                 ]];
             })
             ->filter()
