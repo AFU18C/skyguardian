@@ -50,11 +50,33 @@
                     <div><dt>Ссылка</dt><dd><a href="{{ $bot->group_link }}" target="_blank" rel="noopener">{{ $bot->group_link }}</a></dd></div>
                     <div><dt>Chat ID</dt><dd>{{ $bot->chat_id ?: 'Не определён' }}</dd></div>
                     <div><dt>Последняя проверка</dt><dd>{{ $bot->last_manual_check_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не выполнялась' }}</dd></div>
+                    <div><dt>Последнее тестовое сообщение</dt><dd>{{ $bot->last_test_message_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i') ?? 'Не отправлялось' }}</dd></div>
                 </dl>
+
                 @if($bot->last_error)<div class="sg-inline-error">{{ $bot->last_error }}</div>@endif
+                @if($bot->last_test_message_error)<div class="sg-inline-error">{{ $bot->last_test_message_error }}</div>@endif
+
                 <div class="sg-record-actions">
                     <form method="POST" action="{{ route('admin.group-channel.check', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Проверить подключение</button></form>
+                    <form method="POST" action="{{ route('admin.group-channel.test-message', $bot) }}">@csrf<button class="sg-button sg-button-secondary" type="submit" data-submit-button>Отправить тестовое сообщение</button></form>
                 </div>
+
+                <h3>Функции этого чата</h3>
+                <p>Все функции нового чата отключены. Включайте только нужные.</p>
+                <form method="POST" action="{{ route('admin.group-channel.modules.update', $bot) }}">
+                    @csrf
+                    @method('PUT')
+                    @foreach($availableModules as $key => $label)
+                        <label class="sg-switch-row">
+                            <strong>{{ $label }}</strong>
+                            <input type="checkbox" name="modules[]" value="{{ $key }}" @checked($bot->moduleEnabled($key))>
+                        </label>
+                    @endforeach
+                    <div class="sg-record-actions">
+                        <button class="sg-button sg-button-primary" type="submit" data-submit-button>Сохранить функции</button>
+                    </div>
+                </form>
+
                 <div class="sg-danger-zone">
                     <div><strong>Удаление</strong><p>Бот и привязка к группе/каналу будут удалены.</p></div>
                     <form method="POST" action="{{ route('admin.group-channel.destroy', $bot) }}" data-confirm="Удалить эту запись?">@csrf @method('DELETE')<button class="sg-button sg-button-danger" type="submit">Удалить</button></form>
@@ -76,10 +98,14 @@
                     @foreach([
                         'is_administrator' => 'Бот является администратором',
                         'send_messages' => 'Отправка сообщений',
+                        'post_messages' => 'Публикация в канале',
+                        'edit_messages' => 'Редактирование сообщений',
                         'delete_messages' => 'Удаление сообщений',
                         'pin_messages' => 'Закрепление сообщений',
-                        'restrict_members' => 'Блокировка пользователей',
+                        'restrict_members' => 'Ограничение пользователей',
                         'invite_users' => 'Управление приглашениями',
+                        'manage_chat' => 'Управление чатом',
+                        'manage_topics' => 'Управление темами',
                     ] as $key => $label)
                         <div class="sg-switch-row"><strong>{{ $label }}</strong><span class="sg-status {{ data_get($check, 'permissions.'.$key) ? 'sg-status-success' : 'sg-status-error' }}"><span class="sg-status-dot"></span>{{ data_get($check, 'permissions.'.$key) ? 'Разрешено' : 'Нет права' }}</span></div>
                     @endforeach
