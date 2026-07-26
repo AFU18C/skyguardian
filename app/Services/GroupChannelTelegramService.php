@@ -10,7 +10,7 @@ use RuntimeException;
 
 class GroupChannelTelegramService
 {
-    public function request(GroupChannelBot $bot, string $method, array $payload = []): array
+    public function request(GroupChannelBot $bot, string $method, array $payload = []): mixed
     {
         $response = $this->client($bot)->post($method, $payload)->throw()->json();
 
@@ -43,7 +43,7 @@ class GroupChannelTelegramService
             throw new RuntimeException($response['description'] ?? 'Ошибка Telegram API');
         }
 
-        return $response['result'] ?? [];
+        return is_array($response['result'] ?? null) ? $response['result'] : [];
     }
 
     public function sendMediaGroup(GroupChannelBot $bot, array $items, array $payload = []): array
@@ -81,7 +81,7 @@ class GroupChannelTelegramService
             throw new RuntimeException($response['description'] ?? 'Ошибка Telegram API');
         }
 
-        return $response['result'] ?? [];
+        return is_array($response['result'] ?? null) ? $response['result'] : [];
     }
 
     private function client(GroupChannelBot $bot): PendingRequest
