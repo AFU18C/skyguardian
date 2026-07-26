@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\GroupChannelBot;
 use App\Services\GroupChannelSubscriptionGateService;
-use App\Services\GroupChannelWebhookService;
+use App\Services\GroupChannelWebhookUpdateService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Throwable;
@@ -16,7 +16,7 @@ class GroupChannelWebhookController extends Controller
         string $fingerprint,
         string $secret,
         GroupChannelSubscriptionGateService $subscriptionGate,
-        GroupChannelWebhookService $service,
+        GroupChannelWebhookUpdateService $service,
     ): Response {
         GroupChannelBot::query()
             ->where('token_fingerprint', $fingerprint)
@@ -67,6 +67,8 @@ class GroupChannelWebhookController extends Controller
     {
         return data_get($update, 'message.chat.id')
             ?? data_get($update, 'edited_message.chat.id')
+            ?? data_get($update, 'channel_post.chat.id')
+            ?? data_get($update, 'edited_channel_post.chat.id')
             ?? data_get($update, 'chat_join_request.chat.id')
             ?? data_get($update, 'callback_query.message.chat.id')
             ?? data_get($update, 'my_chat_member.chat.id');
