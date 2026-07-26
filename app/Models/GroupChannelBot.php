@@ -132,9 +132,9 @@ class GroupChannelBot extends Model
             'timeout_minutes' => 5,
         ];
         $defaults['warnings'] += [
-            'mute_after' => 2,
+            'mute_after' => 3,
             'mute_minutes' => 60,
-            'ban_after' => 3,
+            'ban_after' => 4,
         ];
         $defaults['newcomer_restrictions'] += [
             'minutes' => 10,
