@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GroupChannelBot extends Model
 {
@@ -52,6 +53,11 @@ class GroupChannelBot extends Model
             'last_test_message_at' => 'datetime',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function publications(): HasMany
+    {
+        return $this->hasMany(GroupChannelPublication::class);
     }
 
     public function moduleEnabled(string $module): bool
