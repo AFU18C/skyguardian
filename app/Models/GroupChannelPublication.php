@@ -20,7 +20,10 @@ class GroupChannelPublication extends Model
         'text',
         'status',
         'scheduled_at',
+        'delete_after_minutes',
         'sent_at',
+        'delete_at',
+        'deleted_at_telegram',
         'telegram_message_id',
         'last_error',
     ];
@@ -34,6 +37,9 @@ class GroupChannelPublication extends Model
         return [
             'scheduled_at' => 'datetime',
             'sent_at' => 'datetime',
+            'delete_at' => 'datetime',
+            'deleted_at_telegram' => 'datetime',
+            'delete_after_minutes' => 'integer',
         ];
     }
 
