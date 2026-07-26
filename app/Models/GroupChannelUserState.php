@@ -30,6 +30,15 @@ class GroupChannelUserState extends Model
         'window_message_count' => 0,
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $state): void {
+            if (! $state->joined_at && ! $state->verification_expires_at && ! $state->verified_at) {
+                $state->verified_at = now();
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
