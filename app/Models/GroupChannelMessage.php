@@ -19,6 +19,7 @@ class GroupChannelMessage extends Model
         'has_link',
         'matched_rule',
         'telegram_created_at',
+        'delete_at',
         'deleted_at_telegram',
     ];
 
@@ -27,6 +28,7 @@ class GroupChannelMessage extends Model
         return [
             'has_link' => 'boolean',
             'telegram_created_at' => 'datetime',
+            'delete_at' => 'datetime',
             'deleted_at_telegram' => 'datetime',
         ];
     }
