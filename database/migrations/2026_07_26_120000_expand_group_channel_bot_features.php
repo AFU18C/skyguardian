@@ -59,10 +59,26 @@ return new class extends Migration
             $table->timestamps();
             $table->unique(['group_channel_bot_id', 'telegram_user_id'], 'group_channel_user_state_unique');
         });
+
+        Schema::create('group_channel_join_requests', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('group_channel_bot_id')->constrained()->cascadeOnDelete();
+            $table->string('telegram_user_id', 64);
+            $table->string('username')->nullable();
+            $table->string('first_name')->nullable();
+            $table->string('last_name')->nullable();
+            $table->string('status', 24)->default('pending')->index();
+            $table->timestamp('requested_at')->nullable()->index();
+            $table->timestamp('actioned_at')->nullable();
+            $table->text('last_error')->nullable();
+            $table->timestamps();
+            $table->unique(['group_channel_bot_id', 'telegram_user_id'], 'group_channel_join_request_unique');
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('group_channel_join_requests');
         Schema::dropIfExists('group_channel_user_states');
         Schema::dropIfExists('group_channel_messages');
 
