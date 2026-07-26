@@ -11,8 +11,11 @@ class GroupChannelPublication extends Model
     use HasFactory;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_SCHEDULED = 'scheduled';
+
     public const STATUS_SENT = 'sent';
+
     public const STATUS_ERROR = 'error';
 
     protected $fillable = [
