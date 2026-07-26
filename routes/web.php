@@ -53,4 +53,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::put('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'update'])->name('group-channel.update');
     Route::delete('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'destroy'])->name('group-channel.destroy');
     Route::post('/group-channel/{groupChannelBot}/check', [GroupChannelController::class, 'check'])->name('group-channel.check');
+    Route::post('/group-channel/{groupChannelBot}/test-message', [GroupChannelController::class, 'sendTestMessage'])->name('group-channel.test-message');
+    Route::put('/group-channel/{groupChannelBot}/modules', [GroupChannelController::class, 'updateModules'])->name('group-channel.modules.update');
 });
