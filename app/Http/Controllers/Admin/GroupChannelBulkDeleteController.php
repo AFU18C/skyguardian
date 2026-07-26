@@ -31,33 +31,44 @@ class GroupChannelBulkDeleteController extends Controller
         ]);
 
         if ($data['mode'] === 'user' && empty($data['user_id'])) {
-            return back()->with('toast', [
+            return $this->backToManagement($groupChannelBot, [
                 'type' => 'error',
                 'title' => 'Не указан пользователь',
                 'message' => 'Введите Telegram ID пользователя.',
             ]);
         }
 
-        $query = $groupChannelBot->messages()
-            ->whereNull('deleted_at_telegram');
-        $this->applyCriteria($query, $groupChannelBot, $data);
+        try {
+            $query = $groupChannelBot->messages()
+                ->getQuery()
+                ->whereNull('deleted_at_telegram');
+            $this->applyCriteria($query, $groupChannelBot, $data);
 
-        $limit = $data['mode'] === 'last' ? (int) ($data['count'] ?? 10) : 1000;
-        $messages = $query
-            ->latest('telegram_created_at')
-            ->limit($limit)
-            ->get(['id', 'telegram_message_id']);
-        $token = Str::random(40);
-        $preview = [
-            'token' => $token,
-            'bot_id' => $groupChannelBot->id,
-            'message_ids' => $messages->pluck('telegram_message_id')->all(),
-            'count' => $messages->count(),
-            'mode' => $data['mode'],
-        ];
-        $request->session()->put('group_channel_bulk_delete', $preview);
+            $limit = $data['mode'] === 'last' ? (int) ($data['count'] ?? 10) : 1000;
+            $messages = $query
+                ->latest('telegram_created_at')
+                ->limit($limit)
+                ->get(['id', 'telegram_message_id']);
+            $token = Str::random(40);
+            $preview = [
+                'token' => $token,
+                'bot_id' => $groupChannelBot->id,
+                'message_ids' => $messages->pluck('telegram_message_id')->all(),
+                'count' => $messages->count(),
+                'mode' => $data['mode'],
+            ];
+            $request->session()->put('group_channel_bulk_delete', $preview);
 
-        return back()->with('group_channel_bulk_delete_preview', $preview);
+            return back()->with('group_channel_bulk_delete_preview', $preview);
+        } catch (Throwable $e) {
+            report($e);
+
+            return $this->backToManagement($groupChannelBot, [
+                'type' => 'error',
+                'title' => 'Ошибка массового удаления',
+                'message' => 'Не удалось получить список сообщений: '.$e->getMessage(),
+            ]);
+        }
     }
 
     public function execute(Request $request, GroupChannelBot $groupChannelBot): RedirectResponse
@@ -93,7 +104,7 @@ class GroupChannelBulkDeleteController extends Controller
             }
         }
 
-        return back()->with('toast', [
+        return $this->backToManagement($groupChannelBot, [
             'type' => $errors > 0 ? 'warning' : 'success',
             'title' => 'Массовое удаление завершено',
             'message' => "Удалено: {$deleted}. Ошибок: {$errors}.",
@@ -133,5 +144,15 @@ class GroupChannelBulkDeleteController extends Controller
                 $builder->orWhere('text', 'like', '%'.$forbiddenWord.'%');
             }
         });
+    }
+
+    private function backToManagement(GroupChannelBot $bot, array $toast): RedirectResponse
+    {
+        return back()->with([
+            'toast' => $toast,
+            'open_group_channel_manage' => $bot->id,
+            'open_group_channel_module' => 'bulk_delete',
+            'open_group_channel_scroll' => '#group-channel-module-bulk_delete-'.$bot->id,
+        ]);
     }
 }
