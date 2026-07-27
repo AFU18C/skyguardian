@@ -79,9 +79,16 @@ jobs:
 
           sudo cp deploy/systemd/skyguardian-telethon.service /etc/systemd/system/skyguardian-telethon.service
           sudo cp deploy/systemd/skyguardian-scheduler.service /etc/systemd/system/skyguardian-scheduler.service
+          sudo cp deploy/systemd/skyguardian-group-channel-delete.service /etc/systemd/system/skyguardian-group-channel-delete.service
           sudo systemctl daemon-reload
-          sudo systemctl enable skyguardian-telethon.service skyguardian-scheduler.service
-          sudo systemctl restart skyguardian-telethon.service skyguardian-scheduler.service
+          sudo systemctl enable \
+            skyguardian-telethon.service \
+            skyguardian-scheduler.service \
+            skyguardian-group-channel-delete.service
+          sudo systemctl restart \
+            skyguardian-telethon.service \
+            skyguardian-scheduler.service \
+            skyguardian-group-channel-delete.service
 
           sudo chown -R www-data:www-data storage bootstrap/cache
           sudo chmod -R ug+rwX storage bootstrap/cache
@@ -90,7 +97,10 @@ jobs:
           sudo nginx -t
           sudo systemctl reload nginx
 
-          sudo systemctl --no-pager --full status skyguardian-telethon.service skyguardian-scheduler.service
+          sudo systemctl --no-pager --full status \
+            skyguardian-telethon.service \
+            skyguardian-scheduler.service \
+            skyguardian-group-channel-delete.service
           echo "SkyGuardian deployed successfully."
 
       - name: Mark deployed revision
