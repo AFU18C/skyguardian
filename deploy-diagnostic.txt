@@ -1,90 +1,10 @@
-timestamp=2026-07-27T09:33:16+00:00
-main_sha=7b257324aa800bd200c5431ef9735dc356006fdb
+timestamp=2026-07-27T09:40:28+00:00
+main_sha=71eb10b8d2eb8e41c9574101e26c3a939b9af8be
 
 == sync current main ==
-cannot delete non-empty directory: node_modules/shell-quote
-cannot delete non-empty directory: node_modules/shell-quote
-cannot delete non-empty directory: node_modules
 Installing dependencies from lock file
 Verifying lock file contents can be installed on current platform.
-Package operations: 77 installs, 0 updates, 0 removals
-  - Installing doctrine/inflector (2.1.0): Extracting archive
-  - Installing doctrine/lexer (3.0.1): Extracting archive
-  - Installing dragonmantank/cron-expression (v3.6.0): Extracting archive
-  - Installing symfony/polyfill-mbstring (v1.38.2): Extracting archive
-  - Installing symfony/deprecation-contracts (v3.7.1): Extracting archive
-  - Installing symfony/http-foundation (v7.4.14): Extracting archive
-  - Installing fruitcake/php-cors (v1.4.0): Extracting archive
-  - Installing symfony/polyfill-php80 (v1.37.0): Extracting archive
-  - Installing psr/http-message (2.0): Extracting archive
-  - Installing psr/http-client (1.0.3): Extracting archive
-  - Installing ralouphie/getallheaders (3.0.3): Extracting archive
-  - Installing psr/http-factory (1.1.0): Extracting archive
-  - Installing guzzlehttp/psr7 (2.13.0): Extracting archive
-  - Installing guzzlehttp/promises (2.5.1): Extracting archive
-  - Installing guzzlehttp/guzzle (7.15.1): Extracting archive
-  - Installing guzzlehttp/uri-template (v1.0.10): Extracting archive
-  - Installing symfony/polyfill-intl-normalizer (v1.38.0): Extracting archive
-  - Installing symfony/polyfill-intl-grapheme (v1.38.1): Extracting archive
-  - Installing symfony/polyfill-ctype (v1.37.0): Extracting archive
-  - Installing symfony/string (v7.4.13): Extracting archive
-  - Installing psr/container (2.0.2): Extracting archive
-  - Installing symfony/service-contracts (v3.7.1): Extracting archive
-  - Installing symfony/console (v7.4.14): Extracting archive
-  - Installing laravel/prompts (v0.3.21): Extracting archive
-  - Installing laravel/serializable-closure (v2.0.15): Extracting archive
-  - Installing symfony/var-dumper (v7.4.14): Extracting archive
-  - Installing nikic/php-parser (v5.8.0): Extracting archive
-  - Installing psy/psysh (v0.12.24): Extracting archive
-  - Installing voku/portable-ascii (2.1.1): Extracting archive
-  - Installing phpoption/phpoption (1.9.5): Extracting archive
-  - Installing graham-campbell/result-type (v1.1.4): Extracting archive
-  - Installing vlucas/phpdotenv (v5.6.4): Extracting archive
-  - Installing symfony/css-selector (v7.4.9): Extracting archive
-  - Installing tijsverkoyen/css-to-inline-styles (v2.4.0): Extracting archive
-  - Installing symfony/polyfill-uuid (v1.37.0): Extracting archive
-  - Installing symfony/uid (v7.4.9): Extracting archive
-  - Installing symfony/routing (v7.4.13): Extracting archive
-  - Installing symfony/process (v7.4.13): Extracting archive
-  - Installing symfony/polyfill-php86 (v1.38.0): Extracting archive
-  - Installing symfony/polyfill-php85 (v1.38.1): Extracting archive
-  - Installing symfony/polyfill-php84 (v1.38.1): Extracting archive
-  - Installing symfony/polyfill-intl-idn (v1.38.1): Extracting archive
-  - Installing symfony/mime (v7.4.13): Extracting archive
-  - Installing psr/event-dispatcher (1.0.0): Extracting archive
-  - Installing symfony/event-dispatcher-contracts (v3.7.1): Extracting archive
-  - Installing symfony/event-dispatcher (v7.4.14): Extracting archive
-  - Installing psr/log (3.0.2): Extracting archive
-  - Installing egulias/email-validator (4.0.4): Extracting archive
-  - Installing symfony/mailer (v7.4.14): Extracting archive
-  - Installing symfony/error-handler (v7.4.14): Extracting archive
-  - Installing symfony/http-kernel (v7.4.14): Extracting archive
-  - Installing symfony/finder (v7.4.14): Extracting archive
-  - Installing ramsey/collection (2.1.1): Extracting archive
-  - Installing brick/math (0.18.0): Extracting archive
-  - Installing ramsey/uuid (4.9.3): Extracting archive
-  - Installing psr/simple-cache (3.0.0): Extracting archive
-  - Installing nunomaduro/termwind (v2.4.0): Extracting archive
-  - Installing symfony/translation-contracts (v3.7.1): Extracting archive
-  - Installing symfony/translation (v7.4.14): Extracting archive
-  - Installing symfony/polyfill-php83 (v1.38.2): Extracting archive
-  - Installing psr/clock (1.0.0): Extracting archive
-  - Installing symfony/clock (v7.4.8): Extracting archive
-  - Installing carbonphp/carbon-doctrine-types (3.2.0): Extracting archive
-  - Installing nesbot/carbon (3.13.1): Extracting archive
-  - Installing monolog/monolog (3.10.0): Extracting archive
-  - Installing league/uri-interfaces (7.8.1): Extracting archive
-  - Installing league/uri (7.8.1): Extracting archive
-  - Installing league/mime-type-detection (1.17.0): Extracting archive
-  - Installing league/flysystem-local (3.31.0): Extracting archive
-  - Installing league/flysystem (3.35.2): Extracting archive
-  - Installing nette/utils (v4.1.5): Extracting archive
-  - Installing nette/schema (v1.3.5): Extracting archive
-  - Installing dflydev/dot-access-data (v3.0.3): Extracting archive
-  - Installing league/config (v1.2.0): Extracting archive
-  - Installing league/commonmark (2.8.3): Extracting archive
-  - Installing laravel/framework (v13.22.0): Extracting archive
-  - Installing laravel/tinker (v3.0.2): Extracting archive
+Nothing to install, update or remove
 Generating optimized autoload files
 > Illuminate\Foundation\ComposerScripts::postAutoloadDump
 > @php artisan package:discover --ansi
@@ -102,7 +22,7 @@ Requirement already satisfied: pyaes in ./.venv/lib/python3.12/site-packages (fr
 Requirement already satisfied: rsa in ./.venv/lib/python3.12/site-packages (from Telethon<2.0,>=1.36->-r telethon/requirements.txt (line 1)) (4.9.1)
 Requirement already satisfied: pyasn1>=0.1.3 in ./.venv/lib/python3.12/site-packages (from rsa->Telethon<2.0,>=1.36->-r telethon/requirements.txt (line 1)) (0.6.4)
 
-added 63 packages, removed 1 package, and audited 64 packages in 5s
+up to date, audited 59 packages in 716ms
 
 16 packages are looking for funding
   run `npm fund` for details
@@ -136,41 +56,59 @@ public/build/assets/topbar-metrics-CelFYgN_.js                  0.80 kB │ gzip
 public/build/assets/group-channel-management-BQ70Xt0t.js        3.15 kB │ gzip:  1.40 kB
 public/build/assets/app-Ctmo-wgh.js                             5.46 kB │ gzip:  1.89 kB
 
-[32m✓ built in 929ms[39m
+[32m✓ built in 262ms[39m
 
    INFO  Clearing cached bootstrap files.  
 
-  config ......................................................... 0.94ms DONE
-  cache .......................................................... 2.66ms DONE
-  compiled ....................................................... 0.67ms DONE
-  events ......................................................... 0.53ms DONE
-  routes ......................................................... 0.53ms DONE
-  views .......................................................... 4.21ms DONE
+  config ......................................................... 0.96ms DONE
+  cache .......................................................... 2.78ms DONE
+  compiled ....................................................... 0.70ms DONE
+  events ......................................................... 0.46ms DONE
+  routes ......................................................... 0.45ms DONE
+  views .......................................................... 3.24ms DONE
 
 
-   INFO  Running migrations.  
+   INFO  Nothing to migrate.  
 
-  2026_07_27_120000_create_group_channel_technical_delete_tasks_table  3.17ms FAIL
 
-In StreamHandler.php line 164:
-                                                                               
-  The stream or file "/var/www/skyguardian/storage/logs/laravel.log" could no  
-  t be opened in append mode: Failed to open stream: Permission denied         
-  The exception occurred while attempting to log: SQLSTATE[42S01]: Base table  
-   or view already exists: 1050 Table 'group_channel_technical_delete_tasks'   
-  already exists (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: s  
-  kyguardian, SQL: create table `group_channel_technical_delete_tasks` (`id`   
-  bigint unsigned not null auto_increment primary key, `group_channel_bot_id`  
-   bigint unsigned not null, `technical_account_id` bigint unsigned null, `te  
-  chnical_account_name` varchar(255) not null, `mode` varchar(24) not null, `  
-  criteria` json not null, `status` varchar(24) not null default 'pending', `  
-  matched_count` int unsigned not null default '0', `deleted_count` int unsig  
-  ned not null default '0', `failed_count` int unsigned not null default '0',  
-   `started_at` timestamp null, `finished_at` timestamp null, `last_error` te  
-  xt null, `created_at` timestamp null, `updated_at` timestamp null) default   
-  character set utf8mb4 collate 'utf8mb4_unicode_ci')                          
-  Context: {"exception":{"errorInfo":["42S01",1050,"Table 'group_channel_tech  
-  nical_delete_tasks' already exists"],"connectionName":"mysql","readWriteTyp  
-  e":"write"}}                                                                 
-                                                                               
+   INFO  Configuration cached successfully.  
 
+
+
+   INFO  Blade templates cached successfully.  
+
+
+== install isolated services ==
+
+== verify existing production services ==
+active
+active
+
+== verify isolated services ==
+active
+active
+● skyguardian-group-channel-telethon.service - SkyGuardian group-channel Telethon daemon
+     Loaded: loaded (/etc/systemd/system/skyguardian-group-channel-telethon.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-07-27 09:40:34 UTC; 103ms ago
+   Main PID: 737807 (python)
+      Tasks: 1 (limit: 2076)
+     Memory: 7.0M (peak: 7.0M)
+        CPU: 49ms
+     CGroup: /system.slice/skyguardian-group-channel-telethon.service
+             └─737807 /var/www/skyguardian/.venv/bin/python /var/www/skyguardian/telethon/group_channel_worker.py
+
+Jul 27 09:40:34 bigxaos.whost.systems systemd[1]: Started skyguardian-group-channel-telethon.service - SkyGuardian group-channel Telethon daemon.
+
+● skyguardian-group-channel-delete.service - SkyGuardian group-channel technical account delete worker
+     Loaded: loaded (/etc/systemd/system/skyguardian-group-channel-delete.service; enabled; preset: enabled)
+     Active: active (running) since Mon 2026-07-27 09:40:34 UTC; 104ms ago
+   Main PID: 737808 (php)
+      Tasks: 1 (limit: 2076)
+     Memory: 11.0M (peak: 11.3M)
+        CPU: 50ms
+     CGroup: /system.slice/skyguardian-group-channel-delete.service
+             └─737808 /usr/bin/php artisan skyguardian:group-channel-technical-delete:work
+
+Jul 27 09:40:34 bigxaos.whost.systems systemd[1]: Started skyguardian-group-channel-delete.service - SkyGuardian group-channel technical account delete worker.
+
+== verify port and migration ==
