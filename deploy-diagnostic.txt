@@ -1,114 +1,18 @@
-timestamp=2026-07-27T09:40:28+00:00
+timestamp=2026-07-27T09:42:10+00:00
+
+== existing production services ==
+telethon=active
+scheduler=active
+
+== isolated group-channel services ==
+group_channel_telethon=active
+group_channel_delete=active
+port_8788=listening
+  2026_07_27_120000_create_group_channel_technical_delete_tasks_table  [6] Ran  
+migration=ran
+  skyguardian:group-channel-technical-delete:work  Обрабатывает задачи удаления истории через технические аккаунты
+artisan_worker=registered
+python_worker=valid
 main_sha=71eb10b8d2eb8e41c9574101e26c3a939b9af8be
-
-== sync current main ==
-Installing dependencies from lock file
-Verifying lock file contents can be installed on current platform.
-Nothing to install, update or remove
-Generating optimized autoload files
-> Illuminate\Foundation\ComposerScripts::postAutoloadDump
-> @php artisan package:discover --ansi
-
-  [37;44m INFO [39;49m Discovering packages.  
-
-  laravel/tinker [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
-  nesbot/carbon [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
-  nunomaduro/termwind [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
-
-54 packages you are using are looking for funding.
-Use the `composer fund` command to find out more!
-Requirement already satisfied: Telethon<2.0,>=1.36 in ./.venv/lib/python3.12/site-packages (from -r telethon/requirements.txt (line 1)) (1.44.0)
-Requirement already satisfied: pyaes in ./.venv/lib/python3.12/site-packages (from Telethon<2.0,>=1.36->-r telethon/requirements.txt (line 1)) (1.6.1)
-Requirement already satisfied: rsa in ./.venv/lib/python3.12/site-packages (from Telethon<2.0,>=1.36->-r telethon/requirements.txt (line 1)) (4.9.1)
-Requirement already satisfied: pyasn1>=0.1.3 in ./.venv/lib/python3.12/site-packages (from rsa->Telethon<2.0,>=1.36->-r telethon/requirements.txt (line 1)) (0.6.4)
-
-up to date, audited 59 packages in 716ms
-
-16 packages are looking for funding
-  run `npm fund` for details
-
-found 0 vulnerabilities
-
-> build
-> vite build
-
-[36mvite v8.1.5 [32mbuilding client environment for production...[36m[39m
-[33m[plugin laravel:fonts] Optimized font fallbacks require the optional "fontaine" package. Install it, or set "optimizedFallbacks: false" on your fonts to disable the feature.[39m
-[2Ktransforming...✓ 10 modules transformed.
-rendering chunks...
-computing gzip size...
-public/build/manifest.json                                      3.06 kB │ gzip:  0.55 kB
-public/build/fonts-manifest.json                                5.74 kB │ gzip:  0.71 kB
-public/build/assets/instrument-sans-400-normal-DRC__1Mx.woff2  16.86 kB
-public/build/assets/instrument-sans-500-normal-Dk9ku72i.woff2  17.23 kB
-public/build/assets/instrument-sans-600-normal-B7fBEWYG.woff2  17.40 kB
-public/build/assets/instrument-sans-400-normal-D1W7dsQl.woff   21.24 kB
-public/build/assets/instrument-sans-500-normal-Z6ESRlEs.woff   21.65 kB
-public/build/assets/instrument-sans-600-normal-B9e8oLYv.woff   21.67 kB
-public/build/assets/topbar-metrics-Ch53ruzm.css                 1.02 kB │ gzip:  0.42 kB
-public/build/assets/source-copying-B_er-zjk.css                 1.47 kB │ gzip:  0.63 kB
-public/build/assets/collapsible-cards-DqtQny_8.css              1.50 kB │ gzip:  0.62 kB
-public/build/assets/fonts-C9MNnjVw.css                          2.35 kB │ gzip:  0.38 kB
-public/build/assets/group-channel-BLeex38n.css                  3.68 kB │ gzip:  1.11 kB
-public/build/assets/app-BpGR08lp.css                           59.02 kB │ gzip: 14.43 kB
-public/build/assets/collapsible-cards-qc0m0BB4.js               0.72 kB │ gzip:  0.40 kB
-public/build/assets/topbar-metrics-CelFYgN_.js                  0.80 kB │ gzip:  0.48 kB
-public/build/assets/group-channel-management-BQ70Xt0t.js        3.15 kB │ gzip:  1.40 kB
-public/build/assets/app-Ctmo-wgh.js                             5.46 kB │ gzip:  1.89 kB
-
-[32m✓ built in 262ms[39m
-
-   INFO  Clearing cached bootstrap files.  
-
-  config ......................................................... 0.96ms DONE
-  cache .......................................................... 2.78ms DONE
-  compiled ....................................................... 0.70ms DONE
-  events ......................................................... 0.46ms DONE
-  routes ......................................................... 0.45ms DONE
-  views .......................................................... 3.24ms DONE
-
-
-   INFO  Nothing to migrate.  
-
-
-   INFO  Configuration cached successfully.  
-
-
-
-   INFO  Blade templates cached successfully.  
-
-
-== install isolated services ==
-
-== verify existing production services ==
-active
-active
-
-== verify isolated services ==
-active
-active
-● skyguardian-group-channel-telethon.service - SkyGuardian group-channel Telethon daemon
-     Loaded: loaded (/etc/systemd/system/skyguardian-group-channel-telethon.service; enabled; preset: enabled)
-     Active: active (running) since Mon 2026-07-27 09:40:34 UTC; 103ms ago
-   Main PID: 737807 (python)
-      Tasks: 1 (limit: 2076)
-     Memory: 7.0M (peak: 7.0M)
-        CPU: 49ms
-     CGroup: /system.slice/skyguardian-group-channel-telethon.service
-             └─737807 /var/www/skyguardian/.venv/bin/python /var/www/skyguardian/telethon/group_channel_worker.py
-
-Jul 27 09:40:34 bigxaos.whost.systems systemd[1]: Started skyguardian-group-channel-telethon.service - SkyGuardian group-channel Telethon daemon.
-
-● skyguardian-group-channel-delete.service - SkyGuardian group-channel technical account delete worker
-     Loaded: loaded (/etc/systemd/system/skyguardian-group-channel-delete.service; enabled; preset: enabled)
-     Active: active (running) since Mon 2026-07-27 09:40:34 UTC; 104ms ago
-   Main PID: 737808 (php)
-      Tasks: 1 (limit: 2076)
-     Memory: 11.0M (peak: 11.3M)
-        CPU: 50ms
-     CGroup: /system.slice/skyguardian-group-channel-delete.service
-             └─737808 /usr/bin/php artisan skyguardian:group-channel-technical-delete:work
-
-Jul 27 09:40:34 bigxaos.whost.systems systemd[1]: Started skyguardian-group-channel-delete.service - SkyGuardian group-channel technical account delete worker.
-
-== verify port and migration ==
+deployed_sha=71eb10b8d2eb8e41c9574101e26c3a939b9af8be
+verification_status=success
