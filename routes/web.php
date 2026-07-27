@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\GroupChannelJoinRequestController;
 use App\Http\Controllers\Admin\GroupChannelModuleSettingsController;
 use App\Http\Controllers\Admin\GroupChannelModuleToggleController;
 use App\Http\Controllers\Admin\GroupChannelPublicationController;
+use App\Http\Controllers\Admin\GroupChannelTechnicalBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelWebhookRegistrationController;
 use App\Http\Controllers\Admin\GroupChannelWelcomeController;
 use App\Http\Controllers\Admin\SourceController;
@@ -79,4 +80,6 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::delete('/group-channel/{groupChannelBot}/publications/{publication}', [GroupChannelPublicationController::class, 'destroy'])->name('group-channel.publications.destroy');
     Route::post('/group-channel/{groupChannelBot}/bulk-delete/preview', [GroupChannelBulkDeleteController::class, 'preview'])->name('group-channel.bulk-delete.preview');
     Route::post('/group-channel/{groupChannelBot}/bulk-delete/execute', [GroupChannelBulkDeleteController::class, 'execute'])->name('group-channel.bulk-delete.execute');
+    Route::post('/group-channel/{groupChannelBot}/technical-delete/preview', [GroupChannelTechnicalBulkDeleteController::class, 'preview'])->name('group-channel.technical-delete.preview');
+    Route::post('/group-channel/{groupChannelBot}/technical-delete/execute', [GroupChannelTechnicalBulkDeleteController::class, 'execute'])->name('group-channel.technical-delete.execute');
 });

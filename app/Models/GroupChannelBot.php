@@ -17,6 +17,7 @@ class GroupChannelBot extends Model
         'auto_delete_publications' => 'Автоудаление публикаций',
         'polls' => 'Опросы и голосования',
         'bulk_delete' => 'Массовое удаление',
+        'technical_account_bulk_delete' => 'Удаление через техаккаунт',
         'antispam' => 'Антиспам',
         'welcome' => 'Приветствие новых пользователей',
         'subscription_check' => 'Проверка подписки',
@@ -77,6 +78,11 @@ class GroupChannelBot extends Model
     public function joinRequests(): HasMany
     {
         return $this->hasMany(GroupChannelJoinRequest::class);
+    }
+
+    public function technicalDeleteTasks(): HasMany
+    {
+        return $this->hasMany(GroupChannelTechnicalDeleteTask::class);
     }
 
     public function moduleEnabled(string $module): bool
