@@ -13,4 +13,9 @@ return [
         'port' => (int) env('SKYGUARDIAN_TELETHON_PORT', 8787),
         'timeout_seconds' => (int) env('SKYGUARDIAN_TELETHON_TIMEOUT', 60),
     ],
+    'group_channel_telethon' => [
+        'host' => env('SKYGUARDIAN_GROUP_CHANNEL_TELETHON_HOST', '127.0.0.1'),
+        'port' => (int) env('SKYGUARDIAN_GROUP_CHANNEL_TELETHON_PORT', 8788),
+        'timeout_seconds' => (int) env('SKYGUARDIAN_GROUP_CHANNEL_TELETHON_TIMEOUT', 180),
+    ],
 ];
