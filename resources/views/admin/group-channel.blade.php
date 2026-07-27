@@ -82,6 +82,21 @@
             </x-modal>
             <div data-open-modal-on-load="group-channel-bulk-delete-preview"></div>
         @endif
+
+        @if(session('group_channel_technical_delete_preview'))
+            @php $technicalPreview = session('group_channel_technical_delete_preview'); @endphp
+            <x-modal id="group-channel-technical-delete-preview" title="Удаление через техаккаунт">
+                <p>Техаккаунт: <strong>{{ $technicalPreview['technical_account_name'] }}</strong>.</p>
+                <p>Найдено сообщений: <strong>{{ $technicalPreview['count'] }}</strong>.</p>
+                <p>Проверка прав заранее не выполняется. После подтверждения отдельный процесс попробует удалить найденную историю.</p>
+                <form method="POST" action="{{ route('admin.group-channel.technical-delete.execute', $technicalPreview['bot_id']) }}" data-confirm="Удалить через техаккаунт {{ $technicalPreview['count'] }} сообщений?">
+                    @csrf
+                    <input type="hidden" name="token" value="{{ $technicalPreview['token'] }}">
+                    <button class="sg-button sg-button-danger" type="submit">Запустить удаление</button>
+                </form>
+            </x-modal>
+            <div data-open-modal-on-load="group-channel-technical-delete-preview"></div>
+        @endif
     @endpush
 
     @if(session('open_group_channel_manage'))
