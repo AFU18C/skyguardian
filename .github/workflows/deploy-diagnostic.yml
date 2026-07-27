@@ -1,0 +1,67 @@
+name: Diagnose technical delete deployment
+
+on:
+  push:
+    branches:
+      - deploy-diagnostic-technical-delete
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+
+      - name: Collect safe deployment diagnostics
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "timestamp=$(date -Is)"
+            echo "workflow_sha=$GITHUB_SHA"
+            echo "main_sha=$(git rev-parse main 2>/dev/null || true)"
+            echo
+            echo "== deployed files =="
+            test -f /var/www/skyguardian/telethon/group_channel_worker.py && echo "group_channel_worker.py=present" || echo "group_channel_worker.py=missing"
+            test -f /var/www/skyguardian/app/Console/Commands/WorkGroupChannelTechnicalDeletes.php && echo "laravel_worker=present" || echo "laravel_worker=missing"
+            test -f /var/www/skyguardian/database/migrations/2026_07_27_120000_create_group_channel_technical_delete_tasks_table.php && echo "migration_file=present" || echo "migration_file=missing"
+            echo
+            echo "== service state =="
+            for service in \
+              skyguardian-telethon.service \
+              skyguardian-scheduler.service \
+              skyguardian-group-channel-telethon.service \
+              skyguardian-group-channel-delete.service; do
+              echo "[$service]"
+              sudo systemctl show "$service" \
+                --property=LoadState \
+                --property=ActiveState \
+                --property=SubState \
+                --property=Result \
+                --property=ExecMainStatus \
+                --no-pager 2>&1
+            done
+            echo
+            echo "== port 8788 =="
+            sudo ss -ltnp 2>&1 | grep ':8788' || true
+            echo
+            echo "== application checks =="
+            cd /var/www/skyguardian 2>/dev/null || exit 0
+            /usr/bin/php artisan list 2>&1 | grep 'group-channel-technical-delete' || true
+            /usr/bin/php artisan migrate:status 2>&1 | grep '2026_07_27_120000' || true
+            /var/www/skyguardian/.venv/bin/python -m py_compile telethon/group_channel_worker.py 2>&1
+          } > deploy-diagnostic.txt 2>&1
+
+      - name: Commit diagnostic result
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy-diagnostic.txt
+          git commit -m "Record deployment diagnostics" || exit 0
+          git push origin HEAD:deploy-diagnostic-technical-delete
