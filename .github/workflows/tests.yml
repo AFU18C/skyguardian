@@ -63,4 +63,4 @@ jobs:
         run: git diff --exit-code
 
       - name: Check Telethon worker syntax
-        run: python3 -m py_compile telethon/worker.py
+        run: python3 -m py_compile telethon/worker.py telethon/group_channel_worker.py
