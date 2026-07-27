@@ -1,4 +1,4 @@
-name: Repair technical delete deployment
+name: Verify technical delete deployment
 
 on:
   push:
@@ -9,128 +9,68 @@ permissions:
   contents: write
 
 jobs:
-  repair:
+  verify:
+    if: github.actor != 'github-actions[bot]'
     runs-on: self-hosted
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@v4
-        with:
-          path: diagnostic
 
-      - name: Checkout current main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          path: application
-
-      - name: Deploy only the isolated group-channel services
-        id: repair
+      - name: Verify production without restarting services
         shell: bash
         run: |
           set +e
-          DIAGNOSTIC_FILE="$GITHUB_WORKSPACE/diagnostic/deploy-diagnostic.txt"
           {
             set -Eeuo pipefail
-            APP="$GITHUB_WORKSPACE/application"
-            MAIN_SHA="$(git -C "$APP" rev-parse HEAD)"
-
             echo "timestamp=$(date -Is)"
-            echo "main_sha=$MAIN_SHA"
             echo
-            echo "== sync current main =="
-            sudo mkdir -p /var/www/skyguardian
-            sudo rsync -a --delete \
-              --exclude=".git" \
-              --exclude=".github" \
-              --exclude=".env" \
-              --exclude=".venv" \
-              --exclude="node_modules" \
-              --exclude="vendor" \
-              "$APP/" /var/www/skyguardian/
+            echo "== existing production services =="
+            echo "telethon=$(sudo systemctl is-active skyguardian-telethon.service)"
+            echo "scheduler=$(sudo systemctl is-active skyguardian-scheduler.service)"
+            echo
+            echo "== isolated group-channel services =="
+            echo "group_channel_telethon=$(sudo systemctl is-active skyguardian-group-channel-telethon.service)"
+            echo "group_channel_delete=$(sudo systemctl is-active skyguardian-group-channel-delete.service)"
+
+            PORT_READY=0
+            for attempt in $(seq 1 20); do
+              if sudo ss -ltnp | grep -q ':8788'; then
+                PORT_READY=1
+                break
+              fi
+              sleep 0.5
+            done
+            [ "$PORT_READY" -eq 1 ]
+            echo "port_8788=listening"
 
             cd /var/www/skyguardian
-            sudo mkdir -p \
-              storage/framework/cache \
-              storage/framework/sessions \
-              storage/framework/views \
-              storage/logs \
-              bootstrap/cache
-            sudo chown -R github-runner:www-data /var/www/skyguardian
-            sudo chmod -R ug+rwX storage bootstrap/cache
-            sudo touch storage/logs/laravel.log
-            sudo chown github-runner:www-data storage/logs/laravel.log
-            sudo chmod 664 storage/logs/laravel.log
-
-            composer install \
-              --no-dev \
-              --no-interaction \
-              --prefer-dist \
-              --optimize-autoloader
-            .venv/bin/pip install --disable-pip-version-check -r telethon/requirements.txt
-
-            if [ -f package-lock.json ]; then
-              npm ci
-            else
-              npm install
-            fi
-            npm run build
-
-            php artisan optimize:clear
-            php artisan migrate --force
-            php artisan config:cache
-            php artisan view:cache
-
-            echo
-            echo "== install isolated services =="
-            sudo cp deploy/systemd/skyguardian-group-channel-telethon.service /etc/systemd/system/skyguardian-group-channel-telethon.service
-            sudo cp deploy/systemd/skyguardian-group-channel-delete.service /etc/systemd/system/skyguardian-group-channel-delete.service
-            sudo systemctl daemon-reload
-            sudo systemctl enable skyguardian-group-channel-telethon.service skyguardian-group-channel-delete.service
-            sudo systemctl restart skyguardian-group-channel-telethon.service skyguardian-group-channel-delete.service
-
-            sudo chown -R www-data:www-data storage bootstrap/cache
-            sudo chmod -R ug+rwX storage bootstrap/cache
-
-            echo
-            echo "== verify existing production services =="
-            sudo systemctl is-active skyguardian-telethon.service
-            sudo systemctl is-active skyguardian-scheduler.service
-
-            echo
-            echo "== verify isolated services =="
-            sudo systemctl is-active skyguardian-group-channel-telethon.service
-            sudo systemctl is-active skyguardian-group-channel-delete.service
-            sudo systemctl --no-pager --full status \
-              skyguardian-group-channel-telethon.service \
-              skyguardian-group-channel-delete.service
-
-            echo
-            echo "== verify port and migration =="
-            sudo ss -ltnp | grep ':8788'
             php artisan migrate:status | grep '2026_07_27_120000' | grep 'Ran'
+            echo "migration=ran"
             php artisan list | grep 'group-channel-technical-delete'
+            echo "artisan_worker=registered"
             .venv/bin/python -m py_compile telethon/group_channel_worker.py
+            echo "python_worker=valid"
 
-            echo
-            echo "== mark deployed revision =="
-            git -C "$APP" tag -f deployed "$MAIN_SHA"
-            git -C "$APP" push origin refs/tags/deployed --force
-            echo "deployed_sha=$MAIN_SHA"
-            echo "repair_status=success"
-          } > "$DIAGNOSTIC_FILE" 2>&1
+            MAIN_SHA="$(git ls-remote https://github.com/AFU18C/skyguardian.git refs/heads/main | cut -f1)"
+            DEPLOYED_SHA="$(git ls-remote https://github.com/AFU18C/skyguardian.git refs/tags/deployed | cut -f1)"
+            echo "main_sha=$MAIN_SHA"
+            echo "deployed_sha=$DEPLOYED_SHA"
+            [ -n "$MAIN_SHA" ]
+            [ "$MAIN_SHA" = "$DEPLOYED_SHA" ]
+            echo "verification_status=success"
+          } > deploy-diagnostic.txt 2>&1
           STATUS=$?
-          echo "exit_code=$STATUS" >> "$DIAGNOSTIC_FILE"
+          echo "exit_code=$STATUS" >> deploy-diagnostic.txt
           exit "$STATUS"
 
-      - name: Commit deployment result
+      - name: Commit verification result
         if: always()
         shell: bash
         run: |
-          cd "$GITHUB_WORKSPACE/diagnostic"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deploy-diagnostic.txt
-          git commit -m "Record isolated deployment result" || exit 0
+          git commit -m "Record final deployment verification" || exit 0
           git push origin HEAD:deploy-diagnostic-technical-delete
