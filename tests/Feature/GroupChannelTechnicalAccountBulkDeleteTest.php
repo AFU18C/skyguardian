@@ -109,7 +109,7 @@ class GroupChannelTechnicalAccountBulkDeleteTest extends TestCase
             ->withArgs(fn (string $action, TechnicalAccount $selected, array $payload, int $timeout): bool => $action === 'group_channel_bulk_delete'
                 && $selected->is($account)
                 && $payload['mode'] === 'last'
-                && $timeout === 3600)
+                && $timeout === 21600)
             ->andReturn([
                 'ok' => true,
                 'matched_count' => 10,
