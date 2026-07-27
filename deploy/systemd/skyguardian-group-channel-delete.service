@@ -1,0 +1,17 @@
+[Unit]
+Description=SkyGuardian group-channel technical account delete worker
+After=network-online.target mysql.service skyguardian-telethon.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/skyguardian
+ExecStart=/usr/bin/php artisan skyguardian:group-channel-technical-delete:work
+Restart=always
+RestartSec=3
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
