@@ -1,0 +1,40 @@
+timestamp=2026-07-27T09:26:17+00:00
+workflow_sha=48d8db8b17b4562e5c547456384701ce64a8e925
+main_sha=main
+
+== deployed files ==
+group_channel_worker.py=present
+laravel_worker=present
+migration_file=present
+
+== service state ==
+[skyguardian-telethon.service]
+Result=success
+ExecMainStatus=0
+LoadState=loaded
+ActiveState=active
+SubState=running
+[skyguardian-scheduler.service]
+Result=success
+ExecMainStatus=0
+LoadState=loaded
+ActiveState=active
+SubState=running
+[skyguardian-group-channel-telethon.service]
+Result=success
+ExecMainStatus=0
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+[skyguardian-group-channel-delete.service]
+Result=success
+ExecMainStatus=0
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+
+== port 8788 ==
+
+== application checks ==
+  skyguardian:group-channel-technical-delete:work  Обрабатывает задачи удаления истории через технические аккаунты
+  2026_07_27_120000_create_group_channel_technical_delete_tasks_table  Pending  
