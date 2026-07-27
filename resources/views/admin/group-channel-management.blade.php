@@ -28,6 +28,7 @@
         $configurableModules = [
             'publications',
             'bulk_delete',
+            'technical_account_bulk_delete',
             'antispam',
             'welcome',
             'subscription_check',
