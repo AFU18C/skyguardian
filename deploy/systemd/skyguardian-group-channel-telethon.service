@@ -1,0 +1,20 @@
+[Unit]
+Description=SkyGuardian group-channel Telethon daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/skyguardian
+Environment=SKYGUARDIAN_GROUP_CHANNEL_TELETHON_HOST=127.0.0.1
+Environment=SKYGUARDIAN_GROUP_CHANNEL_TELETHON_PORT=8788
+ExecStart=/var/www/skyguardian/.venv/bin/python /var/www/skyguardian/telethon/group_channel_worker.py
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
