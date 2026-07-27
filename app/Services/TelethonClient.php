@@ -7,12 +7,8 @@ use RuntimeException;
 
 class TelethonClient
 {
-    public function call(
-        string $action,
-        TechnicalAccount $account,
-        array $payload = [],
-        ?int $timeoutSeconds = null,
-    ): array {
+    public function call(string $action, TechnicalAccount $account, array $payload = []): array
+    {
         $api = $account->telegramApi;
 
         if (! $api || ! $api->is_active) {
@@ -29,7 +25,7 @@ class TelethonClient
             'payload' => $payload,
         ], JSON_THROW_ON_ERROR)."\n";
 
-        $timeout = max(1, $timeoutSeconds ?? (int) config('skyguardian.telethon.timeout_seconds', 60));
+        $timeout = max(1, (int) config('skyguardian.telethon.timeout_seconds', 60));
         $socket = @stream_socket_client(
             sprintf('tcp://%s:%d', config('skyguardian.telethon.host'), config('skyguardian.telethon.port')),
             $errno,
