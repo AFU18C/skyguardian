@@ -14,10 +14,14 @@ jobs:
     name: Deploy to VPS
     runs-on: self-hosted
     timeout-minutes: 20
+    env:
+      BEFORE_SHA: ${{ github.event.before }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Deploy Laravel application
         shell: bash
@@ -31,6 +35,8 @@ jobs:
             --exclude=".github" \
             --exclude=".env" \
             --exclude=".venv" \
+            --exclude="node_modules" \
+            --exclude="vendor" \
             "$GITHUB_WORKSPACE/" /var/www/skyguardian/
 
           cd /var/www/skyguardian
@@ -44,6 +50,9 @@ jobs:
 
           sudo chown -R github-runner:www-data /var/www/skyguardian
           sudo chmod -R ug+rwX storage bootstrap/cache
+          sudo touch storage/logs/laravel.log
+          sudo chown github-runner:www-data storage/logs/laravel.log
+          sudo chmod 664 storage/logs/laravel.log
 
           composer install \
             --no-dev \
@@ -87,9 +96,26 @@ jobs:
             skyguardian-scheduler.service \
             skyguardian-group-channel-telethon.service \
             skyguardian-group-channel-delete.service
+
+          CORE_RESTART_REQUIRED=1
+          if [ -n "${BEFORE_SHA:-}" ] \
+            && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] \
+            && git -C "$GITHUB_WORKSPACE" cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            CHANGED_FILES="$(git -C "$GITHUB_WORKSPACE" diff --name-only "$BEFORE_SHA" "$GITHUB_SHA")"
+            if [ -n "$CHANGED_FILES" ] \
+              && ! printf '%s\n' "$CHANGED_FILES" | grep -Ev '^(database/migrations/2026_07_27_120000_create_group_channel_technical_delete_tasks_table\.php|\.github/workflows/deploy\.yml)$' >/dev/null; then
+              CORE_RESTART_REQUIRED=0
+            fi
+          fi
+
+          if [ "$CORE_RESTART_REQUIRED" -eq 1 ]; then
+            sudo systemctl restart skyguardian-telethon.service skyguardian-scheduler.service
+          else
+            sudo systemctl is-active --quiet skyguardian-telethon.service || sudo systemctl start skyguardian-telethon.service
+            sudo systemctl is-active --quiet skyguardian-scheduler.service || sudo systemctl start skyguardian-scheduler.service
+          fi
+
           sudo systemctl restart \
-            skyguardian-telethon.service \
-            skyguardian-scheduler.service \
             skyguardian-group-channel-telethon.service \
             skyguardian-group-channel-delete.service
 
