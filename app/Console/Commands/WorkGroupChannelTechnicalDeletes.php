@@ -21,7 +21,7 @@ class WorkGroupChannelTechnicalDeletes extends Command
 
     public function handle(): int
     {
-        $this->recoverStaleTasks();
+        $this->recoverInterruptedTasks();
 
         do {
             $task = $this->claimTask();
@@ -87,7 +87,7 @@ class WorkGroupChannelTechnicalDeletes extends Command
                     'peer' => $bot->group_link,
                     ...($task->criteria ?? []),
                 ],
-                3600,
+                21600,
             );
 
             $task->update([
@@ -108,11 +108,10 @@ class WorkGroupChannelTechnicalDeletes extends Command
         }
     }
 
-    private function recoverStaleTasks(): void
+    private function recoverInterruptedTasks(): void
     {
         GroupChannelTechnicalDeleteTask::query()
             ->where('status', GroupChannelTechnicalDeleteTask::STATUS_RUNNING)
-            ->where('started_at', '<=', now()->subHours(2))
             ->update([
                 'status' => GroupChannelTechnicalDeleteTask::STATUS_PENDING,
                 'started_at' => null,
