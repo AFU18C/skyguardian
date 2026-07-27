@@ -1,6 +1,7 @@
 [Unit]
 Description=SkyGuardian group-channel technical account delete worker
-After=network-online.target mysql.service skyguardian-telethon.service
+After=network-online.target mysql.service skyguardian-group-channel-telethon.service
+Requires=skyguardian-group-channel-telethon.service
 Wants=network-online.target
 
 [Service]
