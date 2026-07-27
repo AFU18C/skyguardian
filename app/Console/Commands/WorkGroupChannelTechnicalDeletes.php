@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\GroupChannelTechnicalDeleteTask;
-use App\Services\TelethonClient;
+use App\Services\GroupChannelTelethonClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -14,7 +14,7 @@ class WorkGroupChannelTechnicalDeletes extends Command
 
     protected $description = 'Обрабатывает задачи удаления истории через технические аккаунты';
 
-    public function __construct(private readonly TelethonClient $telethon)
+    public function __construct(private readonly GroupChannelTelethonClient $telethon)
     {
         parent::__construct();
     }
