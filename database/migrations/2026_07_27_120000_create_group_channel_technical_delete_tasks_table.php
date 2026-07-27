@@ -10,13 +10,8 @@ return new class extends Migration
     {
         Schema::create('group_channel_technical_delete_tasks', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('group_channel_bot_id')
-                ->constrained('group_channel_bots')
-                ->cascadeOnDelete();
-            $table->foreignId('technical_account_id')
-                ->nullable()
-                ->constrained('technical_accounts')
-                ->nullOnDelete();
+            $table->unsignedBigInteger('group_channel_bot_id');
+            $table->unsignedBigInteger('technical_account_id')->nullable();
             $table->string('technical_account_name');
             $table->string('mode', 24);
             $table->json('criteria');
@@ -29,6 +24,14 @@ return new class extends Migration
             $table->text('last_error')->nullable();
             $table->timestamps();
 
+            $table->foreign('group_channel_bot_id', 'gc_td_bot_fk')
+                ->references('id')
+                ->on('group_channel_bots')
+                ->cascadeOnDelete();
+            $table->foreign('technical_account_id', 'gc_td_account_fk')
+                ->references('id')
+                ->on('technical_accounts')
+                ->nullOnDelete();
             $table->index(['status', 'created_at'], 'gc_technical_delete_status_created_idx');
         });
     }
