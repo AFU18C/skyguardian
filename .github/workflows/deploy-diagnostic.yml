@@ -1,4 +1,4 @@
-name: Diagnose technical delete deployment
+name: Repair technical delete deployment
 
 on:
   push:
@@ -9,59 +9,123 @@ permissions:
   contents: write
 
 jobs:
-  diagnose:
+  repair:
     runs-on: self-hosted
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout diagnostic branch
         uses: actions/checkout@v4
+        with:
+          path: diagnostic
 
-      - name: Collect safe deployment diagnostics
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: application
+
+      - name: Deploy only the isolated group-channel services
+        id: repair
         shell: bash
         run: |
           set +e
+          DIAGNOSTIC_FILE="$GITHUB_WORKSPACE/diagnostic/deploy-diagnostic.txt"
           {
-            echo "timestamp=$(date -Is)"
-            echo "workflow_sha=$GITHUB_SHA"
-            echo "main_sha=$(git rev-parse main 2>/dev/null || true)"
-            echo
-            echo "== deployed files =="
-            test -f /var/www/skyguardian/telethon/group_channel_worker.py && echo "group_channel_worker.py=present" || echo "group_channel_worker.py=missing"
-            test -f /var/www/skyguardian/app/Console/Commands/WorkGroupChannelTechnicalDeletes.php && echo "laravel_worker=present" || echo "laravel_worker=missing"
-            test -f /var/www/skyguardian/database/migrations/2026_07_27_120000_create_group_channel_technical_delete_tasks_table.php && echo "migration_file=present" || echo "migration_file=missing"
-            echo
-            echo "== service state =="
-            for service in \
-              skyguardian-telethon.service \
-              skyguardian-scheduler.service \
-              skyguardian-group-channel-telethon.service \
-              skyguardian-group-channel-delete.service; do
-              echo "[$service]"
-              sudo systemctl show "$service" \
-                --property=LoadState \
-                --property=ActiveState \
-                --property=SubState \
-                --property=Result \
-                --property=ExecMainStatus \
-                --no-pager 2>&1
-            done
-            echo
-            echo "== port 8788 =="
-            sudo ss -ltnp 2>&1 | grep ':8788' || true
-            echo
-            echo "== application checks =="
-            cd /var/www/skyguardian 2>/dev/null || exit 0
-            /usr/bin/php artisan list 2>&1 | grep 'group-channel-technical-delete' || true
-            /usr/bin/php artisan migrate:status 2>&1 | grep '2026_07_27_120000' || true
-            /var/www/skyguardian/.venv/bin/python -m py_compile telethon/group_channel_worker.py 2>&1
-          } > deploy-diagnostic.txt 2>&1
+            set -Eeuo pipefail
+            APP="$GITHUB_WORKSPACE/application"
+            MAIN_SHA="$(git -C "$APP" rev-parse HEAD)"
 
-      - name: Commit diagnostic result
+            echo "timestamp=$(date -Is)"
+            echo "main_sha=$MAIN_SHA"
+            echo
+            echo "== sync current main =="
+            sudo mkdir -p /var/www/skyguardian
+            sudo rsync -a --delete \
+              --exclude=".git" \
+              --exclude=".github" \
+              --exclude=".env" \
+              --exclude=".venv" \
+              "$APP/" /var/www/skyguardian/
+
+            cd /var/www/skyguardian
+            sudo mkdir -p \
+              storage/framework/cache \
+              storage/framework/sessions \
+              storage/framework/views \
+              storage/logs \
+              bootstrap/cache
+            sudo chown -R github-runner:www-data /var/www/skyguardian
+            sudo chmod -R ug+rwX storage bootstrap/cache
+
+            composer install \
+              --no-dev \
+              --no-interaction \
+              --prefer-dist \
+              --optimize-autoloader
+            .venv/bin/pip install --disable-pip-version-check -r telethon/requirements.txt
+
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+            fi
+            npm run build
+
+            php artisan optimize:clear
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan view:cache
+
+            echo
+            echo "== install isolated services =="
+            sudo cp deploy/systemd/skyguardian-group-channel-telethon.service /etc/systemd/system/skyguardian-group-channel-telethon.service
+            sudo cp deploy/systemd/skyguardian-group-channel-delete.service /etc/systemd/system/skyguardian-group-channel-delete.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable skyguardian-group-channel-telethon.service skyguardian-group-channel-delete.service
+            sudo systemctl restart skyguardian-group-channel-telethon.service skyguardian-group-channel-delete.service
+
+            sudo chown -R www-data:www-data storage bootstrap/cache
+            sudo chmod -R ug+rwX storage bootstrap/cache
+
+            echo
+            echo "== verify existing production services =="
+            sudo systemctl is-active skyguardian-telethon.service
+            sudo systemctl is-active skyguardian-scheduler.service
+
+            echo
+            echo "== verify isolated services =="
+            sudo systemctl is-active skyguardian-group-channel-telethon.service
+            sudo systemctl is-active skyguardian-group-channel-delete.service
+            sudo systemctl --no-pager --full status \
+              skyguardian-group-channel-telethon.service \
+              skyguardian-group-channel-delete.service
+
+            echo
+            echo "== verify port and migration =="
+            sudo ss -ltnp | grep ':8788'
+            php artisan migrate:status | grep '2026_07_27_120000' | grep 'Ran'
+            php artisan list | grep 'group-channel-technical-delete'
+            .venv/bin/python -m py_compile telethon/group_channel_worker.py
+
+            echo
+            echo "== mark deployed revision =="
+            git -C "$APP" tag -f deployed "$MAIN_SHA"
+            git -C "$APP" push origin refs/tags/deployed --force
+            echo "deployed_sha=$MAIN_SHA"
+            echo "repair_status=success"
+          } > "$DIAGNOSTIC_FILE" 2>&1
+          STATUS=$?
+          echo "exit_code=$STATUS" >> "$DIAGNOSTIC_FILE"
+          exit "$STATUS"
+
+      - name: Commit deployment result
+        if: always()
         shell: bash
         run: |
+          cd "$GITHUB_WORKSPACE/diagnostic"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add deploy-diagnostic.txt
-          git commit -m "Record deployment diagnostics" || exit 0
+          git commit -m "Record isolated deployment result" || exit 0
           git push origin HEAD:deploy-diagnostic-technical-delete
