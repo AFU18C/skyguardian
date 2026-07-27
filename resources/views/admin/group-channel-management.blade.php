@@ -82,7 +82,11 @@
                         @if($module === 'bulk_delete')
                             @include('admin.group-channel-bulk-delete-note', ['bot' => $bot])
                         @endif
-                        @include('admin.group-channel-module-content', ['bot' => $bot, 'module' => $module])
+                        @if($module === 'technical_account_bulk_delete')
+                            @include('admin.group-channel-technical-delete', ['bot' => $bot])
+                        @else
+                            @include('admin.group-channel-module-content', ['bot' => $bot, 'module' => $module])
+                        @endif
                     </div>
                 @endif
             </section>
