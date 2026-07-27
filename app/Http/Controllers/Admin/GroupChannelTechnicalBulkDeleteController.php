@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\GroupChannelBot;
 use App\Models\GroupChannelTechnicalDeleteTask;
 use App\Models\TechnicalAccount;
-use App\Services\TelethonClient;
+use App\Services\GroupChannelTelethonClient;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +16,7 @@ use Throwable;
 
 class GroupChannelTechnicalBulkDeleteController extends Controller
 {
-    public function __construct(private readonly TelethonClient $telethon) {}
+    public function __construct(private readonly GroupChannelTelethonClient $telethon) {}
 
     public function preview(Request $request, GroupChannelBot $groupChannelBot): RedirectResponse
     {
