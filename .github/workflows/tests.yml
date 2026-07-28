@@ -43,7 +43,9 @@ jobs:
         run: npm run build
 
       - name: Run PHP tests
-        run: php artisan test 2>&1 | tee test-output.txt
+        run: |
+          set -o pipefail
+          php artisan test 2>&1 | tee test-output.txt
 
       - name: Upload failed test output
         if: failure()
