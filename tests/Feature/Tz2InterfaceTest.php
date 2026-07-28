@@ -47,7 +47,7 @@ class Tz2InterfaceTest extends TestCase
         ])->assertRedirect('/admin');
 
         $this->assertAuthenticatedAs($user);
-        $this->get('/admin')->assertOk()->assertSee('Раздел находится в разработке');
+        $this->get('/admin')->assertOk()->assertSee('Нагрузка VPS');
         $this->post('/admin/logout')->assertRedirect('/admin/login');
         $this->assertGuest();
     }
