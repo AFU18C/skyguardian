@@ -36,7 +36,19 @@
             </div>
         @endif
 
+        @if($editing)
+            <form id="site-page-duplicate-form" method="POST" action="{{ route('admin.site-settings.pages.duplicate', $page) }}">
+                @csrf
+            </form>
+            @unless($page->is_system)
+                <form id="site-page-delete-form" method="POST" action="{{ route('admin.site-settings.pages.destroy', $page) }}" data-confirm="Удалить страницу без возможности восстановления?">
+                    @csrf @method('DELETE')
+                </form>
+            @endunless
+        @endif
+
         <form
+            id="site-page-main-form"
             method="POST"
             action="{{ $editing ? route('admin.site-settings.pages.update', $page) : route('admin.site-settings.pages.store') }}"
             enctype="multipart/form-data"
@@ -203,10 +215,7 @@
                             <header><h3>Действия</h3></header>
                             <div class="site-editor-card-body site-editor-actions">
                                 <a class="sg-button sg-button-secondary" href="{{ route('admin.site-settings.pages.preview', $page) }}" target="_blank" rel="noopener">Открыть предпросмотр</a>
-                                <form method="POST" action="{{ route('admin.site-settings.pages.duplicate', $page) }}">
-                                    @csrf
-                                    <button class="sg-button sg-button-secondary" type="submit">Создать копию</button>
-                                </form>
+                                <button class="sg-button sg-button-secondary" type="submit" form="site-page-duplicate-form">Создать копию</button>
                             </div>
                         </section>
 
@@ -217,10 +226,7 @@
                             @else
                                 <strong>Удаление страницы</strong>
                                 <p>Страница и связанный пункт меню будут удалены.</p>
-                                <form method="POST" action="{{ route('admin.site-settings.pages.destroy', $page) }}" data-confirm="Удалить страницу без возможности восстановления?">
-                                    @csrf @method('DELETE')
-                                    <button class="sg-button sg-button-danger" type="submit">Удалить страницу</button>
-                                </form>
+                                <button class="sg-button sg-button-danger" type="submit" form="site-page-delete-form">Удалить страницу</button>
                             @endif
                         </section>
                     @endif
