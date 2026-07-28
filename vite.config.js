@@ -12,10 +12,13 @@ export default defineConfig({
                 'resources/css/collapsible-cards.css',
                 'resources/css/topbar-metrics.css',
                 'resources/css/group-channel.css',
+                'resources/css/site-settings.css',
+                'resources/css/public-site.css',
                 'resources/js/app.js',
                 'resources/js/group-channel-management.js',
                 'resources/js/collapsible-cards.js',
                 'resources/js/topbar-metrics.js',
+                'resources/js/site-page-editor.js',
             ],
             refresh: true,
             fonts: [
