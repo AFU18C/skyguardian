@@ -1,16 +1,21 @@
 @php
     $type = $block['type'] ?? 'text';
     $data = is_array($block['data'] ?? null) ? $block['data'] : [];
+    $levelValue = (string) ($data['level'] ?? '2');
+    $level = in_array($levelValue, ['2', '3', '4'], true) ? $levelValue : '2';
+    $alignmentValue = (string) ($data['align'] ?? 'left');
+    $alignment = in_array($alignmentValue, ['left', 'center', 'right'], true) ? $alignmentValue : 'left';
+    $dividerValue = (string) ($data['style'] ?? 'solid');
+    $dividerStyle = in_array($dividerValue, ['solid', 'dashed', 'ornament'], true) ? $dividerValue : 'solid';
 @endphp
 
 @if($type === 'heading')
-    @php $level = in_array((string) ($data['level'] ?? '2'), ['2', '3', '4'], true) ? (string) $data['level'] : '2'; @endphp
     <section class="site-block site-block-heading">
         <h{{ $level }}>{{ $data['text'] ?? '' }}</h{{ $level }}>
     </section>
 
 @elseif($type === 'text')
-    <section class="site-block site-block-text align-{{ in_array($data['align'] ?? 'left', ['left','center','right'], true) ? $data['align'] : 'left' }}">
+    <section class="site-block site-block-text align-{{ $alignment }}">
         <p>{!! nl2br(e($data['content'] ?? '')) !!}</p>
     </section>
 
@@ -79,7 +84,7 @@
     </section>
 
 @elseif($type === 'divider')
-    <div class="site-block site-divider is-{{ in_array($data['style'] ?? 'solid', ['solid','dashed','ornament'], true) ? $data['style'] : 'solid' }}"></div>
+    <div class="site-block site-divider is-{{ $dividerStyle }}"></div>
 
 @elseif($type === 'columns')
     <section class="site-block site-columns">
