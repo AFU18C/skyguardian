@@ -43,16 +43,7 @@ jobs:
         run: npm run build
 
       - name: Run PHP tests
-        run: |
-          set -o pipefail
-          php artisan test 2>&1 | tee test-output.txt
-
-      - name: Upload failed test output
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dashboard-test-output
-          path: test-output.txt
+        run: php artisan test
 
       - name: Apply PHP formatting
         run: vendor/bin/pint
