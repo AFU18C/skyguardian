@@ -1,0 +1,109 @@
+@php
+    $type = $block['type'] ?? 'text';
+    $data = is_array($block['data'] ?? null) ? $block['data'] : [];
+@endphp
+
+@if($type === 'heading')
+    @php $level = in_array((string) ($data['level'] ?? '2'), ['2', '3', '4'], true) ? (string) $data['level'] : '2'; @endphp
+    <section class="site-block site-block-heading">
+        <h{{ $level }}>{{ $data['text'] ?? '' }}</h{{ $level }}>
+    </section>
+
+@elseif($type === 'text')
+    <section class="site-block site-block-text align-{{ in_array($data['align'] ?? 'left', ['left','center','right'], true) ? $data['align'] : 'left' }}">
+        <p>{!! nl2br(e($data['content'] ?? '')) !!}</p>
+    </section>
+
+@elseif($type === 'image' && !empty($data['src']))
+    <figure class="site-block site-block-image">
+        <img loading="lazy" src="{{ $data['src'] }}" alt="{{ $data['alt'] ?? '' }}">
+        @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
+    </figure>
+
+@elseif($type === 'gallery')
+    @php
+        $images = collect(preg_split('/\R/u', (string) ($data['images'] ?? '')))->map(fn ($value) => trim($value))->filter();
+        $columns = max(2, min(4, (int) ($data['columns'] ?? 3)));
+    @endphp
+    @if($images->isNotEmpty())
+        <section class="site-block site-gallery" style="--site-gallery-columns: {{ $columns }}">
+            @foreach($images as $image)
+                <img loading="lazy" src="{{ $image }}" alt="">
+            @endforeach
+        </section>
+    @endif
+
+@elseif($type === 'video' && !empty($data['url']))
+    @php
+        $videoUrl = (string) $data['url'];
+        $embedUrl = null;
+        if (preg_match('~(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{6,})~', $videoUrl, $match)) {
+            $embedUrl = 'https://www.youtube-nocookie.com/embed/'.$match[1];
+        } elseif (preg_match('~vimeo\.com/(\d+)~', $videoUrl, $match)) {
+            $embedUrl = 'https://player.vimeo.com/video/'.$match[1];
+        }
+    @endphp
+    <figure class="site-block site-block-video">
+        @if($embedUrl)
+            <div class="site-video-frame"><iframe src="{{ $embedUrl }}" title="Видео" loading="lazy" allowfullscreen></iframe></div>
+        @elseif(preg_match('/\.(mp4|webm)(\?.*)?$/i', $videoUrl))
+            <video controls preload="metadata" src="{{ $videoUrl }}"></video>
+        @else
+            <a class="site-button site-button-secondary" href="{{ $videoUrl }}" target="_blank" rel="noopener">Открыть видео</a>
+        @endif
+        @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
+    </figure>
+
+@elseif($type === 'button' && !empty($data['label']) && !empty($data['url']))
+    <section class="site-block site-block-button">
+        <a class="site-button site-button-{{ ($data['style'] ?? 'primary') === 'secondary' ? 'secondary' : 'primary' }}" href="{{ $data['url'] }}" @if($data['new_tab'] ?? false) target="_blank" rel="noopener" @endif>
+            {{ $data['label'] }}
+        </a>
+    </section>
+
+@elseif($type === 'list')
+    @php $items = collect(preg_split('/\R/u', (string) ($data['items'] ?? '')))->map(fn ($value) => trim($value))->filter(); @endphp
+    @if($items->isNotEmpty())
+        <section class="site-block site-block-list">
+            @if($data['ordered'] ?? false)<ol>@else<ul>@endif
+                @foreach($items as $item)<li>{{ $item }}</li>@endforeach
+            @if($data['ordered'] ?? false)</ol>@else</ul>@endif
+        </section>
+    @endif
+
+@elseif($type === 'card')
+    <section class="site-block site-info-card">
+        @if(!empty($data['title']))<h3>{{ $data['title'] }}</h3>@endif
+        @if(!empty($data['text']))<p>{!! nl2br(e($data['text'])) !!}</p>@endif
+        @if(!empty($data['link_label']) && !empty($data['link_url']))<a href="{{ $data['link_url'] }}">{{ $data['link_label'] }} →</a>@endif
+    </section>
+
+@elseif($type === 'divider')
+    <div class="site-block site-divider is-{{ in_array($data['style'] ?? 'solid', ['solid','dashed','ornament'], true) ? $data['style'] : 'solid' }}"></div>
+
+@elseif($type === 'columns')
+    <section class="site-block site-columns">
+        <div>{!! $data['left_html'] ?? '' !!}</div>
+        <div>{!! $data['right_html'] ?? '' !!}</div>
+    </section>
+
+@elseif($type === 'contacts')
+    <section class="site-block site-contact-card">
+        @if(!empty($data['address']))<div><strong>Адрес</strong><span>{{ $data['address'] }}</span></div>@endif
+        @if(!empty($data['phone']))<div><strong>Телефон</strong><a href="tel:{{ preg_replace('/[^+0-9]/', '', $data['phone']) }}">{{ $data['phone'] }}</a></div>@endif
+        @if(!empty($data['email']))<div><strong>Email</strong><a href="mailto:{{ $data['email'] }}">{{ $data['email'] }}</a></div>@endif
+    </section>
+
+@elseif($type === 'telegram' && !empty($data['url']))
+    <section class="site-block site-telegram-card">
+        <span class="site-telegram-icon">➤</span>
+        <div>
+            <strong>{{ $data['label'] ?? 'Telegram' }}</strong>
+            @if(!empty($data['text']))<p>{{ $data['text'] }}</p>@endif
+        </div>
+        <a href="{{ $data['url'] }}" target="_blank" rel="noopener">Открыть</a>
+    </section>
+
+@elseif($type === 'html')
+    <section class="site-block site-block-html">{!! $data['html'] ?? '' !!}</section>
+@endif
