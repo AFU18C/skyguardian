@@ -19,6 +19,7 @@ export default defineConfig({
                 'resources/js/collapsible-cards.js',
                 'resources/js/topbar-metrics.js',
                 'resources/js/site-page-editor.js',
+                'resources/js/site-settings.js',
             ],
             refresh: true,
             fonts: [
