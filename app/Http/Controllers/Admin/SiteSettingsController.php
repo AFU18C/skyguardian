@@ -19,6 +19,12 @@ class SiteSettingsController extends Controller
     {
         return view('admin.site-settings', [
             'pages' => SitePage::query()->latest('updated_at')->paginate(20),
+            'pageStats' => [
+                'total' => SitePage::query()->count(),
+                'published' => SitePage::query()->where('status', SitePage::STATUS_PUBLISHED)->count(),
+                'draft' => SitePage::query()->where('status', SitePage::STATUS_DRAFT)->count(),
+                'system' => SitePage::query()->where('is_system', true)->count(),
+            ],
             'settings' => $siteContent->settings(),
             'menuItems' => SiteMenuItem::query()
                 ->with(['page', 'parent'])
