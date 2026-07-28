@@ -11,15 +11,20 @@ use App\Http\Controllers\Admin\GroupChannelPublicationController;
 use App\Http\Controllers\Admin\GroupChannelTechnicalBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelWebhookRegistrationController;
 use App\Http\Controllers\Admin\GroupChannelWelcomeController;
+use App\Http\Controllers\Admin\SiteMediaController;
+use App\Http\Controllers\Admin\SiteMenuController;
+use App\Http\Controllers\Admin\SitePageController as AdminSitePageController;
+use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\SourceController;
 use App\Http\Controllers\Admin\SystemMetricsController;
 use App\Http\Controllers\Admin\TelegramController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\GroupChannelWebhookController;
+use App\Http\Controllers\SitePageController;
 use App\Models\Source;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'public.home')->name('home');
+Route::get('/', [SitePageController::class, 'home'])->name('home');
 Route::post('/telegram/bot-api/webhook/{fingerprint}/{secret}', GroupChannelWebhookController::class)
     ->where(['fingerprint' => '[a-f0-9]{64}', 'secret' => '[A-Za-z0-9]{40,64}'])
     ->name('group-channel.webhook');
@@ -60,7 +65,20 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/telegram/accounts/{account}/qr/start', [TelegramController::class, 'startQr'])->name('telegram.accounts.qr.start');
     Route::post('/telegram/accounts/{account}/qr/wait', [TelegramController::class, 'waitQr'])->name('telegram.accounts.qr.wait');
 
-    Route::view('/site-settings', 'admin.site-settings')->name('site-settings');
+    Route::get('/site-settings', [SiteSettingsController::class, 'index'])->name('site-settings');
+    Route::put('/site-settings/general', [SiteSettingsController::class, 'updateGeneral'])->name('site-settings.general.update');
+    Route::get('/site-settings/pages/create', [AdminSitePageController::class, 'create'])->name('site-settings.pages.create');
+    Route::post('/site-settings/pages', [AdminSitePageController::class, 'store'])->name('site-settings.pages.store');
+    Route::get('/site-settings/pages/{sitePage}/edit', [AdminSitePageController::class, 'edit'])->name('site-settings.pages.edit');
+    Route::put('/site-settings/pages/{sitePage}', [AdminSitePageController::class, 'update'])->name('site-settings.pages.update');
+    Route::delete('/site-settings/pages/{sitePage}', [AdminSitePageController::class, 'destroy'])->name('site-settings.pages.destroy');
+    Route::post('/site-settings/pages/{sitePage}/duplicate', [AdminSitePageController::class, 'duplicate'])->name('site-settings.pages.duplicate');
+    Route::get('/site-settings/pages/{sitePage}/preview', [AdminSitePageController::class, 'preview'])->name('site-settings.pages.preview');
+    Route::post('/site-settings/media', SiteMediaController::class)->name('site-settings.media.store');
+    Route::post('/site-settings/menu', [SiteMenuController::class, 'store'])->name('site-settings.menu.store');
+    Route::put('/site-settings/menu/{siteMenuItem}', [SiteMenuController::class, 'update'])->name('site-settings.menu.update');
+    Route::delete('/site-settings/menu/{siteMenuItem}', [SiteMenuController::class, 'destroy'])->name('site-settings.menu.destroy');
+
     Route::get('/group-channel', [GroupChannelController::class, 'index'])->name('group-channel');
     Route::post('/group-channel', [GroupChannelController::class, 'store'])->name('group-channel.store');
     Route::put('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'update'])->name('group-channel.update');
@@ -83,3 +101,7 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/group-channel/{groupChannelBot}/technical-delete/preview', [GroupChannelTechnicalBulkDeleteController::class, 'preview'])->name('group-channel.technical-delete.preview');
     Route::post('/group-channel/{groupChannelBot}/technical-delete/execute', [GroupChannelTechnicalBulkDeleteController::class, 'execute'])->name('group-channel.technical-delete.execute');
 });
+
+Route::get('/{slug}', [SitePageController::class, 'show'])
+    ->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')
+    ->name('site.page');
