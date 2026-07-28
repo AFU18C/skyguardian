@@ -47,7 +47,7 @@ class SitePageController extends Controller
     public function store(Request $request, SiteContentService $siteContent): RedirectResponse
     {
         $data = $this->validatePage($request);
-        $page = new SitePage();
+        $page = new SitePage;
         $payload = $this->payload($request, $data, $page, $siteContent);
         $page->fill($payload);
         $page->is_system = false;
