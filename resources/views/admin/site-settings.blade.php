@@ -1,7 +1,7 @@
 @php
     $publishedCount = $pages->getCollection()->where('status', \App\Models\SitePage::STATUS_PUBLISHED)->count();
     $draftCount = $pages->getCollection()->where('status', \App\Models\SitePage::STATUS_DRAFT)->count();
-    $systemCount = $pages->getCollection()->where('is_system', true)->count();
+    $systemCount = $pages->getCollection()->where('is_system', true)->count() + 1;
 @endphp
 
 <x-layouts.admin title="Настройки сайта">
@@ -10,7 +10,7 @@
     </x-slot:actions>
 
     <section class="site-settings-summary">
-        <div class="site-settings-stat"><span>Всего страниц</span><strong>{{ $pages->total() }}</strong></div>
+        <div class="site-settings-stat"><span>Всего страниц</span><strong>{{ $pages->total() + 1 }}</strong></div>
         <div class="site-settings-stat"><span>Опубликовано</span><strong>{{ $publishedCount }}</strong></div>
         <div class="site-settings-stat"><span>Черновики</span><strong>{{ $draftCount }}</strong></div>
         <div class="site-settings-stat"><span>Системные</span><strong>{{ $systemCount }}</strong></div>
@@ -41,6 +41,25 @@
                 </div>
 
                 <div class="site-pages-grid">
+                    <article class="site-page-row">
+                        <div class="site-page-row-main">
+                            <strong>Авторизация <span class="site-system-badge">Системная</span></strong>
+                            <small>{{ url('/admin/login') }}</small>
+                        </div>
+                        <div class="site-page-row-meta">
+                            <span class="site-status-badge is-published">Активна</span>
+                            <small>Защищённая страница</small>
+                        </div>
+                        <div class="site-page-row-meta is-updated">
+                            <strong>Не удаляется</strong>
+                            <small>Логика входа защищена</small>
+                        </div>
+                        <div class="site-page-row-actions">
+                            <a class="sg-button sg-button-small sg-button-secondary" href="{{ route('admin.site-settings.login.edit') }}">Редактировать</a>
+                            <a class="sg-button sg-button-small sg-button-secondary" href="{{ route('admin.site-settings.login.preview') }}" target="_blank" rel="noopener">Предпросмотр</a>
+                        </div>
+                    </article>
+
                     @forelse($pages as $page)
                         <article class="site-page-row">
                             <div class="site-page-row-main">
@@ -75,7 +94,7 @@
                         </article>
                     @empty
                         <section class="sg-empty-state sg-empty-state-compact">
-                            <h2>Страницы ещё не созданы</h2>
+                            <h2>Публичные страницы ещё не созданы</h2>
                             <a class="sg-button sg-button-primary" href="{{ route('admin.site-settings.pages.create') }}">Создать первую страницу</a>
                         </section>
                     @endforelse

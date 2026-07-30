@@ -1,0 +1,105 @@
+.sg-login-page {
+    --sg-login-accent: #687052;
+    --sg-login-background: #20231d;
+    --sg-login-panel: #f8f5e9;
+    background: var(--sg-login-panel);
+}
+
+.sg-login-visual {
+    background-color: var(--sg-login-background);
+    background-image:
+        linear-gradient(155deg, rgba(31, 34, 27, .52), rgba(31, 34, 27, .92)),
+        var(--sg-login-image, none),
+        repeating-linear-gradient(45deg, color-mix(in srgb, var(--sg-login-background) 86%, white) 0 40px, var(--sg-login-background) 40px 80px);
+    background-position: center;
+    background-repeat: no-repeat, no-repeat, repeat;
+    background-size: cover, cover, auto;
+}
+
+.sg-login-form-wrap {
+    background: var(--sg-login-panel);
+}
+
+.sg-login-page .sg-button-primary {
+    background: var(--sg-login-accent);
+    border-color: color-mix(in srgb, var(--sg-login-accent) 78%, black);
+}
+
+.sg-login-page .sg-public-emblem {
+    border-color: color-mix(in srgb, var(--sg-login-accent) 58%, white);
+    background: color-mix(in srgb, var(--sg-login-accent) 72%, #20231d);
+}
+
+.sg-login-logo {
+    display: block;
+    width: min(240px, 62vw);
+    max-height: 110px;
+    margin-bottom: 28px;
+    object-fit: contain;
+    object-position: left center;
+}
+
+.sg-login-preview-bar {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 100;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 9px 16px;
+    color: #f8f5e9;
+    background: #20231d;
+    border-bottom: 1px solid rgba(182, 167, 124, .55);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+}
+
+.sg-login-preview-bar a {
+    color: #d8c895;
+    font-weight: 900;
+}
+
+.sg-login-page.is-preview {
+    padding-top: 48px;
+}
+
+.sg-login-page.is-preview input,
+.sg-login-page.is-preview button,
+.sg-login-page.is-preview .sg-check {
+    pointer-events: none;
+}
+
+.site-brand-preview.is-wide img {
+    width: min(280px, 100%);
+    height: 120px;
+    object-fit: cover;
+}
+
+.site-color-field > div {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.site-color-field input[type="color"] {
+    width: 58px;
+    height: 42px;
+    padding: 3px;
+}
+
+.site-color-field code {
+    color: var(--sg-ink-soft);
+    font-weight: 800;
+}
+
+@media (max-width: 720px) {
+    .sg-login-preview-bar {
+        justify-content: space-between;
+        font-size: 12px;
+    }
+
+    .sg-login-preview-bar span {
+        display: none;
+    }
+}

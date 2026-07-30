@@ -12,7 +12,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request()->url() }}">
     @if(!empty($favicon))<link rel="icon" href="{{ $favicon }}">@endif
-    @vite(['resources/css/app.css', 'resources/css/public-site.css', 'resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/css/public-site.css', 'resources/css/login-page.css', 'resources/js/app.js'])
 </head>
 <body class="sg-guest-body site-theme-{{ $theme ?? 'classic' }}">
     {{ $slot }}

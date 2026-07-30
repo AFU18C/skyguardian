@@ -14,6 +14,7 @@ export default defineConfig({
                 'resources/css/group-channel.css',
                 'resources/css/site-settings.css',
                 'resources/css/public-site.css',
+                'resources/css/login-page.css',
                 'resources/js/app.js',
                 'resources/js/group-channel-management.js',
                 'resources/js/collapsible-cards.js',
