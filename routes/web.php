@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\GroupChannelPublicationController;
 use App\Http\Controllers\Admin\GroupChannelTechnicalBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelWebhookRegistrationController;
 use App\Http\Controllers\Admin\GroupChannelWelcomeController;
+use App\Http\Controllers\Admin\SiteLoginSettingsController;
 use App\Http\Controllers\Admin\SiteMediaController;
 use App\Http\Controllers\Admin\SiteMenuController;
 use App\Http\Controllers\Admin\SitePageController as AdminSitePageController;
@@ -67,6 +68,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
 
     Route::get('/site-settings', [SiteSettingsController::class, 'index'])->name('site-settings');
     Route::put('/site-settings/general', [SiteSettingsController::class, 'updateGeneral'])->name('site-settings.general.update');
+    Route::get('/site-settings/login', [SiteLoginSettingsController::class, 'edit'])->name('site-settings.login.edit');
+    Route::put('/site-settings/login', [SiteLoginSettingsController::class, 'update'])->name('site-settings.login.update');
+    Route::get('/site-settings/login/preview', [SiteLoginSettingsController::class, 'preview'])->name('site-settings.login.preview');
     Route::get('/site-settings/pages/create', [AdminSitePageController::class, 'create'])->name('site-settings.pages.create');
     Route::post('/site-settings/pages', [AdminSitePageController::class, 'store'])->name('site-settings.pages.store');
     Route::get('/site-settings/pages/{sitePage}/edit', [AdminSitePageController::class, 'edit'])->name('site-settings.pages.edit');
