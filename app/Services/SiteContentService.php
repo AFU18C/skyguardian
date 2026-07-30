@@ -73,6 +73,22 @@ class SiteContentService
             'theme' => 'classic',
             'logo_path' => null,
             'favicon_path' => null,
+            'login_visual_eyebrow' => 'Защищённый доступ',
+            'login_visual_title' => 'SkyGuardian',
+            'login_visual_description' => 'Панель управления источниками, техническими аккаунтами и Telegram-интеграцией.',
+            'login_form_eyebrow' => 'Административная панель',
+            'login_form_title' => 'Вход в систему',
+            'login_form_description' => 'Введите Email и пароль администратора.',
+            'login_email_label' => 'Email',
+            'login_password_label' => 'Пароль',
+            'login_remember_label' => 'Запомнить меня',
+            'login_button_label' => 'Войти',
+            'login_back_label' => 'Вернуться на сайт',
+            'login_accent_color' => '#687052',
+            'login_background_color' => '#20231d',
+            'login_panel_color' => '#f8f5e9',
+            'login_logo_path' => null,
+            'login_background_path' => null,
         ];
     }
 
