@@ -16,7 +16,7 @@
         $siteSettings['login_panel_color'] ?? '#f8f5e9',
     );
     if ($backgroundUrl) {
-        $loginStyle .= '--sg-login-image:url("'.e($backgroundUrl).'");';
+        $loginStyle .= '--sg-login-image:url("'.$backgroundUrl.'");';
     }
 @endphp
 
