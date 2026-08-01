@@ -1,0 +1,68 @@
+name: Post deploy status
+
+on:
+  push:
+    branches:
+      - deploy-diagnostics-20260801
+    paths:
+      - .github/workflows/post-deploy-status.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  status:
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for latest deployment and verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          RESULT="$GITHUB_WORKSPACE/post-deploy-status-result.txt"
+          API="https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&per_page=1"
+          : > "$RESULT"
+          for attempt in $(seq 1 60); do
+            JSON="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$API")"
+            STATUS="$(printf '%s' "$JSON" | python3 -c 'import json,sys; r=json.load(sys.stdin)["workflow_runs"][0]; print(r["status"])')"
+            SHA="$(printf '%s' "$JSON" | python3 -c 'import json,sys; r=json.load(sys.stdin)["workflow_runs"][0]; print(r["head_sha"])')"
+            if [ "$SHA" = "8341850574e3af743590b47192daa61d04467f13" ] && [ "$STATUS" = completed ]; then
+              break
+            fi
+            sleep 5
+          done
+          JSON="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$API")"
+          printf '%s' "$JSON" | python3 - "$RESULT" <<'PY'
+          import json,sys
+          data=json.load(sys.stdin)
+          run=data['workflow_runs'][0]
+          with open(sys.argv[1],'a') as f:
+              for key in ('id','head_sha','status','conclusion','created_at','updated_at'):
+                  f.write(f'deploy_{key}={run.get(key)}\n')
+          PY
+          printf 'main_sha=%s\n' "$(git ls-remote origin refs/heads/main | awk '{print $1}')" >> "$RESULT"
+          printf 'deployed_sha=%s\n' "$(git ls-remote origin refs/tags/deployed | awk '{print $1}')" >> "$RESULT"
+          printf 'home_status=%s\n' "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/)" >> "$RESULT"
+          printf 'login_status=%s\n' "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/admin/login)" >> "$RESULT"
+          printf 'health_status=%s\n' "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/up)" >> "$RESULT"
+          printf 'env_permissions=%s\n' "$(stat -c '%a %U:%G' /var/www/skyguardian/.env)" >> "$RESULT"
+          printf 'storage_link=%s\n' "$(test -L /var/www/skyguardian/public/storage && echo yes || echo no)" >> "$RESULT"
+          printf 'backup_timer_active=%s\n' "$(systemctl is-active skyguardian-backup.timer 2>/dev/null || true)" >> "$RESULT"
+          printf 'backup_timer_enabled=%s\n' "$(systemctl is-enabled skyguardian-backup.timer 2>/dev/null || true)" >> "$RESULT"
+          printf 'relayed_errors_last_10m=%s\n' "$(sudo journalctl -u skyguardian-scheduler.service --since '10 minutes ago' --no-pager -q | grep -c messages_relayed || true)" >> "$RESULT"
+          printf 'scheduler_failures_last_10m=%s\n' "$(sudo journalctl -u skyguardian-scheduler.service --since '10 minutes ago' --no-pager -q | grep -c 'failed with exit code' || true)" >> "$RESULT"
+          cd /var/www/skyguardian
+          sudo -u www-data php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo "runtime_db=".config("database.default").PHP_EOL; foreach (["news","air_alert"] as $type) { $s=App\Models\Source::query()->where("type",$type)->where("is_active",true)->get(); echo "{$type}_active=".$s->count().PHP_EOL; echo "{$type}_latest_success=".($s->max("last_success_at")?:"none").PHP_EOL; echo "{$type}_errors=".$s->filter(fn($x)=>filled($x->last_error))->count().PHP_EOL; }' >> "$RESULT"
+      - name: Commit result
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add post-deploy-status-result.txt
+          git commit -m "Record post deploy status" || exit 0
+          git push origin HEAD:deploy-diagnostics-20260801
