@@ -1,0 +1,97 @@
+name: Emergency production repair
+
+on:
+  push:
+    branches:
+      - deploy-diagnostics-20260801
+    paths:
+      - .github/workflows/emergency-production-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repair partial production deployment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          APP=/var/www/skyguardian
+          RESULT="$GITHUB_WORKSPACE/emergency-production-repair-result.txt"
+          : > "$RESULT"
+          item() { printf '%s=%s\n' "$1" "$2" >> "$RESULT"; }
+
+          cd "$APP"
+          sudo chown github-runner:www-data .env
+          sudo chmod 640 .env
+          sudo -u www-data test -r .env
+
+          sudo chown -R www-data:www-data storage bootstrap/cache
+          sudo chmod -R ug+rwX storage bootstrap/cache
+          sudo -u www-data php artisan optimize:clear
+          sudo -u www-data php artisan migrate --force
+          sudo -u www-data php artisan config:cache
+          sudo -u www-data php artisan view:cache
+          sudo -u www-data php artisan schedule:list --no-ansi >/dev/null
+
+          sudo cp deploy/systemd/skyguardian-telethon.service /etc/systemd/system/skyguardian-telethon.service
+          sudo cp deploy/systemd/skyguardian-scheduler.service /etc/systemd/system/skyguardian-scheduler.service
+          sudo cp deploy/systemd/skyguardian-group-channel-telethon.service /etc/systemd/system/skyguardian-group-channel-telethon.service
+          sudo cp deploy/systemd/skyguardian-group-channel-delete.service /etc/systemd/system/skyguardian-group-channel-delete.service
+          sudo cp deploy/systemd/skyguardian-backup.service /etc/systemd/system/skyguardian-backup.service
+          sudo cp deploy/systemd/skyguardian-backup.timer /etc/systemd/system/skyguardian-backup.timer
+          sudo cp deploy/backup/skyguardian-full-backup.sh /usr/local/sbin/skyguardian-full-backup
+          sudo chmod 750 /usr/local/sbin/skyguardian-full-backup
+
+          sudo mkdir -p /etc/skyguardian
+          if [ ! -f /etc/skyguardian/backup.key ]; then
+            sudo sh -c 'umask 077; openssl rand -base64 48 > /etc/skyguardian/backup.key'
+          fi
+          if [ ! -f /etc/skyguardian/backup.env ]; then
+            printf '%s\n' \
+              'RCLONE_REMOTE=' \
+              'BACKUP_ENCRYPTION_PASSWORD_FILE=/etc/skyguardian/backup.key' \
+              | sudo tee /etc/skyguardian/backup.env >/dev/null
+            sudo chmod 600 /etc/skyguardian/backup.env
+          fi
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now skyguardian-backup.timer
+          sudo systemctl restart \
+            skyguardian-telethon.service \
+            skyguardian-scheduler.service \
+            skyguardian-group-channel-telethon.service \
+            skyguardian-group-channel-delete.service
+          sudo systemctl reload php8.3-fpm
+          sudo nginx -t
+          sudo systemctl reload nginx
+
+          sleep 3
+          item repaired_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          item env_permissions "$(stat -c '%a %U:%G' .env)"
+          item runtime_db "$(sudo -u www-data php artisan about --only=drivers --no-ansi | awk '/Database/ {print $NF; exit}')"
+          item home_status "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/)"
+          item login_status "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/admin/login)"
+          item health_status "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/up)"
+          item storage_link "$(test -L public/storage && echo yes || echo no)"
+          item backup_timer "$(systemctl is-active skyguardian-backup.timer)"
+          item scheduler_active "$(systemctl is-active skyguardian-scheduler.service)"
+          item relayed_errors_last_5m "$(sudo journalctl -u skyguardian-scheduler.service --since '5 minutes ago' --no-pager -q | grep -c messages_relayed || true)"
+          item scheduler_failures_last_5m "$(sudo journalctl -u skyguardian-scheduler.service --since '5 minutes ago' --no-pager -q | grep -c 'failed with exit code' || true)"
+
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/)" = 200
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/admin/login)" = 200
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://skyguardian.pp.ua/up)" = 200
+      - name: Commit result
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add emergency-production-repair-result.txt
+          git commit -m "Record emergency production repair" || exit 0
+          git push origin HEAD:deploy-diagnostics-20260801
