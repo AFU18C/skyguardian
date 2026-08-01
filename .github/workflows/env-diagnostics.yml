@@ -1,0 +1,52 @@
+name: Environment diagnostics
+
+on:
+  push:
+    branches:
+      - deploy-diagnostics-20260801
+    paths:
+      - .github/workflows/env-diagnostics.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect safe environment values
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          RESULT="$GITHUB_WORKSPACE/env-diagnostics-result.txt"
+          APP="/var/www/skyguardian"
+          : > "$RESULT"
+          item() { printf '%s=%s\n' "$1" "$2" >> "$RESULT"; }
+          item checked_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          item env_exists "$(test -f "$APP/.env" && echo yes || echo no)"
+          item env_stat "$(stat -c '%a %U:%G %s' "$APP/.env" 2>/dev/null || echo missing)"
+          for key in APP_ENV APP_DEBUG APP_URL DB_CONNECTION CACHE_STORE SESSION_DRIVER LOG_CHANNEL LOG_STACK; do
+            value="$(grep -m1 -E "^${key}=" "$APP/.env" 2>/dev/null | cut -d= -f2- || true)"
+            item "env_${key}" "${value:-missing}"
+          done
+          item runner_DB_CONNECTION "${DB_CONNECTION:-unset}"
+          item runner_CACHE_STORE "${CACHE_STORE:-unset}"
+          item cached_config_exists "$(test -f "$APP/bootstrap/cache/config.php" && echo yes || echo no)"
+          if [ -f "$APP/bootstrap/cache/config.php" ]; then
+            php -r '$c=require $argv[1]; echo "cached_app_env=".($c["app"]["env"]??"missing").PHP_EOL; echo "cached_db_default=".($c["database"]["default"]??"missing").PHP_EOL; echo "cached_cache_default=".($c["cache"]["default"]??"missing").PHP_EOL;' "$APP/bootstrap/cache/config.php" >> "$RESULT" 2>/dev/null || item cached_config_read failed
+          fi
+          if [ -f "$APP/.env" ]; then
+            cd "$APP"
+            sudo -u www-data php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo "runtime_app_env=".app()->environment().PHP_EOL; echo "runtime_db_default=".config("database.default").PHP_EOL; echo "runtime_cache_default=".config("cache.default").PHP_EOL;' >> "$RESULT" 2>&1 || true
+          fi
+      - name: Commit result
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add env-diagnostics-result.txt
+          git commit -m "Record environment diagnostics" || exit 0
+          git push origin HEAD:deploy-diagnostics-20260801
