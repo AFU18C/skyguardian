@@ -1,0 +1,51 @@
+name: Final backup after fixes
+
+on:
+  push:
+    branches:
+      - deploy-diagnostics-20260801
+    paths:
+      - .github/workflows/final-backup-after-fixes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create and validate final backup
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          RESULT="$GITHUB_WORKSPACE/final-backup-after-fixes-result.txt"
+          : > "$RESULT"
+          BEFORE="$(sudo find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' | wc -l)"
+          sudo systemctl start skyguardian-backup.service
+          AFTER="$(sudo find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' | wc -l)"
+          NEWEST="$(sudo find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' -printf '%T@|%p\n' | sort -nr | head -1 | cut -d'|' -f2-)"
+          printf 'created_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$RESULT"
+          printf 'main_sha=%s\n' "$(git ls-remote origin refs/heads/main | awk '{print $1}')" >> "$RESULT"
+          printf 'deployed_sha=%s\n' "$(git ls-remote origin refs/tags/deployed | awk '{print $1}')" >> "$RESULT"
+          printf 'backup_count_before=%s\n' "$BEFORE" >> "$RESULT"
+          printf 'backup_count_after=%s\n' "$AFTER" >> "$RESULT"
+          printf 'backup_path=%s\n' "$NEWEST" >> "$RESULT"
+          printf 'backup_size_bytes=%s\n' "$(sudo stat -c '%s' "$NEWEST")" >> "$RESULT"
+          printf 'backup_size=%s\n' "$(sudo du -h "$NEWEST" | awk '{print $1}')" >> "$RESULT"
+          printf 'backup_permissions=%s\n' "$(sudo stat -c '%a %U:%G' "$NEWEST")" >> "$RESULT"
+          printf 'backup_test=%s\n' "$(sudo tar -tzf "$NEWEST" >/dev/null && echo passed || echo failed)" >> "$RESULT"
+          printf 'backup_sha256=%s\n' "$(sudo sha256sum "$NEWEST" | awk '{print $1}')" >> "$RESULT"
+          sudo tar -xOzf "$NEWEST" ./SHA256SUMS >/tmp/skyguardian-final-backup-sums 2>/dev/null
+          printf 'component_checksums_present=%s\n' "$(test -s /tmp/skyguardian-final-backup-sums && echo yes || echo no)" >> "$RESULT"
+          rm -f /tmp/skyguardian-final-backup-sums
+      - name: Commit result
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add final-backup-after-fixes-result.txt
+          git commit -m "Record final backup after fixes" || exit 0
+          git push origin HEAD:deploy-diagnostics-20260801
