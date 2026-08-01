@@ -71,4 +71,31 @@
             <strong data-vps-updated-at>—</strong>
         </footer>
     </section>
+
+    <section class="sg-source-health-section">
+        <header class="sg-source-health-head">
+            <div>
+                <span class="sg-dashboard-eyebrow">Рабочие процессы</span>
+                <h2>Новости и тревоги</h2>
+                <p>Статус рассчитывается по подключению аккаунта, ошибкам и времени последней успешной обработки.</p>
+            </div>
+        </header>
+
+        <div class="sg-source-health-grid">
+            @foreach($sourceHealth as $item)
+                <article class="sg-source-health-card is-{{ $item['state'] }}">
+                    <div class="sg-source-health-status">
+                        <span></span>
+                        <strong>{{ $item['status'] }}</strong>
+                    </div>
+                    <h3>{{ $item['label'] }}</h3>
+                    <p>{{ $item['description'] }}</p>
+                    <dl>
+                        <dt>Последняя успешная обработка</dt>
+                        <dd>{{ $item['last_success_at']?->diffForHumans() ?? 'ещё не выполнялась' }}</dd>
+                    </dl>
+                </article>
+            @endforeach
+        </div>
+    </section>
 </x-layouts.admin>
