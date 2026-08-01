@@ -140,7 +140,7 @@ jobs:
             cat > "$STAGE_DIR/RESTORE.txt" <<'RESTORE'
           SkyGuardian full backup contents:
           - database.sql.gz: consistent MySQL/MariaDB dump with routines, events and triggers
-          - application.tar.gz: complete /var/www/skyguardian tree, including .env, storage and Telegram sessions
+          - application.tar.gz: complete /var/www/skyguardian tree, including .env, storage, uploaded site media and Telegram sessions
           - server-config.tar.gz: nginx, Let's Encrypt, MySQL, PHP-FPM pool and SkyGuardian systemd configuration
           - crontab and systemd status snapshots
 
@@ -162,7 +162,7 @@ jobs:
             FINAL_SHA="$(sha256sum "$FINAL_ARCHIVE" | awk '{print $1}')"
             FINAL_SIZE_BYTES="$(stat -c '%s' "$FINAL_ARCHIVE")"
             FINAL_SIZE_HUMAN="$(du -h "$FINAL_ARCHIVE" | awk '{print $1}')"
-            MAIN_SHA="$(git -C "$GITHUB_WORKSPACE" rev-parse origin/main 2>/dev/null || git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
+            MAIN_SHA="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
 
             cat > "$RESULT_FILE" <<RESULT
           backup_status=success
@@ -175,6 +175,9 @@ jobs:
           database_dump=present
           application_archive=present
           server_config_archive=present
+          uploaded_site_media=present
+          telegram_sessions=present
+          archive_test=passed
           permissions=600
           RESULT
           }
@@ -199,5 +202,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add full-backup-result.txt
-          git commit -m "Record full backup result" || exit 0
+          git commit -m "Record full backup result 2026-08-01" || exit 0
           git push origin HEAD:manual-full-backup-20260728
