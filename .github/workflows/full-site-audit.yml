@@ -1,4 +1,4 @@
-name: Full site audit
+name: Apply SkyGuardian stabilization
 
 on:
   push:
@@ -11,46 +11,59 @@ permissions:
   contents: write
 
 jobs:
-  audit:
-    runs-on: self-hosted
-    timeout-minutes: 15
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect scheduler errors without changes
+        with:
+          ref: stabilize-full-site-20260801
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_sqlite
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Extract prepared stabilization scripts
         shell: bash
         run: |
-          set +e
-          OUT="$GITHUB_WORKSPACE/error-source-audit.txt"
-          : > "$OUT"
-          APP=/var/www/skyguardian
-          echo "audit_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$OUT"
-          echo "production_modified=no" >> "$OUT"
-          echo >> "$OUT"
-          echo "## messages_relayed references" >> "$OUT"
-          sudo grep -RIn --exclude='*.log' --exclude-dir=vendor --exclude-dir=node_modules 'messages_relayed' "$APP/app" "$APP/routes" "$APP/telethon" 2>/dev/null >> "$OUT" || true
-          echo >> "$OUT"
-          echo "## command and scheduler references" >> "$OUT"
-          sudo grep -RIn --exclude='*.log' --exclude-dir=vendor --exclude-dir=node_modules -E 'sources:process|ProcessSources|messages_relayed' "$APP/app" "$APP/routes" "$APP/telethon" 2>/dev/null >> "$OUT" || true
-          echo >> "$OUT"
-          echo "## latest sanitized stack for messages_relayed" >> "$OUT"
-          LOG="$APP/storage/logs/laravel.log"
-          LINE="$(sudo grep -n 'Undefined array key "messages_relayed"' "$LOG" 2>/dev/null | tail -1 | cut -d: -f1)"
-          echo "log_line=${LINE:-not_found}" >> "$OUT"
-          if [ -n "$LINE" ]; then
-            END=$((LINE+35))
-            sudo sed -n "${LINE},${END}p" "$LOG" \
-              | sed -E 's/[A-Fa-f0-9]{24,}/[REDACTED]/g; s#https://t\.me/[^[:space:]]+#https://t.me/[REDACTED]#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[EMAIL]/g; s/(token|secret|password|api_hash)[=:][^, }]+/\1=[REDACTED]/Ig' \
-              >> "$OUT"
-          fi
-          echo >> "$OUT"
-          echo "## deployment workflow permission commands" >> "$OUT"
-          grep -nE 'chown|chmod|storage/logs|bootstrap/cache|storage/framework' "$GITHUB_WORKSPACE/.github/workflows/deploy.yml" >> "$OUT" 2>/dev/null || true
-      - name: Commit error source report
-        if: always()
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add error-source-audit.txt
-          git commit -m "Record scheduler error source audit" || exit 0
-          git push origin HEAD:full-site-audit-20260801
+          set -Eeuo pipefail
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          workflow = yaml.safe_load(Path('.github/workflows/apply-stability-fixes.yml').read_text())
+          steps = workflow['jobs']['prepare']['steps']
+          wanted = {
+              'Apply code and deployment improvements': '/tmp/skyguardian-step-1.sh',
+              'Generate lock files and validate': '/tmp/skyguardian-step-2.sh',
+              'Record validation and commit': '/tmp/skyguardian-step-3.sh',
+          }
+          found = set()
+          for step in steps:
+              name = step.get('name')
+              if name in wanted:
+                  Path(wanted[name]).write_text('#!/usr/bin/env bash\n' + step['run'])
+                  Path(wanted[name]).chmod(0o700)
+                  found.add(name)
+          missing = set(wanted) - found
+          if missing:
+              raise SystemExit(f'Missing prepared steps: {sorted(missing)}')
+          PY
+
+      - name: Apply prepared changes
+        run: /tmp/skyguardian-step-1.sh
+
+      - name: Generate locks and validate everything
+        run: /tmp/skyguardian-step-2.sh
+
+      - name: Commit validated stabilization branch
+        run: /tmp/skyguardian-step-3.sh
