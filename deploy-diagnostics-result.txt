@@ -1,0 +1,164 @@
+checked_utc=2026-08-01T10:12:38Z
+main_sha=1fa7d66922cec8a80dea6dda05c2316d5527adae
+deployed_tag_sha=3227341d9ab316c7976ba994566a430969db908b
+deploy_runs_found=10
+deploy_run_1_id=30695099648
+deploy_run_1_sha=1fa7d66922cec8a80dea6dda05c2316d5527adae
+deploy_run_1_status=completed
+deploy_run_1_conclusion=failure
+deploy_run_1_event=push
+deploy_run_1_created_at=2026-08-01T10:07:37Z
+deploy_run_1_updated_at=2026-08-01T10:07:58Z
+deploy_run_1_jobs=1
+deploy_run_1_job_1_id=91356506942
+deploy_run_1_job_1_name=Deploy to VPS
+deploy_run_1_job_1_status=completed
+deploy_run_1_job_1_conclusion=failure
+deploy_run_1_job_1_step_1_name=Set up job
+deploy_run_1_job_1_step_1_status=completed
+deploy_run_1_job_1_step_1_conclusion=success
+deploy_run_1_job_1_step_2_name=Checkout repository
+deploy_run_1_job_1_step_2_status=completed
+deploy_run_1_job_1_step_2_conclusion=success
+deploy_run_1_job_1_step_3_name=Deploy Laravel application
+deploy_run_1_job_1_step_3_status=completed
+deploy_run_1_job_1_step_3_conclusion=failure
+deploy_run_1_job_1_step_4_name=Mark deployed revision
+deploy_run_1_job_1_step_4_status=completed
+deploy_run_1_job_1_step_4_conclusion=skipped
+deploy_run_1_job_1_step_5_name=Post Checkout repository
+deploy_run_1_job_1_step_5_status=completed
+deploy_run_1_job_1_step_5_conclusion=success
+deploy_run_1_job_1_step_6_name=Complete job
+deploy_run_1_job_1_step_6_status=completed
+deploy_run_1_job_1_step_6_conclusion=success
+deploy_run_2_id=30521466977
+deploy_run_2_sha=3227341d9ab316c7976ba994566a430969db908b
+deploy_run_2_status=completed
+deploy_run_2_conclusion=success
+deploy_run_2_event=push
+deploy_run_2_created_at=2026-07-30T07:01:00Z
+deploy_run_2_updated_at=2026-07-30T07:01:23Z
+deploy_run_3_id=30403467945
+deploy_run_3_sha=08d9cffc038be1001e6aed3479a1c555cbc4cd69
+deploy_run_3_status=completed
+deploy_run_3_conclusion=success
+deploy_run_3_event=push
+deploy_run_3_created_at=2026-07-28T22:08:48Z
+deploy_run_3_updated_at=2026-07-28T22:10:11Z
+deploy_run_4_id=30344483001
+deploy_run_4_sha=3bf6b886d57c9bde70490bad910591866bcee086
+deploy_run_4_status=completed
+deploy_run_4_conclusion=success
+deploy_run_4_event=push
+deploy_run_4_created_at=2026-07-28T08:56:58Z
+deploy_run_4_updated_at=2026-07-28T08:57:28Z
+deploy_run_5_id=30254847259
+deploy_run_5_sha=71eb10b8d2eb8e41c9574101e26c3a939b9af8be
+deploy_run_5_status=completed
+deploy_run_5_conclusion=success
+deploy_run_5_event=push
+deploy_run_5_created_at=2026-07-27T09:39:00Z
+deploy_run_5_updated_at=2026-07-27T09:40:20Z
+app_directory=present
+production_process_sources_sha=b0449baf84b6eafdc5fd09ede446b908f763baa5ac0ef719e7001b0ae4bcf8c2
+main_process_sources_sha=b0449baf84b6eafdc5fd09ede446b908f763baa5ac0ef719e7001b0ae4bcf8c2
+production_has_messages_copied=yes
+production_has_messages_relayed=no
+production_security_middleware=present
+production_package_lock=present
+production_storage_link=present
+production_backup_script=missing
+production_backup_timer_active=inactive
+missing
+production_backup_timer_enabled=not-found
+missing
+service_nginx_active=active
+service_mysql_active=active
+service_php8.3-fpm_active=active
+service_skyguardian-telethon_active=active
+service_skyguardian-scheduler_active=active
+service_skyguardian-group-channel-telethon_active=active
+service_skyguardian-group-channel-delete_active=active
+schedule_list_status=1
+migration_pending=0
+laravel_log_files=.gitignore,laravel-2026-08-01.log,laravel.log
+relayed_errors_last_15m=0
+scheduler_failures_last_15m=0
+
+In Connection.php line 857:
+                                                                               
+  Uncaught Illuminate\Database\SQLiteDatabaseDoesNotExistException: Database   
+  file at path [/var/www/skyguardian/database/database.sqlite] does not exist  
+  . Ensure this is an absolute path to the database. in /var/www/skyguardian/  
+  vendor/laravel/framework/src/Illuminate/Database/Connectors/SQLiteConnector  
+  .php:61                                                                      
+  Stack trace:                                                                 
+  #0 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnectors/SQLiteConnector.php(19): Illuminate\Database\Connectors\SQLiteConn  
+  ector->parseDatabasePath()                                                   
+  #1 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnectors/ConnectionFactory.php(259): Illuminate\Database\Connectors\SQLiteC  
+  onnector->connect()                                                          
+  #2 [internal function]: Illuminate\Database\Connectors\ConnectionFactory->I  
+  lluminate\Database\Connectors\{closure}()                                    
+  #3 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(1297): call_user_func()                                         
+  #4 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(1335): Illuminate\Database\Connection->getPdo()                 
+  #5 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(542): Illuminate\Database\Connection->getReadPdo()              
+  #6 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(435): Illuminate\Database\Connection->getPdoForSelect()         
+  #7 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(846): Illuminate\Database\Connection->Illuminate\Database\{clo  
+  sure}()                                                                      
+  #8 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(813): Illuminate\Database\Connection->runQueryCallback()        
+  #9 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(426): Illuminate\Database\Connection->run()                     
+  #10 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Q  
+  uery/Builder.php(3574): Illuminate\Database\Connection->select()             
+  #11 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Q  
+  uery/Builder.php(3558): Illuminate\Database\Query\Builder->runSelect()       
+  #12 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/E  
+  loquent/Builder.php(908): Illuminate\Database\Query\Builder->get()           
+  #13 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/E  
+  loquent/Builder.php(890): Illuminate\Database\Eloquent\Builder->getModels()  
+  #14 Command line code(6): Illuminate\Database\Eloquent\Builder->get()        
+  #15 {main}                                                                   
+                                                                               
+  Next Illuminate\Database\QueryException: Database file at path [/var/www/sk  
+  yguardian/database/database.sqlite] does not exist. Ensure this is an absol  
+  ute path to the database. (Connection: sqlite, Database: /var/www/skyguardi  
+  an/database/database.sqlite, SQL: select * from "sources" where "type" = ne  
+  ws) in /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Databas  
+  e/Connection.php:857                                                         
+  Stack trace:                                                                 
+  #0 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(813): Illuminate\Database\Connection->runQueryCallback()        
+  #1 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Co  
+  nnection.php(426): Illuminate\Database\Connection->run()                     
+  #2 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Qu  
+  ery/Builder.php(3574): Illuminate\Database\Connection->select()              
+  #3 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/Qu  
+  ery/Builder.php(3558): Illuminate\Database\Query\Builder->runSelect()        
+  #4 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/El  
+  oquent/Builder.php(908): Illuminate\Database\Query\Builder->get()            
+  #5 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Database/El  
+  oquent/Builder.php(890): Illuminate\Database\Eloquent\Builder->getModels()   
+  #6 Command line code(6): Illuminate\Database\Eloquent\Builder->get()         
+  #7 {main}                                                                    
+    thrown                                                                     
+                                                                               
+
+runtime_database_check=failed
+https_home=500|0.158785
+https_login=500|0.126327
+https_health=200|0.127919
+header_strict_transport_security=max-age=31536000; includeSubDomains
+header_content_security_policy=default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; media-src 'self' https:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com; upgrade-insecure-requests
+header_x_frame_options=SAMEORIGIN
+header_x_content_type_options=nosniff
+header_referrer_policy=strict-origin-when-cross-origin
+header_permissions_policy=camera=(), microphone=(), geolocation=(), payment=(), usb=()
