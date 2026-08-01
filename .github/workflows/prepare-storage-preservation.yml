@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,21 +26,18 @@ jobs:
 
           path = Path('.github/workflows/deploy.yml')
           lines = path.read_text().splitlines()
-          if any('--exclude="storage"' in line for line in lines):
-              raise SystemExit(0)
-
-          for index, line in enumerate(lines):
-              if '--exclude="vendor"' in line:
-                  slash = chr(92)
-                  lines[index + 1:index + 1] = [
-                      f'            --exclude="storage" {slash}',
-                      f'            --exclude="public/storage" {slash}',
-                  ]
-                  break
-          else:
-              raise SystemExit('rsync exclude anchor not found')
-
-          path.write_text('\n'.join(lines) + '\n')
+          if not any('--exclude="storage"' in line for line in lines):
+              for index, line in enumerate(lines):
+                  if '--exclude="vendor"' in line:
+                      slash = chr(92)
+                      lines[index + 1:index + 1] = [
+                          f'            --exclude="storage" {slash}',
+                          f'            --exclude="public/storage" {slash}',
+                      ]
+                      break
+              else:
+                  raise SystemExit('rsync exclude anchor not found')
+              path.write_text('\n'.join(lines) + '\n')
           PY
           git rm .github/workflows/prepare-storage-preservation.yml
           git config user.name "github-actions[bot]"
