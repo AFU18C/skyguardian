@@ -1,0 +1,155 @@
+name: Deployment diagnostics
+
+on:
+  push:
+    branches:
+      - deploy-diagnostics-20260801
+    paths:
+      - .github/workflows/deploy-diagnostics.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Inspect deployment and production
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          RESULT="$GITHUB_WORKSPACE/deploy-diagnostics-result.txt"
+          APP_DIR="/var/www/skyguardian"
+          DOMAIN="skyguardian.pp.ua"
+          : > "$RESULT"
+
+          item() {
+            printf '%s=%s\n' "$1" "$2" >> "$RESULT"
+          }
+
+          item checked_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          item main_sha "$(git rev-parse origin/main)"
+          item deployed_tag_sha "$(git ls-remote origin refs/tags/deployed | awk '{print $1}')"
+
+          python3 - "$RESULT" <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          result_path = sys.argv[1]
+          repository = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'skyguardian-deploy-diagnostics',
+          }
+
+          def api(path):
+              request = urllib.request.Request(f'https://api.github.com/repos/{repository}{path}', headers=headers)
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          with open(result_path, 'a', encoding='utf-8') as out:
+              try:
+                  runs = api('/actions/workflows/deploy.yml/runs?branch=main&per_page=10').get('workflow_runs', [])
+                  out.write(f'deploy_runs_found={len(runs)}\n')
+                  for index, run in enumerate(runs[:5], 1):
+                      prefix = f'deploy_run_{index}'
+                      out.write(f'{prefix}_id={run.get("id")}\n')
+                      out.write(f'{prefix}_sha={run.get("head_sha")}\n')
+                      out.write(f'{prefix}_status={run.get("status")}\n')
+                      out.write(f'{prefix}_conclusion={run.get("conclusion")}\n')
+                      out.write(f'{prefix}_event={run.get("event")}\n')
+                      out.write(f'{prefix}_created_at={run.get("created_at")}\n')
+                      out.write(f'{prefix}_updated_at={run.get("updated_at")}\n')
+                      if index == 1:
+                          jobs = api(f'/actions/runs/{run.get("id")}/jobs?per_page=100').get('jobs', [])
+                          out.write(f'{prefix}_jobs={len(jobs)}\n')
+                          for job_index, job in enumerate(jobs, 1):
+                              job_prefix = f'{prefix}_job_{job_index}'
+                              out.write(f'{job_prefix}_id={job.get("id")}\n')
+                              out.write(f'{job_prefix}_name={job.get("name")}\n')
+                              out.write(f'{job_prefix}_status={job.get("status")}\n')
+                              out.write(f'{job_prefix}_conclusion={job.get("conclusion")}\n')
+                              for step_index, step in enumerate(job.get('steps') or [], 1):
+                                  step_prefix = f'{job_prefix}_step_{step_index}'
+                                  out.write(f'{step_prefix}_name={step.get("name")}\n')
+                                  out.write(f'{step_prefix}_status={step.get("status")}\n')
+                                  out.write(f'{step_prefix}_conclusion={step.get("conclusion")}\n')
+              except Exception as exc:
+                  out.write(f'deploy_api_error={exc.__class__.__name__}\n')
+          PY
+
+          if [ -d "$APP_DIR" ]; then
+            item app_directory present
+            item production_process_sources_sha "$(sha256sum "$APP_DIR/app/Console/Commands/ProcessSources.php" | awk '{print $1}')"
+            item main_process_sources_sha "$(sha256sum "$GITHUB_WORKSPACE/app/Console/Commands/ProcessSources.php" | awk '{print $1}')"
+            item production_has_messages_copied "$(grep -q "messages_copied" "$APP_DIR/app/Console/Commands/ProcessSources.php" && echo yes || echo no)"
+            item production_has_messages_relayed "$(grep -q "messages_relayed" "$APP_DIR/app/Console/Commands/ProcessSources.php" && echo yes || echo no)"
+            item production_security_middleware "$(test -f "$APP_DIR/app/Http/Middleware/SecurityHeaders.php" && echo present || echo missing)"
+            item production_package_lock "$(test -f "$APP_DIR/package-lock.json" && echo present || echo missing)"
+            item production_storage_link "$(test -L "$APP_DIR/public/storage" && echo present || echo missing)"
+            item production_backup_script "$(test -x /usr/local/sbin/skyguardian-full-backup && echo present || echo missing)"
+            item production_backup_timer_active "$(systemctl is-active skyguardian-backup.timer 2>/dev/null || echo missing)"
+            item production_backup_timer_enabled "$(systemctl is-enabled skyguardian-backup.timer 2>/dev/null || echo missing)"
+
+            for service in nginx mysql php8.3-fpm skyguardian-telethon skyguardian-scheduler skyguardian-group-channel-telethon skyguardian-group-channel-delete; do
+              item "service_${service}_active" "$(systemctl is-active "$service.service" 2>/dev/null || echo missing)"
+            done
+
+            item schedule_list_status "$(cd "$APP_DIR" && sudo -u www-data php artisan schedule:list --no-ansi >/dev/null 2>&1; echo $?)"
+            item migration_pending "$(cd "$APP_DIR" && sudo -u www-data php artisan migrate:status --no-ansi 2>/dev/null | grep -c Pending || true)"
+            item laravel_log_files "$(find "$APP_DIR/storage/logs" -maxdepth 2 -type f -printf '%f\n' 2>/dev/null | sort | paste -sd, -)"
+            item relayed_errors_last_15m "$(sudo journalctl -u skyguardian-scheduler.service --since '15 minutes ago' --no-pager -q 2>/dev/null | grep -c 'messages_relayed' || true)"
+            item scheduler_failures_last_15m "$(sudo journalctl -u skyguardian-scheduler.service --since '15 minutes ago' --no-pager -q 2>/dev/null | grep -c 'failed with exit code' || true)"
+
+            cd "$APP_DIR"
+            sudo -u www-data php -r '
+              require "vendor/autoload.php";
+              $app = require "bootstrap/app.php";
+              $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+              foreach (["news", "air_alert"] as $type) {
+                  $sources = App\Models\Source::query()->where("type", $type)->get();
+                  echo "source_{$type}_total=".$sources->count().PHP_EOL;
+                  echo "source_{$type}_active=".$sources->where("is_active", true)->count().PHP_EOL;
+                  $latest = $sources->max("last_success_at");
+                  echo "source_{$type}_latest_success=".($latest ?: "none").PHP_EOL;
+                  echo "source_{$type}_errors=".$sources->filter(fn ($source) => filled($source->last_error))->count().PHP_EOL;
+              }
+            ' >> "$RESULT" 2>/dev/null || item runtime_database_check failed
+          else
+            item app_directory missing
+          fi
+
+          HEADERS="$(mktemp)"
+          item https_home "$(curl -sS -o /dev/null -D "$HEADERS" -w '%{http_code}|%{time_total}' "https://$DOMAIN/")"
+          item https_login "$(curl -sS -o /dev/null -w '%{http_code}|%{time_total}' "https://$DOMAIN/admin/login")"
+          item https_health "$(curl -sS -o /dev/null -w '%{http_code}|%{time_total}' "https://$DOMAIN/up")"
+          for header in strict-transport-security content-security-policy x-frame-options x-content-type-options referrer-policy permissions-policy; do
+            value="$(awk -v h="$header" 'BEGIN{IGNORECASE=1} $0 ~ "^"h":" {sub(/\r$/,""); sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "$HEADERS")"
+            item "header_$(printf '%s' "$header" | tr '-' '_')" "${value:-missing}"
+          done
+          rm -f "$HEADERS"
+
+      - name: Commit sanitized result
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy-diagnostics-result.txt
+          git commit -m "Record deployment diagnostics" || exit 0
+          git push origin HEAD:deploy-diagnostics-20260801
