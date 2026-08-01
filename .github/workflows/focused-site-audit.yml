@@ -1,0 +1,178 @@
+name: Focused site audit
+
+on:
+  push:
+    branches:
+      - full-site-audit-20260801
+    paths:
+      - .github/workflows/focused-site-audit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: self-hosted
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, pdo_sqlite, sqlite3
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Run focused read-only checks
+        shell: bash
+        run: |
+          set +e
+          REPORT="$GITHUB_WORKSPACE/focused-site-audit-report.txt"
+          RAW="$GITHUB_WORKSPACE/focused-site-audit-raw.txt"
+          : > "$REPORT"
+          : > "$RAW"
+          APP_DIR=/var/www/skyguardian
+          DOMAIN=skyguardian.pp.ua
+
+          item() { printf '%s=%s\n' "$1" "$2" | tee -a "$REPORT"; }
+          run() {
+            local name="$1"; shift
+            printf '\n===== %s =====\n' "$name" >> "$RAW"
+            "$@" >> "$RAW" 2>&1
+            local code=$?
+            item "$name.status" "$code"
+          }
+
+          item audit_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          item main_sha "$(git rev-parse origin/main)"
+          item php_version "$(php -r 'echo PHP_VERSION;')"
+          item node_version "$(node --version)"
+          item npm_version "$(npm --version)"
+
+          run composer_install composer install --no-interaction --prefer-dist --no-progress
+          run npm_ci npm ci --ignore-scripts
+          run frontend_build npm run build
+          run php_tests php artisan test --no-ansi
+          run php_format vendor/bin/pint --test
+          run composer_audit composer audit --locked --no-interaction
+          run npm_audit npm audit --audit-level=moderate
+          run telethon_syntax python3 -m py_compile telethon/worker.py telethon/group_channel_worker.py
+
+          cd "$APP_DIR"
+          cat > /tmp/skyguardian-safe-audit.php <<'PHP'
+          <?php
+          require __DIR__.'/../var/www/skyguardian/vendor/autoload.php';
+          $app = require __DIR__.'/../var/www/skyguardian/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $out = static function (string $key, mixed $value): void {
+              if (is_bool($value)) $value = $value ? 'true' : 'false';
+              if ($value === null || $value === '') $value = 'null';
+              echo $key.'='.$value.PHP_EOL;
+          };
+          $out('app_env', app()->environment());
+          $out('app_debug', (bool) config('app.debug'));
+          $out('app_url', (string) config('app.url'));
+          $out('cache_store', (string) config('cache.default'));
+          $out('queue_connection', (string) config('queue.default'));
+          $out('session_driver', (string) config('session.driver'));
+          $out('session_cookie', (string) config('session.cookie'));
+          $out('session_secure', (bool) config('session.secure'));
+          $out('session_http_only', (bool) config('session.http_only'));
+          $out('session_same_site', (string) config('session.same_site'));
+          $out('log_channel', (string) config('logging.default'));
+          try {
+              Illuminate\Support\Facades\DB::select('select 1');
+              $out('database_connection', 'ok');
+              $out('database_driver', Illuminate\Support\Facades\DB::connection()->getDriverName());
+              $out('database_tables', count(Illuminate\Support\Facades\Schema::getTableListing()));
+              if (Illuminate\Support\Facades\Schema::hasTable('site_pages')) {
+                  $out('cms_pages', App\Models\SitePage::query()->count());
+                  $out('cms_published', App\Models\SitePage::query()->where('status', 'published')->count());
+                  $out('cms_drafts', App\Models\SitePage::query()->where('status', 'draft')->count());
+                  $out('cms_hidden', App\Models\SitePage::query()->where('status', 'hidden')->count());
+                  $out('cms_system_pages', App\Models\SitePage::query()->where('is_system', true)->count());
+              }
+              if (Illuminate\Support\Facades\Schema::hasTable('site_menu_items')) $out('cms_menu_items', App\Models\SiteMenuItem::query()->count());
+              if (Illuminate\Support\Facades\Schema::hasTable('site_settings')) {
+                  $out('cms_settings', App\Models\SiteSetting::query()->count());
+                  $paths = App\Models\SiteSetting::query()->whereIn('key', ['logo_path','favicon_path','login_logo_path','login_background_path'])->pluck('value')->filter()->values();
+                  $out('cms_setting_media_paths', $paths->count());
+                  foreach ($paths as $index => $path) {
+                      $out('cms_setting_media_'.$index.'_exists', Illuminate\Support\Facades\Storage::disk('public')->exists($path));
+                      $out('cms_setting_media_'.$index.'_url', Illuminate\Support\Facades\Storage::disk('public')->url($path));
+                  }
+              }
+              if (Illuminate\Support\Facades\Schema::hasTable('site_pages')) {
+                  $pagePaths = App\Models\SitePage::query()->get(['featured_image_path','social_image_path'])->flatMap(fn ($p) => [$p->featured_image_path, $p->social_image_path])->filter()->values();
+                  $out('cms_page_media_paths', $pagePaths->count());
+                  foreach ($pagePaths->take(5) as $index => $path) {
+                      $out('cms_page_media_'.$index.'_exists', Illuminate\Support\Facades\Storage::disk('public')->exists($path));
+                      $out('cms_page_media_'.$index.'_url', Illuminate\Support\Facades\Storage::disk('public')->url($path));
+                  }
+              }
+          } catch (Throwable $e) {
+              $out('database_connection', 'failed');
+              $out('database_error_class', $e::class);
+          }
+          PHP
+          sudo -u www-data php /tmp/skyguardian-safe-audit.php >> "$REPORT" 2>> "$RAW"
+          rm -f /tmp/skyguardian-safe-audit.php
+
+          run production_schedule_as_www_data sudo -u www-data php artisan schedule:list --no-ansi
+          run production_route_list_as_www_data sudo -u www-data php artisan route:list --no-ansi
+          run production_migrations_as_www_data sudo -u www-data php artisan migrate:status --no-ansi
+          item production_cli_as_runner_schedule_status "$(php artisan schedule:list --no-ansi >/dev/null 2>&1; echo $?)"
+          item github_runner_in_www_data_group "$(id -nG github-runner | tr ' ' '\n' | grep -qx www-data && echo yes || echo no)"
+
+          SESSION_COOKIE="$(sudo -u www-data php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo config("session.cookie");' 2>/dev/null)"
+          HEADERS="$(mktemp)"
+          curl -sS -D "$HEADERS" -o /dev/null "https://$DOMAIN/admin/login"
+          SESSION_SET_COOKIE="$(awk -v cookie="$SESSION_COOKIE" 'BEGIN{IGNORECASE=1} /^set-cookie:/ && index($0,cookie"=") {sub(/\r$/,""); print; exit}' "$HEADERS")"
+          item session_cookie_header_found "$([ -n "$SESSION_SET_COOKIE" ] && echo yes || echo no)"
+          item session_cookie_secure "$(printf '%s' "$SESSION_SET_COOKIE" | grep -qi 'secure' && echo yes || echo no)"
+          item session_cookie_httponly "$(printf '%s' "$SESSION_SET_COOKIE" | grep -qi 'httponly' && echo yes || echo no)"
+          item session_cookie_samesite "$(printf '%s' "$SESSION_SET_COOKIE" | grep -oEi 'SameSite=[^;]+' | head -1 || echo missing)"
+          rm -f "$HEADERS"
+
+          item laravel_log_size_bytes "$(stat -c '%s' storage/logs/laravel.log 2>/dev/null || echo 0)"
+          item laravel_errors_today "$(grep "$(date +%Y-%m-%d)" storage/logs/laravel.log 2>/dev/null | grep -cE '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' || true)"
+          printf '\n===== top_laravel_errors_today =====\n' >> "$RAW"
+          grep "$(date +%Y-%m-%d)" storage/logs/laravel.log 2>/dev/null \
+            | grep -E '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' \
+            | sed -E 's/^.*\.(ERROR|CRITICAL|ALERT|EMERGENCY):[[:space:]]*//' \
+            | sed -E 's/[[:space:]]*\{.*$//' \
+            | sed -E 's/[A-Fa-f0-9]{32,}/[REDACTED]/g; s#https://t\.me/[^[:space:]]+#https://t.me/[REDACTED]#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[EMAIL]/g' \
+            | sort | uniq -c | sort -nr | head -15 >> "$RAW"
+
+          cd "$GITHUB_WORKSPACE"
+          printf '\n===== tracked_env_files =====\n' >> "$RAW"
+          git ls-files | grep -E '(^|/)\.env($|\.)' >> "$RAW" || true
+          printf '\n===== secret_pattern_files =====\n' >> "$RAW"
+          git grep -IlE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api_hash\s*=|bot_token\s*=|DB_PASSWORD=)' -- ':!*.lock' ':!.github/workflows/*.yml' >> "$RAW" 2>/dev/null || true
+          printf '\n===== raw_blade_echo_locations =====\n' >> "$RAW"
+          grep -RIn --include='*.blade.php' '{!!' resources/views >> "$RAW" 2>/dev/null || true
+
+          item tracked_env_file_count "$(git ls-files | grep -Ec '(^|/)\.env($|\.)' || true)"
+          item secret_pattern_file_count "$(git grep -IlE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api_hash\s*=|bot_token\s*=|DB_PASSWORD=)' -- ':!*.lock' ':!.github/workflows/*.yml' 2>/dev/null | wc -l)"
+          item raw_blade_echo_count "$(grep -RIn --include='*.blade.php' '{!!' resources/views 2>/dev/null | wc -l)"
+          item audit_completed yes
+          item production_modified no
+
+      - name: Commit focused reports
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add focused-site-audit-report.txt focused-site-audit-raw.txt
+          git commit -m "Record focused site audit" || exit 0
+          git push origin HEAD:full-site-audit-20260801
