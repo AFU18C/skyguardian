@@ -1,0 +1,12 @@
+created_utc=2026-08-01T10:36:11Z
+main_sha=8e8faa2fecedbba890ab10182238979c8d51294a
+deployed_sha=8e8faa2fecedbba890ab10182238979c8d51294a
+backup_count_before=5
+backup_count_after=6
+backup_path=/var/backups/skyguardian/skyguardian-full-20260801T103601Z.tar.gz
+backup_size_bytes=52944662
+backup_size=51M
+backup_permissions=600 root:root
+backup_test=passed
+backup_sha256=9eedc9628b1af12f6cdd7d84e6f407ba7d1659f7023d0294474d0925c2abb2cf
+component_checksums_present=yes
