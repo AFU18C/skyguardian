@@ -11,7 +11,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   tests:
@@ -20,8 +20,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -34,26 +32,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Commit generated package lock
-        if: github.event_name == 'pull_request' && github.head_ref == 'stabilize-full-site-20260801'
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "Зафиксировать frontend-зависимости"
-          git push origin HEAD:${{ github.head_ref }}
+        run: npm ci --no-audit --no-fund
 
       - name: Build frontend assets
         run: npm run build
