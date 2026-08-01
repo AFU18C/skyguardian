@@ -39,6 +39,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Export generated frontend lock
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-package-lock-${{ github.run_id }}
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Build frontend assets
         run: npm run build
 
