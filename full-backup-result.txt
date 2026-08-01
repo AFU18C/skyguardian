@@ -1,0 +1,14 @@
+backup_status=success
+created_utc=20260801T082255Z
+backup_path=/var/backups/skyguardian/skyguardian-full-20260801T082255Z.tar.gz
+backup_size_bytes=28587411
+backup_size=28M
+sha256=ba4d790a79f8973ce1aa9d8c140e7db3c3d3847ce1d671b01825b73740952d6e
+main_sha=3227341d9ab316c7976ba994566a430969db908b
+database_dump=present
+application_archive=present
+server_config_archive=present
+uploaded_site_media=present
+telegram_sessions=present
+archive_test=passed
+permissions=600
