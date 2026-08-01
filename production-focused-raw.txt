@@ -1,0 +1,49 @@
+
+===== schedule_as_www_data =====
+
+  * * * * * 1s  php artisan skyguardian:sources:process --limit=40  Has Mutex › Next Due: через 0 секунд
+  * * * * *     php artisan skyguardian:group-channel-publications:process --limit=20  Next Due: через 48 секунд
+
+
+===== migrations_as_www_data =====
+
+  Migration name .............................................. Batch / Status  
+  0001_01_01_000000_create_users_table ............................... [1] Ran  
+  0001_01_01_000001_create_cache_table ............................... [1] Ran  
+  0001_01_01_000002_create_jobs_table ................................ [1] Ran  
+  2026_07_25_000100_create_skyguardian_core_tables ................... [2] Ran  
+  2026_07_25_000200_reset_source_cursors_after_copy_fix .............. [3] Ran  
+  2026_07_25_193000_create_group_channel_bots_table .................. [4] Ran  
+  2026_07_26_075900_create_group_channel_publications_table .......... [5] Ran  
+  2026_07_26_080000_add_auto_delete_to_group_channel_publications_table  [5] Ran  
+  2026_07_26_100000_add_module_settings_to_group_channel_bots_table .. [5] Ran  
+  2026_07_26_120000_expand_group_channel_bot_features ................ [5] Ran  
+  2026_07_27_120000_create_group_channel_technical_delete_tasks_table  [6] Ran  
+  2026_07_29_000000_create_site_content_tables ....................... [7] Ran  
+
+
+===== top_laravel_errors_today =====
+   1524 Undefined array key "messages_relayed"
+   1521 Scheduled command ['/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40] failed with exit code [1].
+      1 Uncaught Error: Call to undefined function Symfony\Polyfill\Mbstring\iconv() in /var/www/skyguardian/vendor/symfony/polyfill-mbstring/Mbstring.php:1068
+      1 Scheduled command ['/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40] failed with exit code [255].
+      1 Class "PDO" not found
+      1 Call to undefined function Symfony\Polyfill\Mbstring\iconv()
+
+===== media_url_checks =====
+
+===== tracked_env_files =====
+.env.example
+
+===== secret_pattern_files =====
+.env.example
+app/Http/Controllers/Admin/TelegramController.php
+telethon/worker.py
+
+===== raw_blade_echo_locations =====
+resources/views/admin/group-channel.blade.php:57:                    <div><dt>Текст</dt><dd>{!! nl2br(e($preview['text'])) !!}</dd></div>
+resources/views/public/partials/page-block.blade.php:19:        <p>{!! nl2br(e($data['content'] ?? '')) !!}</p>
+resources/views/public/partials/page-block.blade.php:82:        @if(!empty($data['text']))<p>{!! nl2br(e($data['text'])) !!}</p>@endif
+resources/views/public/partials/page-block.blade.php:91:        <div>{!! $data['left_html'] ?? '' !!}</div>
+resources/views/public/partials/page-block.blade.php:92:        <div>{!! $data['right_html'] ?? '' !!}</div>
+resources/views/public/partials/page-block.blade.php:113:    <section class="site-block site-block-html">{!! $data['html'] ?? '' !!}</section>
