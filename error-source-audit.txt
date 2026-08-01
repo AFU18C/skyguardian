@@ -1,0 +1,64 @@
+audit_utc=2026-08-01T08:45:48Z
+production_modified=no
+
+## messages_relayed references
+/var/www/skyguardian/app/Console/Commands/ProcessSources.php:29:                    $result['messages_relayed'],
+
+## command and scheduler references
+/var/www/skyguardian/app/Console/Commands/ProcessSources.php:10:class ProcessSources extends Command
+/var/www/skyguardian/app/Console/Commands/ProcessSources.php:12:    protected $signature = 'skyguardian:sources:process {--limit=40 : Максимальное количество источников за запуск}';
+/var/www/skyguardian/app/Console/Commands/ProcessSources.php:29:                    $result['messages_relayed'],
+/var/www/skyguardian/routes/console.php:5:Schedule::command('skyguardian:sources:process --limit=40')
+
+## latest sanitized stack for messages_relayed
+log_line=276884
+[2026-08-01 11:45:43] production.ERROR: Undefined array key "messages_relayed" {"exception":"[object] (ErrorException(code: 0): Undefined array key \"messages_relayed\" at /var/www/skyguardian/app/Console/Commands/ProcessSources.php:29)
+[stacktrace]
+#0 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Bootstrap/HandleExceptions.php(263): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->handleError()
+#1 /var/www/skyguardian/app/Console/Commands/ProcessSources.php(29): Illuminate\\Foundation\\Bootstrap\\HandleExceptions->Illuminate\\Foundation\\Bootstrap\\{closure}()
+#2 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): App\\Console\\Commands\\ProcessSources->handle()
+#3 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
+#4 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate\\Container\\Util::unwrapIfClosure()
+#5 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod()
+#6 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/Container.php(800): Illuminate\\Container\\BoundMethod::call()
+#7 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Command.php(280): Illuminate\\Container\\Container->call()
+#8 /var/www/skyguardian/vendor/symfony/console/Command/Command.php(341): Illuminate\\Console\\Command->execute()
+#9 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Command.php(249): Symfony\\Component\\Console\\Command\\Command->run()
+#10 /var/www/skyguardian/vendor/symfony/console/Application.php(1117): Illuminate\\Console\\Command->run()
+#11 /var/www/skyguardian/vendor/symfony/console/Application.php(356): Symfony\\Component\\Console\\Application->doRunCommand()
+#12 /var/www/skyguardian/vendor/symfony/console/Application.php(195): Symfony\\Component\\Console\\Application->doRun()
+#13 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(198): Symfony\\Component\\Console\\Application->run()
+#14 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Application.php(1242): Illuminate\\Foundation\\Console\\Kernel->handle()
+#15 /var/www/skyguardian/artisan(16): Illuminate\\Foundation\\Application->handleCommand()
+#16 {main}
+"} 
+[2026-08-01 11:45:43] production.ERROR: Scheduled command ['/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40] failed with exit code [1]. {"exception":"[object] (Exception(code: 0): Scheduled command ['/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40] failed with exit code [1]. at /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Scheduling/ScheduleRunCommand.php:215)
+[stacktrace]
+#0 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/View/Components/Task.php(43): Illuminate\\Console\\Scheduling\\ScheduleRunCommand->Illuminate\\Console\\Scheduling\\{closure}()
+#1 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/View/Components/Factory.php(59): Illuminate\\Console\\View\\Components\\Task->render()
+#2 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Scheduling/ScheduleRunCommand.php(199): Illuminate\\Console\\View\\Components\\Factory->__call()
+#3 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Scheduling/ScheduleRunCommand.php(282): Illuminate\\Console\\Scheduling\\ScheduleRunCommand->runEvent()
+#4 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Scheduling/ScheduleRunCommand.php(149): Illuminate\\Console\\Scheduling\\ScheduleRunCommand->repeatEvents()
+#5 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): Illuminate\\Console\\Scheduling\\ScheduleRunCommand->handle()
+#6 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
+#7 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(96): Illuminate\\Container\\Util::unwrapIfClosure()
+#8 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod()
+#9 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Container/Container.php(800): Illuminate\\Container\\BoundMethod::call()
+#10 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Command.php(280): Illuminate\\Container\\Container->call()
+#11 /var/www/skyguardian/vendor/symfony/console/Command/Command.php(341): Illuminate\\Console\\Command->execute()
+#12 /var/www/skyguardian/vendor/laravel/framework/src/Illuminate/Console/Command.php(249): Symfony\\Component\\Console\\Command\\Command->run()
+#13 /var/www/skyguardian/vendor/symfony/console/Application.php(1117): Illuminate\\Console\\Command->run()
+
+## deployment workflow permission commands
+45:            storage/framework/cache \
+46:            storage/framework/sessions \
+47:            storage/framework/views \
+48:            storage/logs \
+49:            bootstrap/cache
+51:          sudo chown -R github-runner:www-data /var/www/skyguardian
+52:          sudo chmod -R ug+rwX storage bootstrap/cache
+53:          sudo touch storage/logs/laravel.log
+54:          sudo chown github-runner:www-data storage/logs/laravel.log
+55:          sudo chmod 664 storage/logs/laravel.log
+122:          sudo chown -R www-data:www-data storage bootstrap/cache
+123:          sudo chmod -R ug+rwX storage bootstrap/cache
