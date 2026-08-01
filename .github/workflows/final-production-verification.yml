@@ -1,0 +1,136 @@
+name: Final production verification
+
+on:
+  push:
+    branches:
+      - deploy-diagnostics-20260801
+    paths:
+      - .github/workflows/final-production-verification.yml
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify production and real scheduler cycles
+        shell: bash
+        run: |
+          set -u
+          RESULT="$GITHUB_WORKSPACE/final-production-verification-result.txt"
+          APP=/var/www/skyguardian
+          DOMAIN=skyguardian.pp.ua
+          START_UTC="$(date -u '+%Y-%m-%d %H:%M:%S')"
+          : > "$RESULT"
+          item() { printf '%s=%s\n' "$1" "$2" >> "$RESULT"; }
+
+          MAIN_SHA="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          DEPLOYED_SHA="$(git ls-remote origin refs/tags/deployed | awk '{print $1}')"
+          item verification_started_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          item main_sha "$MAIN_SHA"
+          item deployed_sha "$DEPLOYED_SHA"
+          item deployment_match "$([ "$MAIN_SHA" = "$DEPLOYED_SHA" ] && echo yes || echo no)"
+
+          item env_permissions "$(stat -c '%a %U:%G' "$APP/.env" 2>/dev/null || echo missing)"
+          item storage_link "$([ -L "$APP/public/storage" ] && echo yes || echo no)"
+          item package_lock "$([ -f "$APP/package-lock.json" ] && echo yes || echo no)"
+          item process_sources_fixed "$(grep -q messages_copied "$APP/app/Console/Commands/ProcessSources.php" && ! grep -q messages_relayed "$APP/app/Console/Commands/ProcessSources.php" && echo yes || echo no)"
+          item security_middleware "$([ -f "$APP/app/Http/Middleware/SecurityHeaders.php" ] && echo yes || echo no)"
+          item html_sanitizer "$([ -f "$APP/app/Services/SiteHtmlSanitizer.php" ] && echo yes || echo no)"
+
+          for service in nginx mysql php8.3-fpm skyguardian-telethon skyguardian-scheduler skyguardian-group-channel-telethon skyguardian-group-channel-delete; do
+            item "service_${service}_active" "$(systemctl is-active "$service.service" 2>/dev/null || echo missing)"
+            item "service_${service}_enabled" "$(systemctl is-enabled "$service.service" 2>/dev/null || echo missing)"
+          done
+          item backup_timer_active "$(systemctl is-active skyguardian-backup.timer 2>/dev/null || echo missing)"
+          item backup_timer_enabled "$(systemctl is-enabled skyguardian-backup.timer 2>/dev/null || echo missing)"
+
+          cd "$APP"
+          item artisan_about_status "$(sudo -u www-data php artisan about --no-ansi >/dev/null 2>&1; echo $?)"
+          item schedule_list_status "$(sudo -u www-data php artisan schedule:list --no-ansi >/dev/null 2>&1; echo $?)"
+          item pending_migrations "$(sudo -u www-data php artisan migrate:status --no-ansi 2>/dev/null | grep -c Pending || true)"
+          item route_list_status "$(sudo -u www-data php artisan route:list --no-ansi >/dev/null 2>&1; echo $?)"
+
+          sudo -u www-data php -r '
+            require "vendor/autoload.php";
+            $app=require "bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            echo "runtime_app_env=".app()->environment().PHP_EOL;
+            echo "runtime_debug=".(config("app.debug")?"yes":"no").PHP_EOL;
+            echo "runtime_db=".config("database.default").PHP_EOL;
+            echo "runtime_cache=".config("cache.default").PHP_EOL;
+            foreach (["news","air_alert"] as $type) {
+                $all=App\Models\Source::query()->where("type",$type)->get();
+                $active=$all->where("is_active",true);
+                echo "before_{$type}_total=".$all->count().PHP_EOL;
+                echo "before_{$type}_active=".$active->count().PHP_EOL;
+                echo "before_{$type}_latest_success=".($active->max("last_success_at")?:"none").PHP_EOL;
+                echo "before_{$type}_errors=".$active->filter(fn($source)=>filled($source->last_error))->count().PHP_EOL;
+                echo "before_{$type}_connected_accounts=".$active->filter(fn($source)=>$source->technicalAccount && $source->technicalAccount->is_active && $source->technicalAccount->status==="connected")->count().PHP_EOL;
+            }
+          ' >> "$RESULT" 2>&1
+
+          item manual_source_command_status "$(sudo -u www-data php artisan skyguardian:sources:process --limit=40 >/tmp/skyguardian-source-command.out 2>&1; echo $?)"
+          item manual_source_command_output "$(tr '\n' ' ' </tmp/skyguardian-source-command.out | sed 's/[[:space:]]\+/ /g' | cut -c1-500)"
+          rm -f /tmp/skyguardian-source-command.out
+
+          sleep 95
+
+          sudo -u www-data php -r '
+            require "vendor/autoload.php";
+            $app=require "bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            foreach (["news","air_alert"] as $type) {
+                $active=App\Models\Source::query()->where("type",$type)->where("is_active",true)->get();
+                echo "after_{$type}_latest_success=".($active->max("last_success_at")?:"none").PHP_EOL;
+                echo "after_{$type}_errors=".$active->filter(fn($source)=>filled($source->last_error))->count().PHP_EOL;
+            }
+          ' >> "$RESULT" 2>&1
+
+          item relayed_errors_during_observation "$(sudo journalctl -u skyguardian-scheduler.service --since "$START_UTC" --no-pager -q 2>/dev/null | grep -c messages_relayed || true)"
+          item scheduler_failures_during_observation "$(sudo journalctl -u skyguardian-scheduler.service --since "$START_UTC" --no-pager -q 2>/dev/null | grep -c 'failed with exit code' || true)"
+          item scheduler_done_during_observation "$(sudo journalctl -u skyguardian-scheduler.service --since "$START_UTC" --no-pager -q 2>/dev/null | grep -c 'skyguardian:sources:process.*DONE' || true)"
+
+          HEADERS="$(mktemp)"
+          item home_status "$(curl -sS -o /dev/null -D "$HEADERS" -w '%{http_code}' "https://$DOMAIN/")"
+          item login_status "$(curl -sS -o /dev/null -w '%{http_code}' "https://$DOMAIN/admin/login")"
+          item health_status "$(curl -sS -o /dev/null -w '%{http_code}' "https://$DOMAIN/up")"
+          item not_found_status "$(curl -sS -o /dev/null -w '%{http_code}' "https://$DOMAIN/final-verification-not-found")"
+          for header in strict-transport-security content-security-policy x-frame-options x-content-type-options referrer-policy permissions-policy; do
+            value="$(awk -v h="$header" 'BEGIN{IGNORECASE=1} $0 ~ "^"h":" {sub(/\r$/,""); sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "$HEADERS")"
+            item "header_$(printf '%s' "$header" | tr '-' '_')" "${value:-missing}"
+          done
+          rm -f "$HEADERS"
+
+          BEFORE_BACKUP="$(find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' | wc -l)"
+          systemctl is-active --quiet skyguardian-backup.service && true
+          sudo systemctl start skyguardian-backup.service
+          BACKUP_STATUS=$?
+          AFTER_BACKUP="$(find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' | wc -l)"
+          NEWEST_BACKUP="$(find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' -printf '%T@|%p\n' | sort -nr | head -1 | cut -d'|' -f2-)"
+          item backup_service_status "$BACKUP_STATUS"
+          item backup_count_before "$BEFORE_BACKUP"
+          item backup_count_after "$AFTER_BACKUP"
+          item newest_backup "$NEWEST_BACKUP"
+          item newest_backup_test "$(tar -tzf "$NEWEST_BACKUP" >/dev/null 2>&1 && echo passed || echo failed)"
+          item newest_backup_permissions "$(stat -c '%a %U:%G' "$NEWEST_BACKUP" 2>/dev/null || echo missing)"
+          item newest_backup_sha256 "$(sha256sum "$NEWEST_BACKUP" 2>/dev/null | awk '{print $1}')"
+
+          item log_rotation_daily "$(find storage/logs -maxdepth 1 -type f -name 'laravel-*.log' | grep -q . && echo yes || echo no)"
+          item archived_old_log "$(find storage/logs/archive -maxdepth 1 -type f -name '*.gz' 2>/dev/null | grep -q . && echo yes || echo no)"
+
+          item verification_finished_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      - name: Commit result
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add final-production-verification-result.txt
+          git commit -m "Record final production verification" || exit 0
+          git push origin HEAD:deploy-diagnostics-20260801
