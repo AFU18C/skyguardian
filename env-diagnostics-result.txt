@@ -1,0 +1,17 @@
+checked_utc=2026-08-01T10:14:12Z
+env_exists=yes
+env_stat=640 github-runner:github-runner 613
+env_APP_ENV=production
+env_APP_DEBUG=false
+env_APP_URL=https://skyguardian.pp.ua
+env_DB_CONNECTION=mysql
+env_CACHE_STORE=file
+env_SESSION_DRIVER=file
+env_LOG_CHANNEL=stack
+env_LOG_STACK=daily
+runner_DB_CONNECTION=unset
+runner_CACHE_STORE=unset
+cached_config_exists=no
+runtime_app_env=production
+runtime_db_default=sqlite
+runtime_cache_default=database
