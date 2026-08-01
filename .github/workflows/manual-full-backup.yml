@@ -21,123 +21,143 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create protected full backup
-        id: backup
         shell: bash
         run: |
-          set +e
+          set -Eeuo pipefail
+          umask 077
+
           RESULT_FILE="$GITHUB_WORKSPACE/full-backup-result.txt"
+          APP_DIR="/var/www/skyguardian"
+          BACKUP_ROOT="/var/backups/skyguardian"
+          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+          WORK_DIR="$BACKUP_ROOT/.work-$STAMP-$RANDOM"
+          STAGE_DIR="$WORK_DIR/stage"
+          FINAL_ARCHIVE="$BACKUP_ROOT/skyguardian-full-$STAMP.tar.gz"
+          DB_CNF="$WORK_DIR/mysql-client.cnf"
+          DB_NAME_FILE="$WORK_DIR/database-name.txt"
+          CURRENT_STEP="initialization"
+
           rm -f "$RESULT_FILE"
 
-          create_backup() {
-            set -Eeuo pipefail
-            umask 077
+          cleanup() {
+            rm -f "$DB_CNF" "$DB_NAME_FILE" 2>/dev/null || true
+            rm -rf "$WORK_DIR" 2>/dev/null || true
+          }
 
-            APP_DIR="/var/www/skyguardian"
-            BACKUP_ROOT="/var/backups/skyguardian"
-            STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-            WORK_DIR="$BACKUP_ROOT/.work-$STAMP-$RANDOM"
-            STAGE_DIR="$WORK_DIR/stage"
-            FINAL_ARCHIVE="$BACKUP_ROOT/skyguardian-full-$STAMP.tar.gz"
-            DB_CNF="$WORK_DIR/mysql-client.cnf"
-            DB_NAME_FILE="$WORK_DIR/database-name.txt"
+          failure_report() {
+            STATUS=$?
+            trap - ERR
+            cat > "$RESULT_FILE" <<RESULT
+          backup_status=failed
+          failed_utc=$(date -u +%Y%m%dT%H%M%SZ)
+          failed_step=$CURRENT_STEP
+          exit_code=$STATUS
+          RESULT
+            exit "$STATUS"
+          }
 
-            sudo mkdir -p "$BACKUP_ROOT"
-            sudo chown "$USER":"$USER" "$BACKUP_ROOT"
-            chmod 700 "$BACKUP_ROOT"
-            mkdir -p "$STAGE_DIR"
+          trap cleanup EXIT
+          trap failure_report ERR
 
-            cleanup() {
-              rm -f "$DB_CNF" "$DB_NAME_FILE"
-              rm -rf "$WORK_DIR"
+          CURRENT_STEP="prepare_directories"
+          sudo mkdir -p "$BACKUP_ROOT"
+          sudo chown "$USER":"$USER" "$BACKUP_ROOT"
+          chmod 700 "$BACKUP_ROOT"
+          mkdir -p "$STAGE_DIR"
+
+          CURRENT_STEP="validate_environment"
+          test -d "$APP_DIR"
+          test -f "$APP_DIR/.env"
+          test -f "$APP_DIR/artisan"
+          command -v mysqldump >/dev/null
+          command -v tar >/dev/null
+          command -v gzip >/dev/null
+          command -v sha256sum >/dev/null
+
+          CURRENT_STEP="read_database_configuration"
+          cd "$APP_DIR"
+          php -r '
+            require "vendor/autoload.php";
+            $app = require "bootstrap/app.php";
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            $connection = (string) config("database.default");
+            $cfg = (array) config("database.connections.".$connection);
+            if (!in_array($connection, ["mysql", "mariadb"], true)) {
+                fwrite(STDERR, "Unsupported database connection: ".$connection.PHP_EOL);
+                exit(2);
             }
-            trap cleanup EXIT
+            $escape = static fn ($value): string => str_replace(["\\", "\n", "\r"], ["\\\\", "", ""], (string) $value);
+            $lines = [
+                "[client]",
+                "host=".$escape($cfg["host"] ?? "127.0.0.1"),
+                "port=".$escape($cfg["port"] ?? "3306"),
+                "user=".$escape($cfg["username"] ?? ""),
+                "password=".$escape($cfg["password"] ?? ""),
+                "default-character-set=utf8mb4",
+            ];
+            file_put_contents($argv[1], implode(PHP_EOL, $lines).PHP_EOL);
+            chmod($argv[1], 0600);
+            file_put_contents($argv[2], (string) ($cfg["database"] ?? ""));
+          ' "$DB_CNF" "$DB_NAME_FILE"
 
-            test -d "$APP_DIR"
-            test -f "$APP_DIR/.env"
-            test -f "$APP_DIR/artisan"
-            command -v mysqldump >/dev/null
-            command -v tar >/dev/null
-            command -v gzip >/dev/null
-            command -v sha256sum >/dev/null
+          DB_NAME="$(cat "$DB_NAME_FILE")"
+          test -n "$DB_NAME"
 
-            cd "$APP_DIR"
+          CURRENT_STEP="database_dump"
+          nice -n 10 ionice -c2 -n7 mysqldump \
+            --defaults-extra-file="$DB_CNF" \
+            --single-transaction \
+            --quick \
+            --routines \
+            --events \
+            --triggers \
+            --hex-blob \
+            --default-character-set=utf8mb4 \
+            "$DB_NAME" | gzip -1 > "$STAGE_DIR/database.sql.gz"
+          test -s "$STAGE_DIR/database.sql.gz"
+          rm -f "$DB_CNF" "$DB_NAME_FILE"
 
-            php -r '
-              require "vendor/autoload.php";
-              $app = require "bootstrap/app.php";
-              $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-              $connection = (string) config("database.default");
-              $cfg = (array) config("database.connections.".$connection);
-              if (!in_array($connection, ["mysql", "mariadb"], true)) {
-                  fwrite(STDERR, "Unsupported database connection: ".$connection.PHP_EOL);
-                  exit(2);
-              }
-              $escape = static fn ($value): string => str_replace(["\\", "\n", "\r"], ["\\\\", "", ""], (string) $value);
-              $lines = [
-                  "[client]",
-                  "host=".$escape($cfg["host"] ?? "127.0.0.1"),
-                  "port=".$escape($cfg["port"] ?? "3306"),
-                  "user=".$escape($cfg["username"] ?? ""),
-                  "password=".$escape($cfg["password"] ?? ""),
-                  "default-character-set=utf8mb4",
-              ];
-              file_put_contents($argv[1], implode(PHP_EOL, $lines).PHP_EOL);
-              chmod($argv[1], 0600);
-              file_put_contents($argv[2], (string) ($cfg["database"] ?? ""));
-            ' "$DB_CNF" "$DB_NAME_FILE"
+          CURRENT_STEP="application_archive"
+          set +e
+          sudo nice -n 10 ionice -c2 -n7 tar \
+            --warning=no-file-changed \
+            --ignore-failed-read \
+            -czf "$STAGE_DIR/application.tar.gz" \
+            -C /var/www skyguardian
+          APP_TAR_STATUS=$?
+          set -e
+          if [ "$APP_TAR_STATUS" -gt 1 ]; then
+            exit "$APP_TAR_STATUS"
+          fi
+          test -s "$STAGE_DIR/application.tar.gz"
 
-            DB_NAME="$(cat "$DB_NAME_FILE")"
-            test -n "$DB_NAME"
-
-            nice -n 10 ionice -c2 -n7 mysqldump \
-              --defaults-extra-file="$DB_CNF" \
-              --single-transaction \
-              --quick \
-              --routines \
-              --events \
-              --triggers \
-              --hex-blob \
-              --default-character-set=utf8mb4 \
-              "$DB_NAME" | gzip -1 > "$STAGE_DIR/database.sql.gz"
-
-            rm -f "$DB_CNF" "$DB_NAME_FILE"
-
-            set +e
-            sudo nice -n 10 ionice -c2 -n7 tar \
-              --warning=no-file-changed \
-              --ignore-failed-read \
-              -czf "$STAGE_DIR/application.tar.gz" \
-              -C /var/www skyguardian
-            APP_TAR_STATUS=$?
-            set -e
-            if [ "$APP_TAR_STATUS" -gt 1 ]; then
-              echo "Application archive failed with status $APP_TAR_STATUS" >&2
-              exit "$APP_TAR_STATUS"
+          CURRENT_STEP="server_configuration_archive"
+          CONFIG_PATHS=()
+          for path in etc/nginx etc/letsencrypt etc/mysql etc/php/8.3/fpm/pool.d; do
+            if [ -e "/$path" ]; then
+              CONFIG_PATHS+=("$path")
             fi
+          done
+          for service in /etc/systemd/system/skyguardian*.service; do
+            if [ -e "$service" ]; then
+              CONFIG_PATHS+=("${service#/}")
+            fi
+          done
+          test "${#CONFIG_PATHS[@]}" -gt 0
 
-            CONFIG_PATHS=(
-              etc/nginx
-              etc/letsencrypt
-              etc/mysql
-              etc/php/8.3/fpm/pool.d
-            )
-            for service in /etc/systemd/system/skyguardian*.service; do
-              if [ -e "$service" ]; then
-                CONFIG_PATHS+=("${service#/}")
-              fi
-            done
+          sudo nice -n 10 ionice -c2 -n7 tar \
+            --ignore-failed-read \
+            -czf "$STAGE_DIR/server-config.tar.gz" \
+            -C / "${CONFIG_PATHS[@]}"
+          test -s "$STAGE_DIR/server-config.tar.gz"
 
-            sudo nice -n 10 ionice -c2 -n7 tar \
-              --ignore-failed-read \
-              -czf "$STAGE_DIR/server-config.tar.gz" \
-              -C / "${CONFIG_PATHS[@]}"
+          CURRENT_STEP="service_snapshots"
+          sudo crontab -l > "$STAGE_DIR/root-crontab.txt" 2>/dev/null || true
+          crontab -l > "$STAGE_DIR/runner-crontab.txt" 2>/dev/null || true
+          sudo systemctl list-unit-files 'skyguardian*' --no-pager > "$STAGE_DIR/systemd-units.txt" 2>/dev/null || true
+          sudo systemctl list-units 'skyguardian*' --all --no-pager > "$STAGE_DIR/systemd-status.txt" 2>/dev/null || true
 
-            sudo crontab -l > "$STAGE_DIR/root-crontab.txt" 2>/dev/null || true
-            crontab -l > "$STAGE_DIR/runner-crontab.txt" 2>/dev/null || true
-            sudo systemctl list-unit-files 'skyguardian*' --no-pager > "$STAGE_DIR/systemd-units.txt" 2>/dev/null || true
-            sudo systemctl list-units 'skyguardian*' --all --no-pager > "$STAGE_DIR/systemd-status.txt" 2>/dev/null || true
-
-            cat > "$STAGE_DIR/RESTORE.txt" <<'RESTORE'
+          cat > "$STAGE_DIR/RESTORE.txt" <<'RESTORE'
           SkyGuardian full backup contents:
           - database.sql.gz: consistent MySQL/MariaDB dump with routines, events and triggers
           - application.tar.gz: complete /var/www/skyguardian tree, including .env, storage, uploaded site media and Telegram sessions
@@ -147,24 +167,29 @@ jobs:
           Keep this archive private. It contains credentials, sessions and SSL private keys.
           RESTORE
 
-            sudo chown -R "$USER":"$USER" "$STAGE_DIR"
-            chmod -R go-rwx "$STAGE_DIR"
+          CURRENT_STEP="checksums"
+          sudo chown -R "$USER":"$USER" "$STAGE_DIR"
+          chmod -R go-rwx "$STAGE_DIR"
+          (
+            cd "$STAGE_DIR"
+            sha256sum database.sql.gz application.tar.gz server-config.tar.gz > SHA256SUMS
+          )
 
-            (
-              cd "$STAGE_DIR"
-              sha256sum database.sql.gz application.tar.gz server-config.tar.gz > SHA256SUMS
-            )
+          CURRENT_STEP="final_archive"
+          nice -n 10 ionice -c2 -n7 tar -czf "$FINAL_ARCHIVE" -C "$STAGE_DIR" .
+          test -s "$FINAL_ARCHIVE"
 
-            nice -n 10 ionice -c2 -n7 tar -czf "$FINAL_ARCHIVE" -C "$STAGE_DIR" .
-            tar -tzf "$FINAL_ARCHIVE" >/dev/null
-            chmod 600 "$FINAL_ARCHIVE"
+          CURRENT_STEP="archive_verification"
+          tar -tzf "$FINAL_ARCHIVE" >/dev/null
+          chmod 600 "$FINAL_ARCHIVE"
 
-            FINAL_SHA="$(sha256sum "$FINAL_ARCHIVE" | awk '{print $1}')"
-            FINAL_SIZE_BYTES="$(stat -c '%s' "$FINAL_ARCHIVE")"
-            FINAL_SIZE_HUMAN="$(du -h "$FINAL_ARCHIVE" | awk '{print $1}')"
-            MAIN_SHA="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          FINAL_SHA="$(sha256sum "$FINAL_ARCHIVE" | awk '{print $1}')"
+          FINAL_SIZE_BYTES="$(stat -c '%s' "$FINAL_ARCHIVE")"
+          FINAL_SIZE_HUMAN="$(du -h "$FINAL_ARCHIVE" | awk '{print $1}')"
+          MAIN_SHA="3227341d9ab316c7976ba994566a430969db908b"
 
-            cat > "$RESULT_FILE" <<RESULT
+          CURRENT_STEP="write_result"
+          cat > "$RESULT_FILE" <<RESULT
           backup_status=success
           created_utc=$STAMP
           backup_path=$FINAL_ARCHIVE
@@ -180,27 +205,22 @@ jobs:
           archive_test=passed
           permissions=600
           RESULT
-          }
 
-          create_backup
-          STATUS=$?
-
-          if [ "$STATUS" -ne 0 ]; then
-            cat > "$RESULT_FILE" <<RESULT
-          backup_status=failed
-          failed_utc=$(date -u +%Y%m%dT%H%M%SZ)
-          exit_code=$STATUS
-          RESULT
-          fi
-
-          exit "$STATUS"
+          trap - ERR
 
       - name: Commit safe backup result
         if: always()
         shell: bash
         run: |
+          if [ ! -f full-backup-result.txt ]; then
+            cat > full-backup-result.txt <<RESULT
+          backup_status=failed
+          failed_utc=$(date -u +%Y%m%dT%H%M%SZ)
+          failed_step=workflow_terminated_before_report
+          RESULT
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add full-backup-result.txt
+          git add -A full-backup-result.txt
           git commit -m "Record full backup result 2026-08-01" || exit 0
           git push origin HEAD:manual-full-backup-20260728
