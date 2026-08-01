@@ -1,0 +1,43 @@
+name: Prepare storage preservation fix
+
+on:
+  push:
+    branches:
+      - preserve-production-storage-20260801
+    paths:
+      - .github/workflows/prepare-storage-preservation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preserve-production-storage-20260801
+      - name: Preserve production storage during rsync
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/deploy.yml')
+          text = path.read_text()
+          needle = '            --exclude="vendor" \\\n'
+          replacement = (
+              '            --exclude="vendor" \\\n'
+              '            --exclude="storage" \\\n'
+              '            --exclude="public/storage" \\\n'
+          )
+          if needle not in text:
+              raise SystemExit('rsync exclude anchor not found')
+          path.write_text(text.replace(needle, replacement, 1))
+          PY
+          git rm .github/workflows/prepare-storage-preservation.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Сохранять production storage при деплое"
+          git push origin HEAD:preserve-production-storage-20260801
