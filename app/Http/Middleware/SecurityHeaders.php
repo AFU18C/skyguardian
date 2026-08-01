@@ -13,10 +13,7 @@ class SecurityHeaders
         /** @var Response $response */
         $response = $next($request);
 
-        if ($request->isSecure()) {
-            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-        }
-
+        $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         $response->headers->set('Content-Security-Policy', implode('; ', [
             "default-src 'self'",
             "base-uri 'self'",
