@@ -12,289 +12,166 @@ permissions:
 
 jobs:
   audit:
-    name: Read-only production and code audit
     runs-on: self-hosted
     timeout-minutes: 60
-
     steps:
-      - name: Checkout audit branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Run full read-only audit
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, pdo_sqlite, sqlite3
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Run corrected read-only audit
         shell: bash
         run: |
           set +e
-          REPORT="$GITHUB_WORKSPACE/full-site-audit-report.txt"
-          RAW="$GITHUB_WORKSPACE/full-site-audit-raw.txt"
+          REPORT="$GITHUB_WORKSPACE/corrected-site-audit-report.txt"
+          RAW="$GITHUB_WORKSPACE/corrected-site-audit-raw.txt"
           : > "$REPORT"
           : > "$RAW"
+          APP_DIR=/var/www/skyguardian
+          DOMAIN=skyguardian.pp.ua
 
-          section() {
-            printf '\n## %s\n' "$1" | tee -a "$REPORT"
-          }
-
-          item() {
-            printf '%s=%s\n' "$1" "$2" | tee -a "$REPORT"
-          }
-
-          capture() {
-            local name="$1"
-            shift
+          item() { printf '%s=%s\n' "$1" "$2" | tee -a "$REPORT"; }
+          check() {
+            local name="$1"; shift
             printf '\n===== %s =====\n' "$name" >> "$RAW"
             "$@" >> "$RAW" 2>&1
-            local status=$?
-            item "$name.status" "$status"
-            return 0
+            item "$name.status" "$?"
           }
 
-          APP_DIR="/var/www/skyguardian"
-          DOMAIN="skyguardian.pp.ua"
-          MAIN_SHA="$(git rev-parse origin/main 2>/dev/null)"
-          DEPLOYED_SHA="$(git ls-remote origin refs/tags/deployed 2>/dev/null | awk '{print $1}')"
+          item audit_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          item mode read-only
+          item main_sha "$(git rev-parse origin/main)"
+          item deployed_sha "$(git ls-remote origin refs/tags/deployed | awk '{print $1}')"
+          item php_version "$(php -r 'echo PHP_VERSION;')"
+          item node_version "$(node --version)"
+          item npm_version "$(npm --version)"
 
-          section "Scope"
-          item "audit_utc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          item "mode" "read-only"
-          item "production_domain" "$DOMAIN"
-          item "main_sha" "$MAIN_SHA"
-          item "deployed_sha" "${DEPLOYED_SHA:-missing}"
-          if [ -n "$DEPLOYED_SHA" ] && [ "$MAIN_SHA" = "$DEPLOYED_SHA" ]; then
-            item "deployment_match" "yes"
-          else
-            item "deployment_match" "no"
-          fi
+          check composer_install composer install --no-interaction --prefer-dist --no-progress
+          check npm_ci npm ci --ignore-scripts
+          check frontend_build npm run build
+          check php_tests php artisan test --no-ansi
+          check php_format vendor/bin/pint --test
+          check composer_audit composer audit --locked --no-interaction
+          check npm_audit npm audit --audit-level=moderate
+          check telethon_syntax python3 -m py_compile telethon/worker.py telethon/group_channel_worker.py
 
-          section "Host resources"
-          item "hostname" "$(hostname)"
-          item "kernel" "$(uname -sr)"
-          item "uptime" "$(uptime -p 2>/dev/null || true)"
-          item "cpu_count" "$(nproc 2>/dev/null || echo unknown)"
-          item "load_1_5_15" "$(awk '{print $1","$2","$3}' /proc/loadavg 2>/dev/null)"
-          item "memory_total_mb" "$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo)"
-          item "memory_available_mb" "$(awk '/MemAvailable/ {printf "%.0f", $2/1024}' /proc/meminfo)"
-          item "swap_total_mb" "$(awk '/SwapTotal/ {printf "%.0f", $2/1024}' /proc/meminfo)"
-          item "swap_free_mb" "$(awk '/SwapFree/ {printf "%.0f", $2/1024}' /proc/meminfo)"
-          item "root_disk" "$(df -P / | awk 'NR==2 {print $3"/"$2" KB used=" $5}')"
-          item "root_inodes" "$(df -Pi / | awk 'NR==2 {print $3"/"$2" used=" $5}')"
-          item "app_disk_usage" "$(sudo du -sh "$APP_DIR" 2>/dev/null | awk '{print $1}')"
-          item "backup_disk_usage" "$(sudo du -sh /var/backups/skyguardian 2>/dev/null | awk '{print $1}')"
-
-          section "Services"
-          SERVICES=(
-            nginx
-            mysql
-            php8.3-fpm
-            skyguardian-telethon
-            skyguardian-scheduler
-            skyguardian-group-channel-telethon
-            skyguardian-group-channel-delete
-          )
-          for service in "${SERVICES[@]}"; do
-            item "service.$service.active" "$(systemctl is-active "$service.service" 2>/dev/null || echo missing)"
-            item "service.$service.enabled" "$(systemctl is-enabled "$service.service" 2>/dev/null || echo missing)"
-            item "service.$service.restarts" "$(systemctl show "$service.service" -p NRestarts --value 2>/dev/null || echo unknown)"
-            ERRORS="$(sudo journalctl -u "$service.service" --since '24 hours ago' -p err..alert --no-pager -q 2>/dev/null | wc -l)"
-            item "service.$service.errors_24h" "$ERRORS"
-          done
-          item "certbot_timer.active" "$(systemctl is-active certbot.timer 2>/dev/null || echo missing)"
-          item "certbot_timer.enabled" "$(systemctl is-enabled certbot.timer 2>/dev/null || echo missing)"
-          capture "systemd_failed_units" systemctl --failed --no-pager
-          capture "listening_ports" bash -lc "sudo ss -ltnp | grep -E ':(80|443|8787|8788)\\b'"
-
-          section "Web server and TLS"
-          capture "nginx_config_test" sudo nginx -t
-          TLS_INFO="$(echo | openssl s_client -servername "$DOMAIN" -connect "$DOMAIN:443" 2>/dev/null | openssl x509 -noout -subject -issuer -dates 2>/dev/null)"
-          printf '%s\n' "$TLS_INFO" >> "$RAW"
-          TLS_END="$(printf '%s\n' "$TLS_INFO" | sed -n 's/^notAfter=//p')"
-          item "tls_not_after" "${TLS_END:-unknown}"
-          if [ -n "$TLS_END" ]; then
-            END_EPOCH="$(date -d "$TLS_END" +%s 2>/dev/null)"
-            NOW_EPOCH="$(date +%s)"
-            if [ -n "$END_EPOCH" ]; then
-              item "tls_days_remaining" "$(( (END_EPOCH - NOW_EPOCH) / 86400 ))"
-            fi
-          fi
-
-          HTTP_HEADERS="$(mktemp)"
-          HTTPS_HEADERS="$(mktemp)"
-          LOGIN_HEADERS="$(mktemp)"
-          HTTP_CODE="$(curl -sS -o /dev/null -D "$HTTP_HEADERS" -w '%{http_code}' "http://$DOMAIN/" 2>>"$RAW")"
-          HTTPS_METRICS="$(curl -sS -o /tmp/skyguardian-home.html -D "$HTTPS_HEADERS" -w '%{http_code}|%{time_total}|%{size_download}' "https://$DOMAIN/" 2>>"$RAW")"
-          LOGIN_METRICS="$(curl -sS -o /tmp/skyguardian-login.html -D "$LOGIN_HEADERS" -w '%{http_code}|%{time_total}|%{size_download}' "https://$DOMAIN/admin/login" 2>>"$RAW")"
-          ADMIN_CODE="$(curl -sS -o /dev/null -w '%{http_code}' "https://$DOMAIN/admin" 2>>"$RAW")"
-          NOT_FOUND_CODE="$(curl -sS -o /tmp/skyguardian-404.html -w '%{http_code}' "https://$DOMAIN/audit-page-that-does-not-exist-987654" 2>>"$RAW")"
-          item "http_root.code" "$HTTP_CODE"
-          item "http_root.location" "$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/,""); print substr($0,index($0,":")+2); exit}' "$HTTP_HEADERS")"
-          item "https_root.code_time_size" "$HTTPS_METRICS"
-          item "login.code_time_size" "$LOGIN_METRICS"
-          item "admin_unauthenticated.code" "$ADMIN_CODE"
-          item "unknown_page.code" "$NOT_FOUND_CODE"
-
-          for header in Strict-Transport-Security Content-Security-Policy X-Frame-Options X-Content-Type-Options Referrer-Policy Permissions-Policy; do
-            KEY="$(printf '%s' "$header" | tr '[:upper:]-' '[:lower:]_')"
-            VALUE="$(awk -v h="$header" 'BEGIN{IGNORECASE=1} $0 ~ "^"h":" {sub(/\r$/,""); sub(/^[^:]+:[[:space:]]*/,""); print; exit}' "$HTTPS_HEADERS")"
-            item "header.home.$KEY" "${VALUE:-missing}"
-          done
-          LOGIN_COOKIE="$(awk 'BEGIN{IGNORECASE=1} /^set-cookie:/ {sub(/\r$/,""); print; exit}' "$LOGIN_HEADERS")"
-          item "login_cookie_present" "$([ -n "$LOGIN_COOKIE" ] && echo yes || echo no)"
-          item "login_cookie_secure" "$(printf '%s' "$LOGIN_COOKIE" | grep -qi 'secure' && echo yes || echo no)"
-          item "login_cookie_httponly" "$(printf '%s' "$LOGIN_COOKIE" | grep -qi 'httponly' && echo yes || echo no)"
-          item "login_cookie_samesite" "$(printf '%s' "$LOGIN_COOKIE" | grep -oEi 'SameSite=[^;]+' | head -1 || echo missing)"
-          item "login_has_csrf" "$(grep -q 'name="_token"' /tmp/skyguardian-login.html && echo yes || echo no)"
-          item "login_has_password_autocomplete" "$(grep -q 'autocomplete="current-password"' /tmp/skyguardian-login.html && echo yes || echo no)"
-          item "home_contains_stack_trace" "$(grep -Eqi 'Stack trace|Whoops|Ignition' /tmp/skyguardian-home.html && echo yes || echo no)"
-          rm -f "$HTTP_HEADERS" "$HTTPS_HEADERS" "$LOGIN_HEADERS"
-
-          section "Production Laravel"
-          if [ -d "$APP_DIR" ] && [ -f "$APP_DIR/artisan" ]; then
-            cd "$APP_DIR"
-            item "app_dir_present" "yes"
-            item "env_permissions" "$(stat -c '%a %U:%G' .env 2>/dev/null || echo missing)"
-            item "storage_permissions" "$(stat -c '%a %U:%G' storage 2>/dev/null || echo missing)"
-            item "bootstrap_cache_permissions" "$(stat -c '%a %U:%G' bootstrap/cache 2>/dev/null || echo missing)"
-            item "public_storage_symlink" "$([ -L public/storage ] && echo yes || echo no)"
-            item "vite_manifest_present" "$([ -f public/build/manifest.json ] && echo yes || echo no)"
-            item "vite_manifest_size" "$(stat -c '%s' public/build/manifest.json 2>/dev/null || echo 0)"
-
-            SAFE_CONFIG="$(php -r '
-              require "vendor/autoload.php";
-              $app = require "bootstrap/app.php";
-              $app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();
-              $values = [
-                "app_env" => app()->environment(),
-                "app_debug" => config("app.debug") ? "true" : "false",
-                "app_url" => (string) config("app.url"),
-                "cache_store" => (string) config("cache.default"),
-                "session_driver" => (string) config("session.driver"),
-                "session_secure" => config("session.secure") ? "true" : "false",
-                "session_http_only" => config("session.http_only") ? "true" : "false",
-                "session_same_site" => (string) config("session.same_site"),
-                "queue_connection" => (string) config("queue.default"),
-                "log_channel" => (string) config("logging.default"),
-              ];
-              foreach ($values as $key => $value) echo $key."=".$value.PHP_EOL;
-              try {
-                Illuminate\\Support\\Facades\\DB::select("select 1");
-                echo "database_connection=ok".PHP_EOL;
-                echo "database_driver=".Illuminate\\Support\\Facades\\DB::connection()->getDriverName().PHP_EOL;
-                echo "database_tables=".count(Illuminate\\Support\\Facades\\Schema::getTableListing()).PHP_EOL;
-                if (Illuminate\\Support\\Facades\\Schema::hasTable("site_pages")) {
-                  echo "cms_pages=".App\\Models\\SitePage::query()->count().PHP_EOL;
-                  echo "cms_published=".App\\Models\\SitePage::query()->where("status", "published")->count().PHP_EOL;
-                  echo "cms_drafts=".App\\Models\\SitePage::query()->where("status", "draft")->count().PHP_EOL;
-                  echo "cms_hidden=".App\\Models\\SitePage::query()->where("status", "hidden")->count().PHP_EOL;
-                  echo "cms_system_pages=".App\\Models\\SitePage::query()->where("is_system", true)->count().PHP_EOL;
-                }
-                if (Illuminate\\Support\\Facades\\Schema::hasTable("site_menu_items")) echo "cms_menu_items=".App\\Models\\SiteMenuItem::query()->count().PHP_EOL;
-                if (Illuminate\\Support\\Facades\\Schema::hasTable("site_settings")) echo "cms_settings=".App\\Models\\SiteSetting::query()->count().PHP_EOL;
-              } catch (Throwable $e) {
-                echo "database_connection=failed".PHP_EOL;
-                echo "database_error_class=".$e::class.PHP_EOL;
+          cd "$APP_DIR"
+          cat > /tmp/sg-safe-audit.php <<'PHP'
+          <?php
+          require '/var/www/skyguardian/vendor/autoload.php';
+          $app = require '/var/www/skyguardian/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $out = static function (string $key, mixed $value): void {
+              if (is_bool($value)) $value = $value ? 'true' : 'false';
+              if ($value === null || $value === '') $value = 'null';
+              echo $key.'='.$value.PHP_EOL;
+          };
+          $out('app_env', app()->environment());
+          $out('app_debug', (bool) config('app.debug'));
+          $out('app_url', (string) config('app.url'));
+          $out('cache_store', (string) config('cache.default'));
+          $out('queue_connection', (string) config('queue.default'));
+          $out('session_driver', (string) config('session.driver'));
+          $out('session_cookie', (string) config('session.cookie'));
+          $out('session_secure', (bool) config('session.secure'));
+          $out('session_http_only', (bool) config('session.http_only'));
+          $out('session_same_site', (string) config('session.same_site'));
+          $out('log_channel', (string) config('logging.default'));
+          try {
+              Illuminate\Support\Facades\DB::select('select 1');
+              $out('database_connection', 'ok');
+              $out('database_driver', Illuminate\Support\Facades\DB::connection()->getDriverName());
+              $out('database_tables', count(Illuminate\Support\Facades\Schema::getTableListing()));
+              if (Illuminate\Support\Facades\Schema::hasTable('site_pages')) {
+                  $out('cms_pages', App\Models\SitePage::query()->count());
+                  $out('cms_published', App\Models\SitePage::query()->where('status', 'published')->count());
+                  $out('cms_drafts', App\Models\SitePage::query()->where('status', 'draft')->count());
+                  $out('cms_hidden', App\Models\SitePage::query()->where('status', 'hidden')->count());
+                  $out('cms_system_pages', App\Models\SitePage::query()->where('is_system', true)->count());
               }
-            ' 2>>"$RAW")"
-            printf '%s\n' "$SAFE_CONFIG" | tee -a "$REPORT"
+              if (Illuminate\Support\Facades\Schema::hasTable('site_menu_items')) $out('cms_menu_items', App\Models\SiteMenuItem::query()->count());
+              if (Illuminate\Support\Facades\Schema::hasTable('site_settings')) {
+                  $out('cms_settings', App\Models\SiteSetting::query()->count());
+                  $paths = App\Models\SiteSetting::query()->whereIn('key', ['logo_path','favicon_path','login_logo_path','login_background_path'])->pluck('value')->filter()->values();
+                  $out('cms_setting_media_paths', $paths->count());
+                  foreach ($paths as $index => $path) {
+                      $out('cms_setting_media_'.$index.'_exists', Illuminate\Support\Facades\Storage::disk('public')->exists($path));
+                      $out('cms_setting_media_'.$index.'_url', Illuminate\Support\Facades\Storage::disk('public')->url($path));
+                  }
+              }
+              if (Illuminate\Support\Facades\Schema::hasTable('site_pages')) {
+                  $pagePaths = App\Models\SitePage::query()->get(['featured_image_path','social_image_path'])->flatMap(fn ($p) => [$p->featured_image_path, $p->social_image_path])->filter()->values();
+                  $out('cms_page_media_paths', $pagePaths->count());
+                  foreach ($pagePaths->take(5) as $index => $path) {
+                      $out('cms_page_media_'.$index.'_exists', Illuminate\Support\Facades\Storage::disk('public')->exists($path));
+                      $out('cms_page_media_'.$index.'_url', Illuminate\Support\Facades\Storage::disk('public')->url($path));
+                  }
+              }
+          } catch (Throwable $e) {
+              $out('database_connection', 'failed');
+              $out('database_error_class', $e::class);
+          }
+          PHP
+          sudo -u www-data php /tmp/sg-safe-audit.php >> "$REPORT" 2>> "$RAW"
+          rm -f /tmp/sg-safe-audit.php
 
-            capture "artisan_about" php artisan about --no-ansi
-            capture "migration_status" php artisan migrate:status --no-ansi
-            capture "schedule_list" php artisan schedule:list --no-ansi
-            capture "route_list" php artisan route:list --no-ansi
+          check schedule_as_www_data sudo -u www-data php artisan schedule:list --no-ansi
+          check routes_as_www_data sudo -u www-data php artisan route:list --no-ansi
+          check migrations_as_www_data sudo -u www-data php artisan migrate:status --no-ansi
+          php artisan schedule:list --no-ansi >/dev/null 2>&1
+          item schedule_as_runner.status "$?"
+          item github_runner_in_www_data_group "$(id -nG github-runner | tr ' ' '\n' | grep -qx www-data && echo yes || echo no)"
 
-            MIGRATION_PENDING="$(php artisan migrate:status --no-ansi 2>/dev/null | grep -c 'Pending' || true)"
-            item "pending_migrations" "$MIGRATION_PENDING"
-            ROUTE_JSON="$(mktemp)"
-            php artisan route:list --json > "$ROUTE_JSON" 2>>"$RAW"
-            python3 - "$ROUTE_JSON" >> "$REPORT" 2>>"$RAW" <<'PY'
-          import json, sys
-          path = sys.argv[1]
-          try:
-              routes = json.load(open(path, encoding='utf-8'))
-          except Exception as exc:
-              print(f"route_json_error={exc.__class__.__name__}")
-              raise SystemExit
-          names = {}
-          insecure = []
-          for route in routes:
-              name = route.get('name') or ''
-              if name:
-                  names[name] = names.get(name, 0) + 1
-              uri = route.get('uri') or ''
-              middleware = route.get('middleware') or []
-              if isinstance(middleware, str):
-                  middleware = [middleware]
-              if uri.startswith('admin') and uri not in ('admin/login',) and not any('auth' in str(m) for m in middleware):
-                  insecure.append(uri)
-          duplicates = sorted(name for name, count in names.items() if count > 1)
-          print(f"routes_total={len(routes)}")
-          print(f"duplicate_route_names={len(duplicates)}")
-          print(f"admin_routes_without_auth={len(set(insecure))}")
-          if insecure:
-              print("admin_routes_without_auth_list=" + ",".join(sorted(set(insecure))))
-          PY
-            rm -f "$ROUTE_JSON"
+          SESSION_COOKIE="$(sudo -u www-data php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo config("session.cookie");' 2>/dev/null)"
+          HEADERS="$(mktemp)"
+          curl -sS -D "$HEADERS" -o /dev/null "https://$DOMAIN/admin/login"
+          SESSION_SET_COOKIE="$(awk -v cookie="$SESSION_COOKIE" 'BEGIN{IGNORECASE=1} /^set-cookie:/ && index($0,cookie"=") {sub(/\r$/,""); print; exit}' "$HEADERS")"
+          item session_cookie_header_found "$([ -n "$SESSION_SET_COOKIE" ] && echo yes || echo no)"
+          item session_cookie_secure "$(printf '%s' "$SESSION_SET_COOKIE" | grep -qi 'secure' && echo yes || echo no)"
+          item session_cookie_httponly "$(printf '%s' "$SESSION_SET_COOKIE" | grep -qi 'httponly' && echo yes || echo no)"
+          item session_cookie_samesite "$(printf '%s' "$SESSION_SET_COOKIE" | grep -oEi 'SameSite=[^;]+' | head -1 || echo missing)"
+          rm -f "$HEADERS"
 
-            LOG_FILE="storage/logs/laravel.log"
-            item "laravel_log_size_bytes" "$(stat -c '%s' "$LOG_FILE" 2>/dev/null || echo 0)"
-            item "laravel_errors_total" "$(grep -cE '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' "$LOG_FILE" 2>/dev/null || true)"
-            TODAY="$(date +%Y-%m-%d)"
-            item "laravel_errors_today" "$(grep "$TODAY" "$LOG_FILE" 2>/dev/null | grep -cE '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' || true)"
-            item "nginx_errors_today" "$(sudo grep "$(date '+%Y/%m/%d')" /var/log/nginx/error.log 2>/dev/null | wc -l)"
-          else
-            item "app_dir_present" "no"
-          fi
+          item laravel_log_size_bytes "$(stat -c '%s' storage/logs/laravel.log 2>/dev/null || echo 0)"
+          item laravel_errors_today "$(grep "$(date +%Y-%m-%d)" storage/logs/laravel.log 2>/dev/null | grep -cE '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' || true)"
+          printf '\n===== top_laravel_errors_today =====\n' >> "$RAW"
+          grep "$(date +%Y-%m-%d)" storage/logs/laravel.log 2>/dev/null \
+            | grep -E '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' \
+            | sed -E 's/^.*\.(ERROR|CRITICAL|ALERT|EMERGENCY):[[:space:]]*//' \
+            | sed -E 's/[[:space:]]*\{.*$//' \
+            | sed -E 's/[A-Fa-f0-9]{32,}/[REDACTED]/g; s#https://t\.me/[^[:space:]]+#https://t.me/[REDACTED]#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[EMAIL]/g' \
+            | sort | uniq -c | sort -nr | head -15 >> "$RAW"
 
-          section "Backups"
-          NEWEST_BACKUP="$(sudo find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' -printf '%T@|%p|%s\n' 2>/dev/null | sort -nr | head -1)"
-          item "backup_count" "$(sudo find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' 2>/dev/null | wc -l)"
-          if [ -n "$NEWEST_BACKUP" ]; then
-            BACKUP_EPOCH="${NEWEST_BACKUP%%|*}"
-            REST="${NEWEST_BACKUP#*|}"
-            BACKUP_PATH="${REST%%|*}"
-            BACKUP_SIZE="${REST##*|}"
-            item "newest_backup_path" "$BACKUP_PATH"
-            item "newest_backup_size_bytes" "$BACKUP_SIZE"
-            item "newest_backup_age_hours" "$(awk -v now="$(date +%s)" -v then="$BACKUP_EPOCH" 'BEGIN {printf "%.2f", (now-then)/3600}')"
-            sudo tar -tzf "$BACKUP_PATH" >/dev/null 2>>"$RAW"
-            item "newest_backup_archive_test" "$([ $? -eq 0 ] && echo passed || echo failed)"
-            item "newest_backup_permissions" "$(stat -c '%a %U:%G' "$BACKUP_PATH" 2>/dev/null || echo unknown)"
-          else
-            item "newest_backup_path" "missing"
-          fi
-
-          section "Repository checks"
           cd "$GITHUB_WORKSPACE"
-          capture "composer_validate" composer validate --strict --no-interaction
-          capture "composer_install" composer install --no-interaction --prefer-dist --no-progress
-          capture "php_tests" php artisan test --no-ansi
-          capture "php_format" vendor/bin/pint --test
-          capture "npm_ci" npm ci --ignore-scripts
-          capture "frontend_build" npm run build
-          capture "composer_audit" composer audit --locked --no-interaction
-          capture "npm_audit" npm audit --audit-level=moderate
-          capture "telethon_worker_syntax" python3 -m py_compile telethon/worker.py telethon/group_channel_worker.py
+          printf '\n===== tracked_env_files =====\n' >> "$RAW"
+          git ls-files | grep -E '(^|/)\.env($|\.)' >> "$RAW" || true
+          printf '\n===== secret_pattern_files =====\n' >> "$RAW"
+          git grep -IlE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api_hash\s*=|bot_token\s*=|DB_PASSWORD=)' -- ':!*.lock' ':!.github/workflows/*.yml' >> "$RAW" 2>/dev/null || true
+          printf '\n===== raw_blade_echo_locations =====\n' >> "$RAW"
+          grep -RIn --include='*.blade.php' '{!!' resources/views >> "$RAW" 2>/dev/null || true
+          item tracked_env_file_count "$(git ls-files | grep -Ec '(^|/)\.env($|\.)' || true)"
+          item secret_pattern_file_count "$(git grep -IlE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api_hash\s*=|bot_token\s*=|DB_PASSWORD=)' -- ':!*.lock' ':!.github/workflows/*.yml' 2>/dev/null | wc -l)"
+          item raw_blade_echo_count "$(grep -RIn --include='*.blade.php' '{!!' resources/views 2>/dev/null | wc -l)"
+          item audit_completed yes
+          item production_modified no
 
-          section "Static risk scan"
-          item "debug_helpers_count" "$(grep -RInE --include='*.php' '\b(dd|dump|var_dump)\s*\(' app routes resources 2>/dev/null | wc -l)"
-          item "env_outside_config_count" "$(grep -RInE --include='*.php' '\benv\s*\(' app routes database resources 2>/dev/null | wc -l)"
-          item "raw_blade_echo_count" "$(grep -RIn --include='*.blade.php' '{!!' resources/views 2>/dev/null | wc -l)"
-          item "process_execution_calls" "$(grep -RInE --include='*.php' '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' app routes 2>/dev/null | wc -l)"
-          item "todo_fixme_count" "$(grep -RInE --exclude-dir=vendor --exclude-dir=node_modules '\b(TODO|FIXME|HACK)\b' app routes resources database telethon 2>/dev/null | wc -l)"
-          item "tracked_env_files" "$(git ls-files | grep -Ec '(^|/)\.env($|\.)' || true)"
-          item "git_secrets_pattern_hits" "$(git grep -nEI '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api_hash\s*=|bot_token\s*=|DB_PASSWORD=)' -- ':!*.lock' ':!.github/workflows/full-site-audit.yml' 2>/dev/null | wc -l)"
-
-          section "Summary markers"
-          item "audit_completed" "yes"
-          item "no_production_changes_made" "yes"
-
-          printf '\nRaw command output is stored in full-site-audit-raw.txt. It intentionally excludes .env values and application log contents.\n' >> "$REPORT"
-
-      - name: Commit audit reports
+      - name: Commit corrected reports
         if: always()
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add full-site-audit-report.txt full-site-audit-raw.txt
-          git commit -m "Record full site audit" || exit 0
+          git add corrected-site-audit-report.txt corrected-site-audit-raw.txt
+          git commit -m "Record corrected site audit" || exit 0
           git push origin HEAD:full-site-audit-20260801
