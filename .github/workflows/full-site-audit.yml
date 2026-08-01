@@ -13,133 +13,44 @@ permissions:
 jobs:
   audit:
     runs-on: self-hosted
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run production read-only checks
+      - name: Inspect scheduler errors without changes
         shell: bash
         run: |
           set +e
-          REPORT="$GITHUB_WORKSPACE/production-focused-audit.txt"
-          RAW="$GITHUB_WORKSPACE/production-focused-raw.txt"
-          : > "$REPORT"
-          : > "$RAW"
-          APP_DIR=/var/www/skyguardian
-          DOMAIN=skyguardian.pp.ua
-          item() { printf '%s=%s\n' "$1" "$2" | tee -a "$REPORT"; }
-          capture() { local n="$1"; shift; printf '\n===== %s =====\n' "$n" >> "$RAW"; "$@" >> "$RAW" 2>&1; item "$n.status" "$?"; }
-
-          item audit_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          item mode read-only
-          item main_sha "$(git rev-parse origin/main)"
-          item deployed_sha "$(git ls-remote origin refs/tags/deployed | awk '{print $1}')"
-          item runner_groups "$(id -nG github-runner | tr ' ' ',')"
-          item runner_in_www_data "$(id -nG github-runner | tr ' ' '\n' | grep -qx www-data && echo yes || echo no)"
-          item php_modules_sqlite "$(php -m | grep -Ei 'pdo_sqlite|sqlite3' | paste -sd, - || echo missing)"
-
-          cd "$APP_DIR"
-          item env_permissions "$(stat -c '%a %U:%G' .env 2>/dev/null)"
-          item storage_permissions "$(stat -c '%a %U:%G' storage 2>/dev/null)"
-          item laravel_log_permissions "$(stat -c '%a %U:%G' storage/logs/laravel.log 2>/dev/null)"
-          item cache_data_permissions "$(stat -c '%a %U:%G' storage/framework/cache/data 2>/dev/null)"
-          item public_storage_symlink "$([ -L public/storage ] && echo yes || echo no)"
-
-          sudo -u www-data php -r '
-          require "vendor/autoload.php";
-          $app = require "bootstrap/app.php";
-          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-          $out = function ($k, $v) { if (is_bool($v)) $v = $v ? "true" : "false"; if ($v === null || $v === "") $v = "null"; echo $k."=".$v.PHP_EOL; };
-          $out("app_env", app()->environment());
-          $out("app_debug", (bool) config("app.debug"));
-          $out("app_url", (string) config("app.url"));
-          $out("cache_store", (string) config("cache.default"));
-          $out("queue_connection", (string) config("queue.default"));
-          $out("session_driver", (string) config("session.driver"));
-          $out("session_cookie", (string) config("session.cookie"));
-          $out("session_secure", (bool) config("session.secure"));
-          $out("session_http_only", (bool) config("session.http_only"));
-          $out("session_same_site", (string) config("session.same_site"));
-          $out("log_channel", (string) config("logging.default"));
-          try {
-              Illuminate\Support\Facades\DB::select("select 1");
-              $out("database_connection", "ok");
-              $out("database_driver", Illuminate\Support\Facades\DB::connection()->getDriverName());
-              $out("database_tables", count(Illuminate\Support\Facades\Schema::getTableListing()));
-              if (Illuminate\Support\Facades\Schema::hasTable("site_pages")) {
-                  $out("cms_pages", App\Models\SitePage::query()->count());
-                  $out("cms_published", App\Models\SitePage::query()->where("status", "published")->count());
-                  $out("cms_drafts", App\Models\SitePage::query()->where("status", "draft")->count());
-                  $out("cms_hidden", App\Models\SitePage::query()->where("status", "hidden")->count());
-                  $out("cms_system_pages", App\Models\SitePage::query()->where("is_system", true)->count());
-                  $paths = App\Models\SitePage::query()->get(["featured_image_path", "social_image_path"])->flatMap(fn ($p) => [$p->featured_image_path, $p->social_image_path])->filter()->values();
-                  $out("cms_page_media_paths", $paths->count());
-                  foreach ($paths->take(5) as $i => $path) { $out("cms_page_media_{$i}_exists", Illuminate\Support\Facades\Storage::disk("public")->exists($path)); $out("cms_page_media_{$i}_url", Illuminate\Support\Facades\Storage::disk("public")->url($path)); }
-              }
-              if (Illuminate\Support\Facades\Schema::hasTable("site_menu_items")) $out("cms_menu_items", App\Models\SiteMenuItem::query()->count());
-              if (Illuminate\Support\Facades\Schema::hasTable("site_settings")) {
-                  $out("cms_settings", App\Models\SiteSetting::query()->count());
-                  $paths = App\Models\SiteSetting::query()->whereIn("key", ["logo_path", "favicon_path", "login_logo_path", "login_background_path"])->pluck("value")->filter()->values();
-                  $out("cms_setting_media_paths", $paths->count());
-                  foreach ($paths as $i => $path) { $out("cms_setting_media_{$i}_exists", Illuminate\Support\Facades\Storage::disk("public")->exists($path)); $out("cms_setting_media_{$i}_url", Illuminate\Support\Facades\Storage::disk("public")->url($path)); }
-              }
-          } catch (Throwable $e) { $out("database_connection", "failed"); $out("database_error_class", $e::class); }
-          ' >> "$REPORT" 2>> "$RAW"
-          item safe_config_status "$?"
-
-          capture schedule_as_www_data sudo -u www-data php artisan schedule:list --no-ansi
-          capture migrations_as_www_data sudo -u www-data php artisan migrate:status --no-ansi
-          php artisan schedule:list --no-ansi >/dev/null 2>&1
-          item schedule_as_runner_status "$?"
-
-          for service in skyguardian-telethon skyguardian-scheduler skyguardian-group-channel-telethon skyguardian-group-channel-delete; do
-            item "$service.user" "$(systemctl show "$service.service" -p User --value 2>/dev/null)"
-            item "$service.group" "$(systemctl show "$service.service" -p Group --value 2>/dev/null)"
-            item "$service.active" "$(systemctl is-active "$service.service" 2>/dev/null)"
-            item "$service.restarts" "$(systemctl show "$service.service" -p NRestarts --value 2>/dev/null)"
-          done
-
-          SESSION_COOKIE="$(sudo -u www-data php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo config("session.cookie");' 2>/dev/null)"
-          HEADERS="$(mktemp)"
-          curl -sS -D "$HEADERS" -o /dev/null "https://$DOMAIN/admin/login"
-          SESSION_LINE="$(awk -v cookie="$SESSION_COOKIE" 'BEGIN{IGNORECASE=1} /^set-cookie:/ && index($0,cookie"=") {sub(/\r$/,""); print; exit}' "$HEADERS")"
-          item session_cookie_name "$SESSION_COOKIE"
-          item session_cookie_header_found "$([ -n "$SESSION_LINE" ] && echo yes || echo no)"
-          item session_cookie_secure "$(printf '%s' "$SESSION_LINE" | grep -qi 'secure' && echo yes || echo no)"
-          item session_cookie_httponly "$(printf '%s' "$SESSION_LINE" | grep -qi 'httponly' && echo yes || echo no)"
-          item session_cookie_samesite "$(printf '%s' "$SESSION_LINE" | grep -oEi 'SameSite=[^;]+' | head -1 || echo missing)"
-          rm -f "$HEADERS"
-
-          item laravel_log_size_bytes "$(stat -c '%s' storage/logs/laravel.log 2>/dev/null)"
-          TODAY="$(date +%Y-%m-%d)"
-          item laravel_errors_today "$(grep "$TODAY" storage/logs/laravel.log 2>/dev/null | grep -cE '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' || true)"
-          printf '\n===== top_laravel_errors_today =====\n' >> "$RAW"
-          grep "$TODAY" storage/logs/laravel.log 2>/dev/null | grep -E '\.(ERROR|CRITICAL|ALERT|EMERGENCY):' | sed -E 's/^.*\.(ERROR|CRITICAL|ALERT|EMERGENCY):[[:space:]]*//' | sed -E 's/[[:space:]]*\{.*$//' | sed -E 's/[A-Fa-f0-9]{24,}/[REDACTED]/g; s#https://t\.me/[^[:space:]]+#https://t.me/[REDACTED]#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[EMAIL]/g' | sort | uniq -c | sort -nr | head -20 >> "$RAW"
-
-          printf '\n===== media_url_checks =====\n' >> "$RAW"
-          grep -E '^cms_(page|setting)_media_[0-9]+_url=' "$REPORT" | cut -d= -f2- | while read -r url; do printf '%s ' "$url" >> "$RAW"; curl -sS -o /dev/null -w '%{http_code}\n' "$url" >> "$RAW" 2>&1; done
-
-          cd "$GITHUB_WORKSPACE"
-          printf '\n===== tracked_env_files =====\n' >> "$RAW"
-          git ls-files | grep -E '(^|/)\.env($|\.)' >> "$RAW" || true
-          printf '\n===== secret_pattern_files =====\n' >> "$RAW"
-          git grep -IlE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api_hash\s*=|bot_token\s*=|DB_PASSWORD=)' -- ':!*.lock' ':!.github/workflows/*.yml' >> "$RAW" 2>/dev/null || true
-          printf '\n===== raw_blade_echo_locations =====\n' >> "$RAW"
-          grep -RIn --include='*.blade.php' '{!!' resources/views >> "$RAW" 2>/dev/null || true
-          item tracked_env_file_count "$(git ls-files | grep -Ec '(^|/)\.env($|\.)' || true)"
-          item secret_pattern_file_count "$(git grep -IlE '(BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|api_hash\s*=|bot_token\s*=|DB_PASSWORD=)' -- ':!*.lock' ':!.github/workflows/*.yml' 2>/dev/null | wc -l)"
-          item raw_blade_echo_count "$(grep -RIn --include='*.blade.php' '{!!' resources/views 2>/dev/null | wc -l)"
-          item audit_completed yes
-          item production_modified no
-
-      - name: Commit report
+          OUT="$GITHUB_WORKSPACE/error-source-audit.txt"
+          : > "$OUT"
+          APP=/var/www/skyguardian
+          echo "audit_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$OUT"
+          echo "production_modified=no" >> "$OUT"
+          echo >> "$OUT"
+          echo "## messages_relayed references" >> "$OUT"
+          sudo grep -RIn --exclude='*.log' --exclude-dir=vendor --exclude-dir=node_modules 'messages_relayed' "$APP/app" "$APP/routes" "$APP/telethon" 2>/dev/null >> "$OUT" || true
+          echo >> "$OUT"
+          echo "## command and scheduler references" >> "$OUT"
+          sudo grep -RIn --exclude='*.log' --exclude-dir=vendor --exclude-dir=node_modules -E 'sources:process|ProcessSources|messages_relayed' "$APP/app" "$APP/routes" "$APP/telethon" 2>/dev/null >> "$OUT" || true
+          echo >> "$OUT"
+          echo "## latest sanitized stack for messages_relayed" >> "$OUT"
+          LOG="$APP/storage/logs/laravel.log"
+          LINE="$(sudo grep -n 'Undefined array key "messages_relayed"' "$LOG" 2>/dev/null | tail -1 | cut -d: -f1)"
+          echo "log_line=${LINE:-not_found}" >> "$OUT"
+          if [ -n "$LINE" ]; then
+            END=$((LINE+35))
+            sudo sed -n "${LINE},${END}p" "$LOG" \
+              | sed -E 's/[A-Fa-f0-9]{24,}/[REDACTED]/g; s#https://t\.me/[^[:space:]]+#https://t.me/[REDACTED]#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[EMAIL]/g; s/(token|secret|password|api_hash)[=:][^, }]+/\1=[REDACTED]/Ig' \
+              >> "$OUT"
+          fi
+          echo >> "$OUT"
+          echo "## deployment workflow permission commands" >> "$OUT"
+          grep -nE 'chown|chmod|storage/logs|bootstrap/cache|storage/framework' "$GITHUB_WORKSPACE/.github/workflows/deploy.yml" >> "$OUT" 2>/dev/null || true
+      - name: Commit error source report
         if: always()
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add production-focused-audit.txt production-focused-raw.txt
-          git commit -m "Record production focused audit" || exit 0
+          git add error-source-audit.txt
+          git commit -m "Record scheduler error source audit" || exit 0
           git push origin HEAD:full-site-audit-20260801
