@@ -1,0 +1,137 @@
+
+## Scope
+audit_utc=2026-08-01T08:33:00Z
+mode=read-only
+production_domain=skyguardian.pp.ua
+main_sha=3227341d9ab316c7976ba994566a430969db908b
+deployed_sha=3227341d9ab316c7976ba994566a430969db908b
+deployment_match=yes
+
+## Host resources
+hostname=bigxaos.whost.systems
+kernel=Linux 6.8.0-111-generic
+uptime=up 1 week, 1 hour, 29 minutes
+cpu_count=2
+load_1_5_15=0.20,0.15,0.17
+memory_total_mb=1812
+memory_available_mb=610
+swap_total_mb=512
+swap_free_mb=476
+root_disk=7832972/36031056 KB used=23%
+root_inodes=200469/2293760 used=9%
+app_disk_usage=168M
+backup_disk_usage=109M
+
+## Services
+service.nginx.active=active
+service.nginx.enabled=enabled
+service.nginx.restarts=0
+service.nginx.errors_24h=0
+service.mysql.active=active
+service.mysql.enabled=enabled
+service.mysql.restarts=0
+service.mysql.errors_24h=0
+service.php8.3-fpm.active=active
+service.php8.3-fpm.enabled=enabled
+service.php8.3-fpm.restarts=0
+service.php8.3-fpm.errors_24h=0
+service.skyguardian-telethon.active=active
+service.skyguardian-telethon.enabled=enabled
+service.skyguardian-telethon.restarts=0
+service.skyguardian-telethon.errors_24h=0
+service.skyguardian-scheduler.active=active
+service.skyguardian-scheduler.enabled=enabled
+service.skyguardian-scheduler.restarts=0
+service.skyguardian-scheduler.errors_24h=0
+service.skyguardian-group-channel-telethon.active=active
+service.skyguardian-group-channel-telethon.enabled=enabled
+service.skyguardian-group-channel-telethon.restarts=0
+service.skyguardian-group-channel-telethon.errors_24h=0
+service.skyguardian-group-channel-delete.active=active
+service.skyguardian-group-channel-delete.enabled=enabled
+service.skyguardian-group-channel-delete.restarts=0
+service.skyguardian-group-channel-delete.errors_24h=0
+certbot_timer.active=active
+certbot_timer.enabled=enabled
+systemd_failed_units.status=0
+listening_ports.status=0
+
+## Web server and TLS
+nginx_config_test.status=0
+tls_not_after=Oct 23 07:47:07 2026 GMT
+tls_days_remaining=82
+http_root.code=301
+http_root.location=https://skyguardian.pp.ua/
+https_root.code_time_size=200|0.116754|3170
+login.code_time_size=200|0.100193|3677
+admin_unauthenticated.code=302
+unknown_page.code=404
+header.home.strict_transport_security=missing
+header.home.content_security_policy=missing
+header.home.x_frame_options=missing
+header.home.x_content_type_options=missing
+header.home.referrer_policy=missing
+header.home.permissions_policy=missing
+login_cookie_present=yes
+login_cookie_secure=yes
+login_cookie_httponly=no
+login_cookie_samesite=samesite=lax
+login_has_csrf=yes
+login_has_password_autocomplete=yes
+home_contains_stack_trace=no
+
+## Production Laravel
+app_dir_present=yes
+env_permissions=640 github-runner:www-data
+storage_permissions=775 www-data:www-data
+bootstrap_cache_permissions=775 www-data:www-data
+public_storage_symlink=no
+vite_manifest_present=yes
+vite_manifest_size=4126
+
+artisan_about.status=0
+migration_status.status=0
+schedule_list.status=1
+route_list.status=0
+pending_migrations=0
+routes_total=71
+duplicate_route_names=0
+admin_routes_without_auth=0
+laravel_log_size_bytes=36443647
+laravel_errors_total=12828
+laravel_errors_today=2999
+nginx_errors_today=0
+
+## Backups
+backup_count=4
+newest_backup_path=/var/backups/skyguardian/skyguardian-full-20260801T082255Z.tar.gz
+newest_backup_size_bytes=28587411
+newest_backup_age_hours=0.17
+newest_backup_archive_test=passed
+newest_backup_permissions=600 github-runner:github-runner
+
+## Repository checks
+composer_validate.status=0
+composer_install.status=0
+php_tests.status=2
+php_format.status=0
+npm_ci.status=1
+frontend_build.status=127
+composer_audit.status=0
+npm_audit.status=1
+telethon_worker_syntax.status=0
+
+## Static risk scan
+debug_helpers_count=0
+env_outside_config_count=0
+raw_blade_echo_count=6
+process_execution_calls=0
+todo_fixme_count=0
+tracked_env_files=1
+git_secrets_pattern_hits=3
+
+## Summary markers
+audit_completed=yes
+no_production_changes_made=yes
+
+Raw command output is stored in full-site-audit-raw.txt. It intentionally excludes .env values and application log contents.

@@ -1,0 +1,1591 @@
+
+===== systemd_failed_units =====
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.
+
+===== listening_ports =====
+LISTEN 0      511          0.0.0.0:443        0.0.0.0:*    users:(("nginx",pid=2497556,fd=6),("nginx",pid=2497555,fd=6),("nginx",pid=2497554,fd=6))
+LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=2497556,fd=7),("nginx",pid=2497555,fd=7),("nginx",pid=2497554,fd=7))
+LISTEN 0      100        127.0.0.1:8788       0.0.0.0:*    users:(("python",pid=2497544,fd=6))                                                     
+LISTEN 0      100        127.0.0.1:8787       0.0.0.0:*    users:(("python",pid=2497591,fd=6))                                                     
+LISTEN 0      511             [::]:443           [::]:*    users:(("nginx",pid=2497556,fd=5),("nginx",pid=2497555,fd=5),("nginx",pid=2497554,fd=5))
+LISTEN 0      511             [::]:80            [::]:*    users:(("nginx",pid=2497556,fd=8),("nginx",pid=2497555,fd=8),("nginx",pid=2497554,fd=8))
+
+===== nginx_config_test =====
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+subject=CN = skyguardian.pp.ua
+issuer=C = US, O = Let's Encrypt, CN = YE1
+notBefore=Jul 25 07:47:08 2026 GMT
+notAfter=Oct 23 07:47:07 2026 GMT
+PHP Parse error:  syntax error, unexpected token "\", expecting ")" in Command line code on line 4
+
+===== artisan_about =====
+
+  Environment ................................................................  
+  Application Name ............................................... SkyGuardian  
+  Laravel Version .................................................... 13.22.0  
+  PHP Version .......................................................... 8.3.6  
+  Composer Version ..................................................... 2.7.1  
+  Environment ..................................................... production  
+  Debug Mode ............................................................. OFF  
+  URL ...................................................... skyguardian.pp.ua  
+  Maintenance Mode ....................................................... OFF  
+  Timezone ....................................................... Europe/Kyiv  
+  Locale .................................................................. ru  
+
+  Cache ......................................................................  
+  Config .............................................................. CACHED  
+  Events .......................................................... NOT CACHED  
+  Routes .......................................................... NOT CACHED  
+  Views ............................................................... CACHED  
+
+  Drivers ....................................................................  
+  Broadcasting .......................................................... null  
+  Cache ................................................................. file  
+  Database ............................................................. mysql  
+  Logs ........................................................ stack / single  
+  Mail ................................................................... log  
+  Queue ................................................................. sync  
+  Session ............................................................... file  
+
+  Storage ....................................................................  
+  public/storage .................................................. NOT LINKED  
+
+
+===== migration_status =====
+
+  Migration name .............................................. Batch / Status  
+  0001_01_01_000000_create_users_table ............................... [1] Ran  
+  0001_01_01_000001_create_cache_table ............................... [1] Ran  
+  0001_01_01_000002_create_jobs_table ................................ [1] Ran  
+  2026_07_25_000100_create_skyguardian_core_tables ................... [2] Ran  
+  2026_07_25_000200_reset_source_cursors_after_copy_fix .............. [3] Ran  
+  2026_07_25_193000_create_group_channel_bots_table .................. [4] Ran  
+  2026_07_26_075900_create_group_channel_publications_table .......... [5] Ran  
+  2026_07_26_080000_add_auto_delete_to_group_channel_publications_table  [5] Ran  
+  2026_07_26_100000_add_module_settings_to_group_channel_bots_table .. [5] Ran  
+  2026_07_26_120000_expand_group_channel_bot_features ................ [5] Ran  
+  2026_07_27_120000_create_group_channel_technical_delete_tasks_table  [6] Ran  
+  2026_07_29_000000_create_site_content_tables ....................... [7] Ran  
+
+
+===== schedule_list =====
+
+In StreamHandler.php line 164:
+                                                                               
+  The stream or file "/var/www/skyguardian/storage/logs/laravel.log" could no  
+  t be opened in append mode: Failed to open stream: Permission denied         
+  The exception occurred while attempting to log: fopen(/var/www/skyguardian/  
+  storage/framework/cache/data/23/4f/234faed649fd07877d7185f88e431c8ce8828ab3  
+  ): Failed to open stream: Permission denied                                  
+  Context: {"exception":{}}                                                    
+                                                                               
+
+
+===== route_list =====
+
+  GET|HEAD  / ................................. home › SitePageController@home
+  GET|HEAD  admin ................ admin.dashboard › Admin\DashboardController
+  GET|HEAD  admin/air-alert admin.air-alert.index › Admin\SourceController@in…
+  POST      admin/air-alert admin.air-alert.store › Admin\SourceController@st…
+  PUT       admin/air-alert/{source} admin.air-alert.update › Admin\SourceCon…
+  DELETE    admin/air-alert/{source} admin.air-alert.destroy › Admin\SourceCo…
+  POST      admin/air-alert/{source}/check admin.air-alert.check › Admin\Sour…
+  GET|HEAD  admin/group-channel admin.group-channel › Admin\GroupChannelContr…
+  POST      admin/group-channel admin.group-channel.store › Admin\GroupChanne…
+  PUT       admin/group-channel/{groupChannelBot} admin.group-channel.update …
+  DELETE    admin/group-channel/{groupChannelBot} admin.group-channel.destroy…
+  POST      admin/group-channel/{groupChannelBot}/bulk-delete/execute admin.g…
+  POST      admin/group-channel/{groupChannelBot}/bulk-delete/preview admin.g…
+  POST      admin/group-channel/{groupChannelBot}/check admin.group-channel.c…
+  POST      admin/group-channel/{groupChannelBot}/join-requests/{joinRequest}/approve admin.group-channel.join-requests.approve › Admin\GroupChannelJoinRequestControlle…
+  POST      admin/group-channel/{groupChannelBot}/join-requests/{joinRequest}/decline admin.group-channel.join-requests.decline › Admin\GroupChannelJoinRequestControlle…
+  PUT       admin/group-channel/{groupChannelBot}/module-settings admin.group…
+  PUT       admin/group-channel/{groupChannelBot}/modules admin.group-channel…
+  PATCH     admin/group-channel/{groupChannelBot}/modules/{module} admin.grou…
+  POST      admin/group-channel/{groupChannelBot}/publications admin.group-ch…
+  DELETE    admin/group-channel/{groupChannelBot}/publications/{publication} …
+  POST      admin/group-channel/{groupChannelBot}/publications/{publication}/send admin.group-channel.publications.send › Admin\GroupChannelPublicationController…
+  POST      admin/group-channel/{groupChannelBot}/technical-delete/execute ad…
+  POST      admin/group-channel/{groupChannelBot}/technical-delete/preview ad…
+  POST      admin/group-channel/{groupChannelBot}/test-message admin.group-ch…
+  POST      admin/group-channel/{groupChannelBot}/webhook admin.group-channel…
+  POST      admin/group-channel/{groupChannelBot}/welcome-photo admin.group-c…
+  DELETE    admin/group-channel/{groupChannelBot}/welcome-photo admin.group-c…
+  GET|HEAD  admin/login admin.login › Auth\AuthenticatedSessionController@cre…
+  POST      admin/login admin.login.store › Auth\AuthenticatedSessionControll…
+  POST      admin/logout admin.logout › Auth\AuthenticatedSessionController@d…
+  GET|HEAD  admin/news ....... admin.news.index › Admin\SourceController@index
+  POST      admin/news ....... admin.news.store › Admin\SourceController@store
+  PUT       admin/news/{source} admin.news.update › Admin\SourceController@up…
+  DELETE    admin/news/{source} admin.news.destroy › Admin\SourceController@d…
+  POST      admin/news/{source}/check admin.news.check › Admin\SourceControll…
+  GET|HEAD  admin/site-settings admin.site-settings › Admin\SiteSettingsContr…
+  PUT       admin/site-settings/general admin.site-settings.general.update › …
+  GET|HEAD  admin/site-settings/login admin.site-settings.login.edit › Admin\…
+  PUT       admin/site-settings/login admin.site-settings.login.update › Admi…
+  GET|HEAD  admin/site-settings/login/preview admin.site-settings.login.previ…
+  POST      admin/site-settings/media admin.site-settings.media.store › Admin…
+  POST      admin/site-settings/menu admin.site-settings.menu.store › Admin\S…
+  PUT       admin/site-settings/menu/{siteMenuItem} admin.site-settings.menu.…
+  DELETE    admin/site-settings/menu/{siteMenuItem} admin.site-settings.menu.…
+  POST      admin/site-settings/pages admin.site-settings.pages.store › Admin…
+  GET|HEAD  admin/site-settings/pages/create admin.site-settings.pages.create…
+  PUT       admin/site-settings/pages/{sitePage} admin.site-settings.pages.up…
+  DELETE    admin/site-settings/pages/{sitePage} admin.site-settings.pages.de…
+  POST      admin/site-settings/pages/{sitePage}/duplicate admin.site-setting…
+  GET|HEAD  admin/site-settings/pages/{sitePage}/edit admin.site-settings.pag…
+  GET|HEAD  admin/site-settings/pages/{sitePage}/preview admin.site-settings.…
+  GET|HEAD  admin/system/metrics admin.system.metrics › Admin\SystemMetricsCo…
+  GET|HEAD  admin/telegram admin.telegram.index › Admin\TelegramController@in…
+  POST      admin/telegram/accounts admin.telegram.accounts.store › Admin\Tel…
+  PUT       admin/telegram/accounts/{account} admin.telegram.accounts.update …
+  DELETE    admin/telegram/accounts/{account} admin.telegram.accounts.destroy…
+  POST      admin/telegram/accounts/{account}/check admin.telegram.accounts.c…
+  POST      admin/telegram/accounts/{account}/password admin.telegram.account…
+  POST      admin/telegram/accounts/{account}/qr/start admin.telegram.account…
+  POST      admin/telegram/accounts/{account}/qr/wait admin.telegram.accounts…
+  POST      admin/telegram/accounts/{account}/send-code admin.telegram.accoun…
+  POST      admin/telegram/accounts/{account}/sign-in admin.telegram.accounts…
+  POST      admin/telegram/apis admin.telegram.apis.store › Admin\TelegramCon…
+  PUT       admin/telegram/apis/{telegramApi} admin.telegram.apis.update › Ad…
+  DELETE    admin/telegram/apis/{telegramApi} admin.telegram.apis.destroy › A…
+  GET|HEAD  storage/{path} storage.local › vendor/laravel/framework/src/Illum…
+  PUT       storage/{path} storage.local.upload › vendor/laravel/framework/sr…
+  POST      telegram/bot-api/webhook/{fingerprint}/{secret} group-channel.web…
+  GET|HEAD  up vendor/laravel/framework/src/Illuminate/Foundation/Configurati…
+  GET|HEAD  {slug} ....................... site.page › SitePageController@show
+
+                                                           Showing [71] routes
+
+
+===== composer_validate =====
+./composer.json is valid
+
+===== composer_install =====
+Installing dependencies from lock file (including require-dev)
+Verifying lock file contents can be installed on current platform.
+Package operations: 110 installs, 0 updates, 0 removals
+  - Installing doctrine/inflector (2.1.0): Extracting archive
+  - Installing doctrine/lexer (3.0.1): Extracting archive
+  - Installing dragonmantank/cron-expression (v3.6.0): Extracting archive
+  - Installing symfony/deprecation-contracts (v3.7.1): Extracting archive
+  - Installing psr/container (2.0.2): Extracting archive
+  - Installing fakerphp/faker (v1.24.1): Extracting archive
+  - Installing symfony/polyfill-mbstring (v1.38.2): Extracting archive
+  - Installing symfony/http-foundation (v7.4.14): Extracting archive
+  - Installing fruitcake/php-cors (v1.4.0): Extracting archive
+  - Installing symfony/polyfill-php80 (v1.37.0): Extracting archive
+  - Installing psr/http-message (2.0): Extracting archive
+  - Installing psr/http-client (1.0.3): Extracting archive
+  - Installing ralouphie/getallheaders (3.0.3): Extracting archive
+  - Installing psr/http-factory (1.1.0): Extracting archive
+  - Installing guzzlehttp/psr7 (2.13.0): Extracting archive
+  - Installing guzzlehttp/promises (2.5.1): Extracting archive
+  - Installing guzzlehttp/guzzle (7.15.1): Extracting archive
+  - Installing guzzlehttp/uri-template (v1.0.10): Extracting archive
+  - Installing symfony/polyfill-intl-normalizer (v1.38.0): Extracting archive
+  - Installing symfony/polyfill-intl-grapheme (v1.38.1): Extracting archive
+  - Installing symfony/polyfill-ctype (v1.37.0): Extracting archive
+  - Installing symfony/string (v7.4.13): Extracting archive
+  - Installing symfony/service-contracts (v3.7.1): Extracting archive
+  - Installing symfony/console (v7.4.14): Extracting archive
+  - Installing nunomaduro/termwind (v2.4.0): Extracting archive
+  - Installing voku/portable-ascii (2.1.1): Extracting archive
+  - Installing phpoption/phpoption (1.9.5): Extracting archive
+  - Installing graham-campbell/result-type (v1.1.4): Extracting archive
+  - Installing vlucas/phpdotenv (v5.6.4): Extracting archive
+  - Installing symfony/css-selector (v7.4.9): Extracting archive
+  - Installing tijsverkoyen/css-to-inline-styles (v2.4.0): Extracting archive
+  - Installing symfony/var-dumper (v7.4.14): Extracting archive
+  - Installing symfony/polyfill-uuid (v1.37.0): Extracting archive
+  - Installing symfony/uid (v7.4.9): Extracting archive
+  - Installing symfony/routing (v7.4.13): Extracting archive
+  - Installing symfony/process (v7.4.13): Extracting archive
+  - Installing symfony/polyfill-php86 (v1.38.0): Extracting archive
+  - Installing symfony/polyfill-php85 (v1.38.1): Extracting archive
+  - Installing symfony/polyfill-php84 (v1.38.1): Extracting archive
+  - Installing symfony/polyfill-intl-idn (v1.38.1): Extracting archive
+  - Installing symfony/mime (v7.4.13): Extracting archive
+  - Installing psr/event-dispatcher (1.0.0): Extracting archive
+  - Installing symfony/event-dispatcher-contracts (v3.7.1): Extracting archive
+  - Installing symfony/event-dispatcher (v7.4.14): Extracting archive
+  - Installing psr/log (3.0.2): Extracting archive
+  - Installing egulias/email-validator (4.0.4): Extracting archive
+  - Installing symfony/mailer (v7.4.14): Extracting archive
+  - Installing symfony/error-handler (v7.4.14): Extracting archive
+  - Installing symfony/http-kernel (v7.4.14): Extracting archive
+  - Installing symfony/finder (v7.4.14): Extracting archive
+  - Installing ramsey/collection (2.1.1): Extracting archive
+  - Installing brick/math (0.18.0): Extracting archive
+  - Installing ramsey/uuid (4.9.3): Extracting archive
+  - Installing psr/simple-cache (3.0.0): Extracting archive
+  - Installing symfony/translation-contracts (v3.7.1): Extracting archive
+  - Installing symfony/translation (v7.4.14): Extracting archive
+  - Installing symfony/polyfill-php83 (v1.38.2): Extracting archive
+  - Installing psr/clock (1.0.0): Extracting archive
+  - Installing symfony/clock (v7.4.8): Extracting archive
+  - Installing carbonphp/carbon-doctrine-types (3.2.0): Extracting archive
+  - Installing nesbot/carbon (3.13.1): Extracting archive
+  - Installing monolog/monolog (3.10.0): Extracting archive
+  - Installing league/uri-interfaces (7.8.1): Extracting archive
+  - Installing league/uri (7.8.1): Extracting archive
+  - Installing league/mime-type-detection (1.17.0): Extracting archive
+  - Installing league/flysystem-local (3.31.0): Extracting archive
+  - Installing league/flysystem (3.35.2): Extracting archive
+  - Installing nette/utils (v4.1.5): Extracting archive
+  - Installing nette/schema (v1.3.5): Extracting archive
+  - Installing dflydev/dot-access-data (v3.0.3): Extracting archive
+  - Installing league/config (v1.2.0): Extracting archive
+  - Installing league/commonmark (2.8.3): Extracting archive
+  - Installing laravel/serializable-closure (v2.0.15): Extracting archive
+  - Installing laravel/prompts (v0.3.21): Extracting archive
+  - Installing laravel/framework (v13.22.0): Extracting archive
+  - Installing laravel/pail (v1.2.7): Extracting archive
+  - Installing laravel/agent-detector (v2.0.2): Extracting archive
+  - Installing laravel/pao (v1.1.2): Extracting archive
+  - Installing laravel/pint (v1.29.3): Extracting archive
+  - Installing nikic/php-parser (v5.8.0): Extracting archive
+  - Installing psy/psysh (v0.12.24): Extracting archive
+  - Installing laravel/tinker (v3.0.2): Extracting archive
+  - Installing hamcrest/hamcrest-php (v2.1.1): Extracting archive
+  - Installing mockery/mockery (1.6.12): Extracting archive
+  - Installing filp/whoops (2.18.4): Extracting archive
+  - Installing nunomaduro/collision (v8.9.5): Extracting archive
+  - Installing staabm/side-effects-detector (1.0.5): Extracting archive
+  - Installing sebastian/version (6.0.0): Extracting archive
+  - Installing sebastian/type (6.0.4): Extracting archive
+  - Installing sebastian/recursion-context (7.0.1): Extracting archive
+  - Installing sebastian/object-reflector (5.0.0): Extracting archive
+  - Installing sebastian/object-enumerator (7.0.0): Extracting archive
+  - Installing sebastian/global-state (8.0.3): Extracting archive
+  - Installing sebastian/exporter (7.0.3): Extracting archive
+  - Installing sebastian/environment (8.1.2): Extracting archive
+  - Installing sebastian/diff (7.0.0): Extracting archive
+  - Installing sebastian/comparator (7.1.8): Extracting archive
+  - Installing sebastian/cli-parser (4.2.1): Extracting archive
+  - Installing phpunit/php-timer (8.0.0): Extracting archive
+  - Installing phpunit/php-text-template (5.0.0): Extracting archive
+  - Installing phpunit/php-invoker (6.0.0): Extracting archive
+  - Installing phpunit/php-file-iterator (6.0.1): Extracting archive
+  - Installing theseer/tokenizer (2.0.1): Extracting archive
+  - Installing sebastian/lines-of-code (4.0.1): Extracting archive
+  - Installing sebastian/complexity (5.0.0): Extracting archive
+  - Installing phpunit/php-code-coverage (12.5.7): Extracting archive
+  - Installing phar-io/version (3.2.1): Extracting archive
+  - Installing phar-io/manifest (2.0.4): Extracting archive
+  - Installing myclabs/deep-copy (1.13.4): Extracting archive
+  - Installing phpunit/phpunit (12.5.32): Extracting archive
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+  [37;44m INFO [39;49m Discovering packages.  
+
+  laravel/pail [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  laravel/pao [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  laravel/tinker [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nesbot/carbon [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nunomaduro/collision [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nunomaduro/termwind [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+
+79 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+
+===== php_tests =====
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true
+
+   FAIL  Tests\Feature\AdminNavigationTest
+  ⨯ new admin menu items are displayed in the required order
+  ⨯ new admin pages are available only after authentication
+
+   FAIL  Tests\Feature\DashboardMetricsPlacementTest
+  ⨯ vps metrics are displayed on dashboard
+  ⨯ vps metrics are not displayed in topbar on other pages
+
+   FAIL  Tests\Feature\ExampleTest
+  ⨯ the application returns a successful response                        0.05s  
+
+   FAIL  Tests\Feature\GroupChannelBotFeaturesTest
+  ⨯ same token can be added for different chats with separate disabled modules
+  ⨯ admin can send text publication from enabled chat
+  ⨯ poll options are sent as input poll option objects
+  ⨯ webhook requires telegram secret header
+  ⨯ webhook antispam deletes link and stores message
+  ⨯ direct join without required subscription is removed
+  ⨯ join request can be approved from admin panel
+
+   FAIL  Tests\Feature\GroupChannelBotTest
+  ⨯ admin can create group channel bot
+  ⨯ manual check saves bot permissions
+
+   FAIL  Tests\Feature\GroupChannelBulkDeleteNoticeTest
+  ⨯ bulk delete panel explains that old history is unavailable
+
+   FAIL  Tests\Feature\GroupChannelChannelPostTest
+  ⨯ channel post is saved for bulk delete after webhook delivery
+  ⨯ manual webhook registration subscribes to channel posts
+  ⨯ module checkbox is saved individually and connects webhook
+  ⨯ management page does not show obsolete save functions button
+
+   FAIL  Tests\Feature\GroupChannelManagementUiTest
+  ⨯ bulk delete preview does not fail for has many relation
+  ⨯ saving one module does not reset another module settings
+  ⨯ connection check updates compact rights and returns to management modal
+
+   FAIL  Tests\Feature\GroupChannelTechnicalAccountBulkDeleteTest
+  ⨯ preview uses existing account without prechecking channel rights
+  ⨯ confirmation creates pending task for separate worker
+  ⨯ separate worker marks task completed
+  ⨯ management panel lists all existing technical accounts
+
+   FAIL  Tests\Feature\SiteLoginSettingsTest
+  ⨯ authorization page is managed from site settings
+  ⨯ administrator can update login texts colors and images
+  ⨯ preview is available only to authenticated administrator
+  ⨯ login security flow is not changed by visual settings
+
+   FAIL  Tests\Feature\SiteSettingsCmsTest
+  ⨯ site settings contains protected system pages
+  ⨯ administrator can create publish and render page with blocks
+  ⨯ draft is available in preview but not publicly
+  ⨯ system page cannot be deleted
+  ⨯ menu supports external and nested items
+  ⨯ general branding and media upload are saved
+  ⨯ site cms does not modify news alerts or group channels
+
+   FAIL  Tests\Feature\SkyGuardianCoreTest
+  ⨯ sensitive telegram values are encrypted
+  ⨯ operation gate enforces per account limit
+  ⨯ operation gate enforces global limit
+  ⨯ manual account check updates only account health data
+  ⨯ manual source check does not change last message id
+  ⨯ first automatic processing sets latest message as baseline without copying history
+  ⨯ automatic processing copies new messages without changing manual status
+  ⨯ account and source limits are enforced
+
+   FAIL  Tests\Feature\SystemMetricsTest
+  ⨯ guest cannot read system metrics
+  ⨯ authenticated admin can read system metrics
+
+   FAIL  Tests\Feature\TelegramAuthFlowTest
+  ⨯ new account reopens modal at connection step
+  ⨯ code confirmation keeps modal open when 2fa is required
+  ⨯ successful code confirmation returns to settings without reopening modal
+
+   FAIL  Tests\Feature\TelegramAuthServiceTest
+  ⨯ phone authorization supports code and two factor password
+  ⨯ qr authorization stores temporary state and completes
+
+   FAIL  Tests\Feature\Tz2InterfaceTest
+  ⨯ public page and login page are available
+  ⨯ admin authentication is working
+  ⨯ news and air alert sources are separated and crud works
+  ⨯ telegram configuration and account crud are connected
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\AdminNavigationTest > new admin men…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\AdminNavigationTest > new admin pag…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DashboardMetricsPlacementTest > vps…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DashboardMetricsPlacementTest > vps…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\ExampleTest > the application returns a successful…    
+  Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+Illuminate\Foundation\ViteManifestNotFoundException: Vite manifest not found at: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/public/build/manifest.json in /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php:960
+Stack trace:
+#0 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php(398): Illuminate\Foundation\Vite->manifest()
+#1 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/storage/framework/views/032adc3337ed449969766c3ac539b558.php(37): Illuminate\Foundation\Vite->__invoke()
+#2 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(123): require('...')
+#3 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(124): Illuminate\Filesystem\Filesystem::Illuminate\Filesystem\{closure}()
+#4 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/PhpEngine.php(57): Illuminate\Filesystem\Filesystem->getRequire()
+#5 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(76): Illuminate\View\Engines\PhpEngine->evaluatePath()
+#6 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(208): Illuminate\View\Engines\CompilerEngine->get()
+#7 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(191): Illuminate\View\View->getContents()
+#8 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(160): Illuminate\View\View->renderContents()
+#9 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Concerns/ManagesComponents.php(103): Illuminate\View\View->render()
+#10 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/storage/framework/views/42efa8b3352ffbf8f89a4666cdf650e0.php(11): Illuminate\View\Factory->renderComponent()
+#11 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(123): require('...')
+#12 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(124): Illuminate\Filesystem\Filesystem::Illuminate\Filesystem\{closure}()
+#13 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/PhpEngine.php(57): Illuminate\Filesystem\Filesystem->getRequire()
+#14 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(76): Illuminate\View\Engines\PhpEngine->evaluatePath()
+#15 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(208): Illuminate\View\Engines\CompilerEngine->get()
+#16 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(191): Illuminate\View\View->getContents()
+#17 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(160): Illuminate\View\View->renderContents()
+#18 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Response.php(82): Illuminate\View\View->render()
+#19 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Response.php(40): Illuminate\Http\Response->setContent()
+#20 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/ResponseFactory.php(61): Illuminate\Http\Response->__construct()
+#21 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/ResponseFactory.php(91): Illuminate\Routing\ResponseFactory->make()
+#22 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(1031): Illuminate\Routing\ResponseFactory->view()
+#23 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(950): Illuminate\Foundation\Exceptions\Handler->renderHttpException()
+#24 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(833): Illuminate\Foundation\Exceptions\Handler->prepareResponse()
+#25 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(720): Illuminate\Foundation\Exceptions\Handler->renderExceptionResponse()
+#26 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Pipeline.php(51): Illuminate\Foundation\Exceptions\Handler->render()
+#27 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(182): Illuminate\Routing\Pipeline->handleException()
+#28 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#29 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle()
+#30 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#31 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle()
+#32 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#33 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle()
+#34 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#35 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest()
+#36 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle()
+#37 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#38 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle()
+#39 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#40 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle()
+#41 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#42 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate\Pipeline\Pipeline->then()
+#43 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate\Routing\Router->runRouteWithinStack()
+#44 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate\Routing\Router->runRoute()
+#45 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate\Routing\Router->dispatchToRoute()
+#46 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate\Routing\Router->dispatch()
+#47 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}()
+#48 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#49 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle()
+#50 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle()
+#51 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#52 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle()
+#53 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle()
+#54 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#55 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle()
+#56 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#57 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle()
+#58 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#59 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle()
+#60 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#61 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle()
+#62 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#63 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle()
+#64 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#65 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle()
+#66 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#67 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\Pipeline\Pipeline->then()
+#68 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter()
+#69 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(638): Illuminate\Foundation\Http\Kernel->handle()
+#70 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call()
+#71 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/tests/Feature/ExampleTest.php(15): Illuminate\Foundation\Testing\TestCase->get()
+#72 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(1318): Tests\Feature\ExampleTest->test_the_application_returns_a_successful_response()
+#73 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(1355): PHPUnit\Framework\TestCase->invokeTestMethod()
+#74 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(521): PHPUnit\Framework\TestCase->runTest()
+#75 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#76 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(361): PHPUnit\Framework\TestRunner->run()
+#77 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#78 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#79 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#80 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/TextUI/TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#81 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/TextUI/Application.php(229): PHPUnit\TextUI\TestRunner->run()
+#82 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/phpunit(104): PHPUnit\TextUI\Application->run()
+#83 {main}
+
+Next Illuminate\View\ViewException: Vite manifest not found at: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/public/build/manifest.json (View: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/resources/views/components/error-page.blade.php) in /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php:960
+Stack trace:
+#0 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/PhpEngine.php(59): Illuminate\View\Engines\CompilerEngine->handleViewException()
+#1 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(76): Illuminate\View\Engines\PhpEngine->evaluatePath()
+#2 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(208): Illuminate\View\Engines\CompilerEngine->get()
+#3 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(191): Illuminate\View\View->getContents()
+#4 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(160): Illuminate\View\View->renderContents()
+#5 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Concerns/ManagesComponents.php(103): Illuminate\View\View->render()
+#6 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/storage/framework/views/42efa8b3352ffbf8f89a4666cdf650e0.php(11): Illuminate\View\Factory->renderComponent()
+#7 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(123): require('...')
+#8 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Filesystem/Filesystem.php(124): Illuminate\Filesystem\Filesystem::Illuminate\Filesystem\{closure}()
+#9 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/PhpEngine.php(57): Illuminate\Filesystem\Filesystem->getRequire()
+#10 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(76): Illuminate\View\Engines\PhpEngine->evaluatePath()
+#11 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(208): Illuminate\View\Engines\CompilerEngine->get()
+#12 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(191): Illuminate\View\View->getContents()
+#13 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(160): Illuminate\View\View->renderContents()
+#14 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Response.php(82): Illuminate\View\View->render()
+#15 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Response.php(40): Illuminate\Http\Response->setContent()
+#16 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/ResponseFactory.php(61): Illuminate\Http\Response->__construct()
+#17 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/ResponseFactory.php(91): Illuminate\Routing\ResponseFactory->make()
+#18 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(1031): Illuminate\Routing\ResponseFactory->view()
+#19 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(950): Illuminate\Foundation\Exceptions\Handler->renderHttpException()
+#20 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(833): Illuminate\Foundation\Exceptions\Handler->prepareResponse()
+#21 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(720): Illuminate\Foundation\Exceptions\Handler->renderExceptionResponse()
+#22 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Pipeline.php(51): Illuminate\Foundation\Exceptions\Handler->render()
+#23 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(182): Illuminate\Routing\Pipeline->handleException()
+#24 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#25 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle()
+#26 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#27 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle()
+#28 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#29 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle()
+#30 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#31 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest()
+#32 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle()
+#33 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#34 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle()
+#35 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#36 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle()
+#37 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#38 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate\Pipeline\Pipeline->then()
+#39 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate\Routing\Router->runRouteWithinStack()
+#40 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate\Routing\Router->runRoute()
+#41 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate\Routing\Router->dispatchToRoute()
+#42 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate\Routing\Router->dispatch()
+#43 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}()
+#44 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#45 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle()
+#46 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle()
+#47 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#48 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle()
+#49 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle()
+#50 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#51 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle()
+#52 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#53 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle()
+#54 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#55 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle()
+#56 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#57 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle()
+#58 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#59 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle()
+#60 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#61 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle()
+#62 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#63 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\Pipeline\Pipeline->then()
+#64 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter()
+#65 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(638): Illuminate\Foundation\Http\Kernel->handle()
+#66 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call()
+#67 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/tests/Feature/ExampleTest.php(15): Illuminate\Foundation\Testing\TestCase->get()
+#68 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(1318): Tests\Feature\ExampleTest->test_the_application_returns_a_successful_response()
+#69 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(1355): PHPUnit\Framework\TestCase->invokeTestMethod()
+#70 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(521): PHPUnit\Framework\TestCase->runTest()
+#71 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#72 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(361): PHPUnit\Framework\TestRunner->run()
+#73 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#74 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#75 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#76 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/TextUI/TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#77 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/TextUI/Application.php(229): PHPUnit\TextUI\TestRunner->run()
+#78 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/phpunit(104): PHPUnit\TextUI\Application->run()
+#79 {main}
+
+Next Illuminate\View\ViewException: Vite manifest not found at: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/public/build/manifest.json (View: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/resources/views/components/error-page.blade.php) (View: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/resources/views/components/error-page.blade.php) in /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Vite.php:960
+Stack trace:
+#0 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/PhpEngine.php(59): Illuminate\View\Engines\CompilerEngine->handleViewException()
+#1 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Engines/CompilerEngine.php(76): Illuminate\View\Engines\PhpEngine->evaluatePath()
+#2 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(208): Illuminate\View\Engines\CompilerEngine->get()
+#3 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(191): Illuminate\View\View->getContents()
+#4 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/View.php(160): Illuminate\View\View->renderContents()
+#5 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Response.php(82): Illuminate\View\View->render()
+#6 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Response.php(40): Illuminate\Http\Response->setContent()
+#7 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/ResponseFactory.php(61): Illuminate\Http\Response->__construct()
+#8 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/ResponseFactory.php(91): Illuminate\Routing\ResponseFactory->make()
+#9 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(1031): Illuminate\Routing\ResponseFactory->view()
+#10 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(950): Illuminate\Foundation\Exceptions\Handler->renderHttpException()
+#11 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(833): Illuminate\Foundation\Exceptions\Handler->prepareResponse()
+#12 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Exceptions/Handler.php(720): Illuminate\Foundation\Exceptions\Handler->renderExceptionResponse()
+#13 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Pipeline.php(51): Illuminate\Foundation\Exceptions\Handler->render()
+#14 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(182): Illuminate\Routing\Pipeline->handleException()
+#15 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Middleware/SubstituteBindings.php(52): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#16 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle()
+#17 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestForgery.php(104): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#18 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestForgery->handle()
+#19 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/View/Middleware/ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#20 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle()
+#21 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#22 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Session/Middleware/StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest()
+#23 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle()
+#24 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#25 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle()
+#26 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Cookie/Middleware/EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#27 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle()
+#28 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#29 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(821): Illuminate\Pipeline\Pipeline->then()
+#30 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(800): Illuminate\Routing\Router->runRouteWithinStack()
+#31 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(764): Illuminate\Routing\Router->runRoute()
+#32 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Routing/Router.php(753): Illuminate\Routing\Router->dispatchToRoute()
+#33 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(200): Illuminate\Routing\Router->dispatch()
+#34 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}()
+#35 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#36 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle()
+#37 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle()
+#38 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#39 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle()
+#40 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle()
+#41 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#42 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle()
+#43 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#44 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle()
+#45 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#46 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle()
+#47 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#48 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle()
+#49 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Middleware/InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#50 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle()
+#51 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Http/Middleware/ValidatePathEncoding.php(28): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#52 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle()
+#53 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Pipeline/Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}()
+#54 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(175): Illuminate\Pipeline\Pipeline->then()
+#55 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Http/Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter()
+#56 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(638): Illuminate\Foundation\Http\Kernel->handle()
+#57 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/laravel/framework/src/Illuminate/Foundation/Testing/Concerns/MakesHttpRequests.php(368): Illuminate\Foundation\Testing\TestCase->call()
+#58 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/tests/Feature/ExampleTest.php(15): Illuminate\Foundation\Testing\TestCase->get()
+#59 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(1318): Tests\Feature\ExampleTest->test_the_application_returns_a_successful_response()
+#60 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(1355): PHPUnit\Framework\TestCase->invokeTestMethod()
+#61 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(521): PHPUnit\Framework\TestCase->runTest()
+#62 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestRunner/TestRunner.php(99): PHPUnit\Framework\TestCase->runBare()
+#63 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestCase.php(361): PHPUnit\Framework\TestRunner->run()
+#64 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestCase->run()
+#65 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#66 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/Framework/TestSuite.php(374): PHPUnit\Framework\TestSuite->run()
+#67 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/TextUI/TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#68 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/src/TextUI/Application.php(229): PHPUnit\TextUI\TestRunner->run()
+#69 /home/github-runner/actions-runner/_work/skyguardian/skyguardian/vendor/phpunit/phpunit/phpunit(104): PHPUnit\TextUI\Application->run()
+#70 {main}
+
+----------------------------------------------------------------------------------
+
+Vite manifest not found at: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/public/build/manifest.json (View: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/resources/views/components/error-page.blade.php) (View: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/resources/views/components/error-page.blade.php)
+
+  at tests/Feature/ExampleTest.php:17
+     13▕     public function test_the_application_returns_a_successful_response(): void
+     14▕     {
+     15▕         $response = $this->get('/');
+     16▕ 
+  ➜  17▕         $response->assertStatus(200);
+     18▕     }
+     19▕ }
+     20▕
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotFeaturesTest > same…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotFeaturesTest > admin…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotFeaturesTest > poll…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotFeaturesTest > webho…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotFeaturesTest > webho…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotFeaturesTest > direc…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotFeaturesTest > join…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotTest > admin can cre…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBotTest > manual check…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelBulkDeleteNoticeTest >…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelChannelPostTest > chann…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelChannelPostTest > manua…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelChannelPostTest > modul…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelChannelPostTest > manag…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelManagementUiTest > bulk…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelManagementUiTest > savi…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelManagementUiTest > conn…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelTechnicalAccountBulkDel…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelTechnicalAccountBulkDel…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelTechnicalAccountBulkDel…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GroupChannelTechnicalAccountBulkDel…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteLoginSettingsTest > authorizati…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteLoginSettingsTest > administrat…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteLoginSettingsTest > preview is…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteLoginSettingsTest > login secur…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteSettingsCmsTest > site settings…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteSettingsCmsTest > administrator…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteSettingsCmsTest > draft is avai…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteSettingsCmsTest > system page c…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteSettingsCmsTest > menu supports…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteSettingsCmsTest > general brand…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SiteSettingsCmsTest > site cms does…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > sensitive tel…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > operation gat…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > operation gat…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > manual accoun…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > manual source…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > first automat…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > automatic pro…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SkyGuardianCoreTest > account and s…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SystemMetricsTest > guest cannot re…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\SystemMetricsTest > authenticated a…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\TelegramAuthFlowTest > new account…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\TelegramAuthFlowTest > code confirm…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\TelegramAuthFlowTest > successful c…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\TelegramAuthServiceTest > phone aut…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\TelegramAuthServiceTest > qr author…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Tz2InterfaceTest > public page and…   QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Tz2InterfaceTest > admin authentica…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Tz2InterfaceTest > news and air ale…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Tz2InterfaceTest > telegram configu…  QueryException   
+  could not find driver (Connection: sqlite, Database: :memory:, SQL: select exists (select 1 from "main".sqlite_master where name = 'migrations' and type = 'table') as "exists")
+
+  at vendor/laravel/framework/src/Illuminate/Database/Connection.php:857
+    853▕             $exceptionType = ($isUniqueConstraintError = $this->isUniqueConstraintError($e))
+    854▕                 ? UniqueConstraintViolationException::class
+    855▕                 : QueryException::class;
+    856▕ 
+  ➜ 857▕             $exception = new $exceptionType(
+    858▕                 $this->getNameWithReadWriteType(),
+    859▕                 $query,
+    860▕                 $this->prepareBindings($bindings),
+    861▕                 $e,
+
+
+
+  Tests:    56 failed, 1 passed (2 assertions)
+  Duration: 1.08s
+
+
+===== php_format =====
+
+  ............................................................................
+  ....................................
+
+  ──────────────────────────────────────────────────────────────────── Laravel  
+    PASS   ......................................................... 112 files  
+
+
+===== npm_ci =====
+npm error code EUSAGE
+npm error
+npm error The `npm ci` command can only install with an existing package-lock.json or
+npm error npm-shrinkwrap.json with lockfileVersion >= 1. Run an install with npm@5 or
+npm error later to generate a package-lock.json file, then try again.
+npm error
+npm error Clean install a project
+npm error
+npm error Usage:
+npm error npm ci
+npm error
+npm error Options:
+npm error [--install-strategy <hoisted|nested|shallow|linked>] [--legacy-bundling]
+npm error [--global-style] [--omit <dev|optional|peer> [--omit <dev|optional|peer> ...]]
+npm error [--include <prod|dev|optional|peer> [--include <prod|dev|optional|peer> ...]]
+npm error [--strict-peer-deps] [--foreground-scripts] [--ignore-scripts] [--no-audit]
+npm error [--no-bin-links] [--no-fund] [--dry-run]
+npm error [-w|--workspace <workspace-name> [-w|--workspace <workspace-name> ...]]
+npm error [-ws|--workspaces] [--include-workspace-root] [--install-links]
+npm error
+npm error aliases: clean-install, ic, install-clean, isntall-clean
+npm error
+npm error Run "npm help ci" for more info
+npm error A complete log of this run can be found in: /home/github-runner/.npm/_logs/2026-08-01T08_33_15_343Z-debug-0.log
+
+===== frontend_build =====
+
+> build
+> vite build
+
+sh: 1: vite: not found
+
+===== composer_audit =====
+No security vulnerability advisories found.
+
+===== npm_audit =====
+npm error code ENOLOCK
+npm error audit This command requires an existing lockfile.
+npm error audit Try creating one first with: npm i --package-lock-only
+npm error audit Original error: loadVirtual requires existing shrinkwrap file
+npm error A complete log of this run can be found in: /home/github-runner/.npm/_logs/2026-08-01T08_33_16_748Z-debug-0.log
+
+===== telethon_worker_syntax =====
