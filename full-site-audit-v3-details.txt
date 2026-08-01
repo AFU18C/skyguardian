@@ -1,0 +1,756 @@
+
+===== systemd_failed_units =====
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.
+
+===== listening_ports =====
+State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                                                                                  
+LISTEN 0      70         127.0.0.1:33060      0.0.0.0:*    users:(("mysqld",pid=2497668,fd=21))                                                    
+LISTEN 0      511          0.0.0.0:443        0.0.0.0:*    users:(("nginx",pid=2497556,fd=6),("nginx",pid=2497555,fd=6),("nginx",pid=2497554,fd=6))
+LISTEN 0      511          0.0.0.0:80         0.0.0.0:*    users:(("nginx",pid=2497556,fd=7),("nginx",pid=2497555,fd=7),("nginx",pid=2497554,fd=7))
+LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=2497557,fd=3),("systemd",pid=1,fd=228))                              
+LISTEN 0      151        127.0.0.1:3306       0.0.0.0:*    users:(("mysqld",pid=2497668,fd=24))                                                    
+LISTEN 0      4096      127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=2497578,fd=17))                                           
+LISTEN 0      100        127.0.0.1:8788       0.0.0.0:*    users:(("python",pid=2497544,fd=6))                                                     
+LISTEN 0      100        127.0.0.1:8787       0.0.0.0:*    users:(("python",pid=2497591,fd=6))                                                     
+LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=2497578,fd=15))                                           
+LISTEN 0      511             [::]:443           [::]:*    users:(("nginx",pid=2497556,fd=5),("nginx",pid=2497555,fd=5),("nginx",pid=2497554,fd=5))
+LISTEN 0      511             [::]:80            [::]:*    users:(("nginx",pid=2497556,fd=8),("nginx",pid=2497555,fd=8),("nginx",pid=2497554,fd=8))
+LISTEN 0      4096            [::]:22            [::]:*    users:(("sshd",pid=2497557,fd=4),("systemd",pid=1,fd=232))                              
+
+===== nginx_config =====
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+===== tls_certificate =====
+subject=CN = skyguardian.pp.ua
+issuer=C = US, O = Let's Encrypt, CN = YE1
+serial=05BAD87C13DF98BEBF76FF567325338F4EA9
+notBefore=Jul 25 07:47:08 2026 GMT
+notAfter=Oct 23 07:47:07 2026 GMT
+sha256 Fingerprint=93:D4:7F:D4:95:80:9A:BB:75:F5:FA:84:89:47:59:B4:EB:A7:C3:B1:C2:64:44:D3:10:E9:18:7A:9F:EF:9A:13
+
+===== internal_asset_link_checks =====
+200|0.039855 https://skyguardian.pp.ua/build/assets/app-BpGR08lp.css
+200|0.048602 https://skyguardian.pp.ua/build/assets/public-site-y66C4Hb7.css
+200|0.029333 https://skyguardian.pp.ua/build/assets/login-page-ClHu4FLR.css
+200|0.059330 https://skyguardian.pp.ua/build/assets/app-Ctmo-wgh.js
+200|0.077925 https://skyguardian.pp.ua
+
+===== artisan_about =====
+
+  Environment ................................................................  
+  Application Name ............................................... SkyGuardian  
+  Laravel Version .................................................... 13.22.0  
+  PHP Version ......................................................... 8.3.33  
+  Composer Version .................................................... 2.10.2  
+  Environment ..................................................... production  
+  Debug Mode ............................................................. OFF  
+  URL ...................................................... skyguardian.pp.ua  
+  Maintenance Mode ....................................................... OFF  
+  Timezone ....................................................... Europe/Kyiv  
+  Locale .................................................................. ru  
+
+  Cache ......................................................................  
+  Config .............................................................. CACHED  
+  Events .......................................................... NOT CACHED  
+  Routes .......................................................... NOT CACHED  
+  Views ............................................................... CACHED  
+
+  Drivers ....................................................................  
+  Broadcasting .......................................................... null  
+  Cache ................................................................. file  
+  Database ............................................................. mysql  
+  Logs ........................................................ stack / single  
+  Mail ................................................................... log  
+  Queue ................................................................. sync  
+  Session ............................................................... file  
+
+  Storage ....................................................................  
+  public/storage .................................................. NOT LINKED  
+
+
+===== migration_status =====
+
+  Migration name .............................................. Batch / Status  
+  0001_01_01_000000_create_users_table ............................... [1] Ran  
+  0001_01_01_000001_create_cache_table ............................... [1] Ran  
+  0001_01_01_000002_create_jobs_table ................................ [1] Ran  
+  2026_07_25_000100_create_skyguardian_core_tables ................... [2] Ran  
+  2026_07_25_000200_reset_source_cursors_after_copy_fix .............. [3] Ran  
+  2026_07_25_193000_create_group_channel_bots_table .................. [4] Ran  
+  2026_07_26_075900_create_group_channel_publications_table .......... [5] Ran  
+  2026_07_26_080000_add_auto_delete_to_group_channel_publications_table  [5] Ran  
+  2026_07_26_100000_add_module_settings_to_group_channel_bots_table .. [5] Ran  
+  2026_07_26_120000_expand_group_channel_bot_features ................ [5] Ran  
+  2026_07_27_120000_create_group_channel_technical_delete_tasks_table  [6] Ran  
+  2026_07_29_000000_create_site_content_tables ....................... [7] Ran  
+
+
+===== schedule_list =====
+
+  * * * * * 1s  php artisan skyguardian:sources:process --limit=40  Has Mutex › Next Due: через 0 секунд
+  * * * * *     php artisan skyguardian:group-channel-publications:process --limit=20  Next Due: через 1 секунду
+
+
+===== route_list =====
+
+  GET|HEAD  / ................................. home › SitePageController@home
+  GET|HEAD  admin ................ admin.dashboard › Admin\DashboardController
+  GET|HEAD  admin/air-alert admin.air-alert.index › Admin\SourceController@in…
+  POST      admin/air-alert admin.air-alert.store › Admin\SourceController@st…
+  PUT       admin/air-alert/{source} admin.air-alert.update › Admin\SourceCon…
+  DELETE    admin/air-alert/{source} admin.air-alert.destroy › Admin\SourceCo…
+  POST      admin/air-alert/{source}/check admin.air-alert.check › Admin\Sour…
+  GET|HEAD  admin/group-channel admin.group-channel › Admin\GroupChannelContr…
+  POST      admin/group-channel admin.group-channel.store › Admin\GroupChanne…
+  PUT       admin/group-channel/{groupChannelBot} admin.group-channel.update …
+  DELETE    admin/group-channel/{groupChannelBot} admin.group-channel.destroy…
+  POST      admin/group-channel/{groupChannelBot}/bulk-delete/execute admin.g…
+  POST      admin/group-channel/{groupChannelBot}/bulk-delete/preview admin.g…
+  POST      admin/group-channel/{groupChannelBot}/check admin.group-channel.c…
+  POST      admin/group-channel/{groupChannelBot}/join-requests/{joinRequest}/approve admin.group-channel.join-requests.approve › Admin\GroupChannelJoinRequestControlle…
+  POST      admin/group-channel/{groupChannelBot}/join-requests/{joinRequest}/decline admin.group-channel.join-requests.decline › Admin\GroupChannelJoinRequestControlle…
+  PUT       admin/group-channel/{groupChannelBot}/module-settings admin.group…
+  PUT       admin/group-channel/{groupChannelBot}/modules admin.group-channel…
+  PATCH     admin/group-channel/{groupChannelBot}/modules/{module} admin.grou…
+  POST      admin/group-channel/{groupChannelBot}/publications admin.group-ch…
+  DELETE    admin/group-channel/{groupChannelBot}/publications/{publication} …
+  POST      admin/group-channel/{groupChannelBot}/publications/{publication}/send admin.group-channel.publications.send › Admin\GroupChannelPublicationController…
+  POST      admin/group-channel/{groupChannelBot}/technical-delete/execute ad…
+  POST      admin/group-channel/{groupChannelBot}/technical-delete/preview ad…
+  POST      admin/group-channel/{groupChannelBot}/test-message admin.group-ch…
+  POST      admin/group-channel/{groupChannelBot}/webhook admin.group-channel…
+  POST      admin/group-channel/{groupChannelBot}/welcome-photo admin.group-c…
+  DELETE    admin/group-channel/{groupChannelBot}/welcome-photo admin.group-c…
+  GET|HEAD  admin/login admin.login › Auth\AuthenticatedSessionController@cre…
+  POST      admin/login admin.login.store › Auth\AuthenticatedSessionControll…
+  POST      admin/logout admin.logout › Auth\AuthenticatedSessionController@d…
+  GET|HEAD  admin/news ....... admin.news.index › Admin\SourceController@index
+  POST      admin/news ....... admin.news.store › Admin\SourceController@store
+  PUT       admin/news/{source} admin.news.update › Admin\SourceController@up…
+  DELETE    admin/news/{source} admin.news.destroy › Admin\SourceController@d…
+  POST      admin/news/{source}/check admin.news.check › Admin\SourceControll…
+  GET|HEAD  admin/site-settings admin.site-settings › Admin\SiteSettingsContr…
+  PUT       admin/site-settings/general admin.site-settings.general.update › …
+  GET|HEAD  admin/site-settings/login admin.site-settings.login.edit › Admin\…
+  PUT       admin/site-settings/login admin.site-settings.login.update › Admi…
+  GET|HEAD  admin/site-settings/login/preview admin.site-settings.login.previ…
+  POST      admin/site-settings/media admin.site-settings.media.store › Admin…
+  POST      admin/site-settings/menu admin.site-settings.menu.store › Admin\S…
+  PUT       admin/site-settings/menu/{siteMenuItem} admin.site-settings.menu.…
+  DELETE    admin/site-settings/menu/{siteMenuItem} admin.site-settings.menu.…
+  POST      admin/site-settings/pages admin.site-settings.pages.store › Admin…
+  GET|HEAD  admin/site-settings/pages/create admin.site-settings.pages.create…
+  PUT       admin/site-settings/pages/{sitePage} admin.site-settings.pages.up…
+  DELETE    admin/site-settings/pages/{sitePage} admin.site-settings.pages.de…
+  POST      admin/site-settings/pages/{sitePage}/duplicate admin.site-setting…
+  GET|HEAD  admin/site-settings/pages/{sitePage}/edit admin.site-settings.pag…
+  GET|HEAD  admin/site-settings/pages/{sitePage}/preview admin.site-settings.…
+  GET|HEAD  admin/system/metrics admin.system.metrics › Admin\SystemMetricsCo…
+  GET|HEAD  admin/telegram admin.telegram.index › Admin\TelegramController@in…
+  POST      admin/telegram/accounts admin.telegram.accounts.store › Admin\Tel…
+  PUT       admin/telegram/accounts/{account} admin.telegram.accounts.update …
+  DELETE    admin/telegram/accounts/{account} admin.telegram.accounts.destroy…
+  POST      admin/telegram/accounts/{account}/check admin.telegram.accounts.c…
+  POST      admin/telegram/accounts/{account}/password admin.telegram.account…
+  POST      admin/telegram/accounts/{account}/qr/start admin.telegram.account…
+  POST      admin/telegram/accounts/{account}/qr/wait admin.telegram.accounts…
+  POST      admin/telegram/accounts/{account}/send-code admin.telegram.accoun…
+  POST      admin/telegram/accounts/{account}/sign-in admin.telegram.accounts…
+  POST      admin/telegram/apis admin.telegram.apis.store › Admin\TelegramCon…
+  PUT       admin/telegram/apis/{telegramApi} admin.telegram.apis.update › Ad…
+  DELETE    admin/telegram/apis/{telegramApi} admin.telegram.apis.destroy › A…
+  GET|HEAD  storage/{path} storage.local › vendor/laravel/framework/src/Illum…
+  PUT       storage/{path} storage.local.upload › vendor/laravel/framework/sr…
+  POST      telegram/bot-api/webhook/{fingerprint}/{secret} group-channel.web…
+  GET|HEAD  up vendor/laravel/framework/src/Illuminate/Foundation/Configurati…
+  GET|HEAD  {slug} ....................... site.page › SitePageController@show
+
+                                                           Showing [71] routes
+
+Could not open input file: /home/github-runner/actions-runner/_work/skyguardian/skyguardian/audit-runtime.php
+
+===== scheduler_recent_sanitized =====
+Aug 01 09:00:43 bigxaos.whost.systems php[2529101]:   [number]:00:42 Running ['artisan' skyguardian:sources:process --limit=40]  232.73ms DONE
+Aug 01 09:00:43 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:44 bigxaos.whost.systems php[2529101]:   [number]:00:43 Running ['artisan' skyguardian:sources:process --limit=40]  299.19ms DONE
+Aug 01 09:00:44 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:45 bigxaos.whost.systems php[2529101]:   [number]:00:44 Running ['artisan' skyguardian:sources:process --limit=40]  255.13ms DONE
+Aug 01 09:00:45 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:46 bigxaos.whost.systems php[2529101]:   [number]:00:46 Running ['artisan' skyguardian:sources:process --limit=40]  244.68ms DONE
+Aug 01 09:00:46 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:47 bigxaos.whost.systems php[2529101]:   [number]:00:47 Running ['artisan' skyguardian:sources:process --limit=40]  221.74ms DONE
+Aug 01 09:00:47 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:48 bigxaos.whost.systems php[2529101]:   [number]:00:48 Running ['artisan' skyguardian:sources:process --limit=40]  242.15ms DONE
+Aug 01 09:00:48 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:49 bigxaos.whost.systems php[2529101]:   [number]:00:49 Running ['artisan' skyguardian:sources:process --limit=40]  595.40ms DONE
+Aug 01 09:00:49 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:50 bigxaos.whost.systems php[2529101]:   [number]:00:50 Running ['artisan' skyguardian:sources:process --limit=40]  232.72ms DONE
+Aug 01 09:00:50 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:51 bigxaos.whost.systems php[2529101]:   [number]:00:51 Running ['artisan' skyguardian:sources:process --limit=40]  259.04ms DONE
+Aug 01 09:00:51 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:52 bigxaos.whost.systems php[2529101]:   [number]:00:52 Running ['artisan' skyguardian:sources:process --limit=40]  224.47ms DONE
+Aug 01 09:00:52 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:53 bigxaos.whost.systems php[2529101]:   [number]:00:53 Running ['artisan' skyguardian:sources:process --limit=40]  247.82ms DONE
+Aug 01 09:00:53 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:54 bigxaos.whost.systems php[2529101]:   [number]:00:54 Running ['artisan' skyguardian:sources:process --limit=40]  224.08ms DONE
+Aug 01 09:00:54 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:55 bigxaos.whost.systems php[2529101]:   [number]:00:55 Running ['artisan' skyguardian:sources:process --limit=40]  229.01ms DONE
+Aug 01 09:00:55 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:56 bigxaos.whost.systems php[2529101]:   [number]:00:56 Running ['artisan' skyguardian:sources:process --limit=40]  221.87ms DONE
+Aug 01 09:00:56 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:57 bigxaos.whost.systems php[2529101]:   [number]:00:57 Running ['artisan' skyguardian:sources:process --limit=40]  221.83ms DONE
+Aug 01 09:00:57 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:58 bigxaos.whost.systems php[2529101]:   [number]:00:58 Running ['artisan' skyguardian:sources:process --limit=40]  223.52ms DONE
+Aug 01 09:00:58 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:00:59 bigxaos.whost.systems php[2529101]:   [number]:00:59 Running ['artisan' skyguardian:sources:process --limit=40]  231.79ms DONE
+Aug 01 09:00:59 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:00 bigxaos.whost.systems php[2529101]:   [number]:01:00 Running ['artisan' skyguardian:sources:process --limit=40]  232.49ms DONE
+Aug 01 09:01:00 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:00 bigxaos.whost.systems php[2529101]:   [number]:01:00 Running ['artisan' skyguardian:group-channel-publications:process --limit=20]  230.56ms DONE
+Aug 01 09:01:00 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:group-channel-publications:process --limit=20 > '/dev/null' 2>&1
+Aug 01 09:01:01 bigxaos.whost.systems php[2529101]:   [number]:01:01 Running ['artisan' skyguardian:sources:process --limit=40]  266.40ms DONE
+Aug 01 09:01:01 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:02 bigxaos.whost.systems php[2529101]:   [number]:01:02 Running ['artisan' skyguardian:sources:process --limit=40]  229.66ms DONE
+Aug 01 09:01:02 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:03 bigxaos.whost.systems php[2529101]:   [number]:01:03 Running ['artisan' skyguardian:sources:process --limit=40]  250.40ms DONE
+Aug 01 09:01:03 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:04 bigxaos.whost.systems php[2529101]:   [number]:01:04 Running ['artisan' skyguardian:sources:process --limit=40]  230.40ms DONE
+Aug 01 09:01:04 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:05 bigxaos.whost.systems php[2529101]:   [number]:01:05 Running ['artisan' skyguardian:sources:process --limit=40]  265.96ms DONE
+Aug 01 09:01:05 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:06 bigxaos.whost.systems php[2529101]:   [number]:01:06 Running ['artisan' skyguardian:sources:process --limit=40]  225.66ms DONE
+Aug 01 09:01:06 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:07 bigxaos.whost.systems php[2529101]:   [number]:01:07 Running ['artisan' skyguardian:sources:process --limit=40]  241.25ms DONE
+Aug 01 09:01:07 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:08 bigxaos.whost.systems php[2529101]:   [number]:01:08 Running ['artisan' skyguardian:sources:process --limit=40]  245.45ms DONE
+Aug 01 09:01:08 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:09 bigxaos.whost.systems php[2529101]:   [number]:01:09 Running ['artisan' skyguardian:sources:process --limit=40]  225.74ms DONE
+Aug 01 09:01:09 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:10 bigxaos.whost.systems php[2529101]:   [number]:01:10 Running ['artisan' skyguardian:sources:process --limit=40]  221.17ms DONE
+Aug 01 09:01:10 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:12 bigxaos.whost.systems php[2529101]:   [number]:01:11 Running ['artisan' skyguardian:sources:process --limit=40]  225.74ms DONE
+Aug 01 09:01:12 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:13 bigxaos.whost.systems php[2529101]:   [number]:01:12 Running ['artisan' skyguardian:sources:process --limit=40]  220.28ms DONE
+Aug 01 09:01:13 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:14 bigxaos.whost.systems php[2529101]:   [number]:01:13 Running ['artisan' skyguardian:sources:process --limit=40]  234.61ms DONE
+Aug 01 09:01:14 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:15 bigxaos.whost.systems php[2529101]:   [number]:01:14 Running ['artisan' skyguardian:sources:process --limit=40]  221.71ms DONE
+Aug 01 09:01:15 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:16 bigxaos.whost.systems php[2529101]:   [number]:01:15 Running ['artisan' skyguardian:sources:process --limit=40]  224.45ms DONE
+Aug 01 09:01:16 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:17 bigxaos.whost.systems php[2529101]:   [number]:01:16 Running ['artisan' skyguardian:sources:process --limit=40]  234.81ms DONE
+Aug 01 09:01:17 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:18 bigxaos.whost.systems php[2529101]:   [number]:01:17 Running ['artisan' skyguardian:sources:process --limit=40]  236.08ms DONE
+Aug 01 09:01:18 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:19 bigxaos.whost.systems php[2529101]:   [number]:01:19 Running ['artisan' skyguardian:sources:process --limit=40]  696.72ms DONE
+Aug 01 09:01:19 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:20 bigxaos.whost.systems php[2529101]:   [number]:01:20 Running ['artisan' skyguardian:sources:process --limit=40]  238.85ms DONE
+Aug 01 09:01:20 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:21 bigxaos.whost.systems php[2529101]:   [number]:01:21 Running ['artisan' skyguardian:sources:process --limit=40]  224.53ms DONE
+Aug 01 09:01:21 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:22 bigxaos.whost.systems php[2529101]:   [number]:01:22 Running ['artisan' skyguardian:sources:process --limit=40]  227.12ms DONE
+Aug 01 09:01:22 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:23 bigxaos.whost.systems php[2529101]:   [number]:01:23 Running ['artisan' skyguardian:sources:process --limit=40]  232.37ms DONE
+Aug 01 09:01:23 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:24 bigxaos.whost.systems php[2529101]:   [number]:01:24 Running ['artisan' skyguardian:sources:process --limit=40]  253.77ms DONE
+Aug 01 09:01:24 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:25 bigxaos.whost.systems php[2529101]:   [number]:01:25 Running ['artisan' skyguardian:sources:process --limit=40]  230.99ms DONE
+Aug 01 09:01:25 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:26 bigxaos.whost.systems php[2529101]:   [number]:01:26 Running ['artisan' skyguardian:sources:process --limit=40]  234.55ms DONE
+Aug 01 09:01:26 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:27 bigxaos.whost.systems php[2529101]:   [number]:01:27 Running ['artisan' skyguardian:sources:process --limit=40]  240.49ms DONE
+Aug 01 09:01:27 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:28 bigxaos.whost.systems php[2529101]:   [number]:01:28 Running ['artisan' skyguardian:sources:process --limit=40]  227.66ms DONE
+Aug 01 09:01:28 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:29 bigxaos.whost.systems php[2529101]:   [number]:01:29 Running ['artisan' skyguardian:sources:process --limit=40]  248.24ms DONE
+Aug 01 09:01:29 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:30 bigxaos.whost.systems php[2529101]:   [number]:01:30 Running ['artisan' skyguardian:sources:process --limit=40]  241.22ms DONE
+Aug 01 09:01:30 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:31 bigxaos.whost.systems php[2529101]:   [number]:01:31 Running ['artisan' skyguardian:sources:process --limit=40]  258.73ms DONE
+Aug 01 09:01:31 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:32 bigxaos.whost.systems php[2529101]:   [number]:01:32 Running ['artisan' skyguardian:sources:process --limit=40]  248.36ms DONE
+Aug 01 09:01:32 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:33 bigxaos.whost.systems php[2529101]:   [number]:01:33 Running ['artisan' skyguardian:sources:process --limit=40]  215.45ms DONE
+Aug 01 09:01:33 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:34 bigxaos.whost.systems php[2529101]:   [number]:01:34 Running ['artisan' skyguardian:sources:process --limit=40]  241.04ms DONE
+Aug 01 09:01:34 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:35 bigxaos.whost.systems php[2529101]:   [number]:01:35 Running ['artisan' skyguardian:sources:process --limit=40]  213.79ms DONE
+Aug 01 09:01:35 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:36 bigxaos.whost.systems php[2529101]:   [number]:01:36 Running ['artisan' skyguardian:sources:process --limit=40]  221.06ms DONE
+Aug 01 09:01:36 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:38 bigxaos.whost.systems php[2529101]:   [number]:01:37 Running ['artisan' skyguardian:sources:process --limit=40]  267.88ms DONE
+Aug 01 09:01:38 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:39 bigxaos.whost.systems php[2529101]:   [number]:01:38 Running ['artisan' skyguardian:sources:process --limit=40]  227.19ms DONE
+Aug 01 09:01:39 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:40 bigxaos.whost.systems php[2529101]:   [number]:01:39 Running ['artisan' skyguardian:sources:process --limit=40]  231.01ms DONE
+Aug 01 09:01:40 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:41 bigxaos.whost.systems php[2529101]:   [number]:01:40 Running ['artisan' skyguardian:sources:process --limit=40]  232.56ms DONE
+Aug 01 09:01:41 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:42 bigxaos.whost.systems php[2529101]:   [number]:01:41 Running ['artisan' skyguardian:sources:process --limit=40]  234.84ms DONE
+Aug 01 09:01:42 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:43 bigxaos.whost.systems php[2529101]:   [number]:01:42 Running ['artisan' skyguardian:sources:process --limit=40]  237.08ms DONE
+Aug 01 09:01:43 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:44 bigxaos.whost.systems php[2529101]:   [number]:01:44 Running ['artisan' skyguardian:sources:process --limit=40]  242.44ms DONE
+Aug 01 09:01:44 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:45 bigxaos.whost.systems php[2529101]:   [number]:01:45 Running ['artisan' skyguardian:sources:process --limit=40]  228.28ms DONE
+Aug 01 09:01:45 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:46 bigxaos.whost.systems php[2529101]:   [number]:01:46 Running ['artisan' skyguardian:sources:process --limit=40]  230.77ms DONE
+Aug 01 09:01:46 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:47 bigxaos.whost.systems php[2529101]:   [number]:01:47 Running ['artisan' skyguardian:sources:process --limit=40]  228.66ms DONE
+Aug 01 09:01:47 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:48 bigxaos.whost.systems php[2529101]:   [number]:01:48 Running ['artisan' skyguardian:sources:process --limit=40]  262.72ms DONE
+Aug 01 09:01:48 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:49 bigxaos.whost.systems php[2529101]:   [number]:01:49 Running ['artisan' skyguardian:sources:process --limit=40]  651.10ms DONE
+Aug 01 09:01:49 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:50 bigxaos.whost.systems php[2529101]:   [number]:01:50 Running ['artisan' skyguardian:sources:process --limit=40]  215.50ms DONE
+Aug 01 09:01:50 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:51 bigxaos.whost.systems php[2529101]:   [number]:01:51 Running ['artisan' skyguardian:sources:process --limit=40]  243.51ms DONE
+Aug 01 09:01:51 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:52 bigxaos.whost.systems php[2529101]:   [number]:01:52 Running ['artisan' skyguardian:sources:process --limit=40]  236.72ms DONE
+Aug 01 09:01:52 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:53 bigxaos.whost.systems php[2529101]:   [number]:01:53 Running ['artisan' skyguardian:sources:process --limit=40]  281.29ms DONE
+Aug 01 09:01:53 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:54 bigxaos.whost.systems php[2529101]:   [number]:01:54 Running ['artisan' skyguardian:sources:process --limit=40]  225.83ms DONE
+Aug 01 09:01:54 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:55 bigxaos.whost.systems php[2529101]:   [number]:01:55 Running ['artisan' skyguardian:sources:process --limit=40]  253.24ms DONE
+Aug 01 09:01:55 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:56 bigxaos.whost.systems php[2529101]:   [number]:01:56 Running ['artisan' skyguardian:sources:process --limit=40]  240.90ms DONE
+Aug 01 09:01:56 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:57 bigxaos.whost.systems php[2529101]:   [number]:01:57 Running ['artisan' skyguardian:sources:process --limit=40]  232.75ms DONE
+Aug 01 09:01:57 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+Aug 01 09:01:58 bigxaos.whost.systems php[2529101]:   [number]:01:58 Running ['artisan' skyguardian:sources:process --limit=40]  268.93ms DONE
+Aug 01 09:01:58 bigxaos.whost.systems php[2529101]:   ⇂ '/usr/bin/php8.3' 'artisan' skyguardian:sources:process --limit=40 > '/dev/null' 2>&1
+
+===== composer_validate =====
+./composer.json is valid
+
+===== composer_audit =====
+No security vulnerability advisories found.
+
+===== php_lint =====
+No syntax errors detected in app/Providers/AppServiceProvider.php
+No syntax errors detected in app/Console/Commands/ProcessGroupChannelPublications.php
+No syntax errors detected in app/Console/Commands/SignInTelegramQr.php
+No syntax errors detected in app/Console/Commands/SendTelegramCode.php
+No syntax errors detected in app/Console/Commands/ProcessSources.php
+No syntax errors detected in app/Console/Commands/CreateAdminUser.php
+No syntax errors detected in app/Console/Commands/SignInTelegram.php
+No syntax errors detected in app/Console/Commands/CheckSource.php
+No syntax errors detected in app/Console/Commands/SignInTelegramPassword.php
+No syntax errors detected in app/Console/Commands/CheckTechnicalAccount.php
+No syntax errors detected in app/Console/Commands/WorkGroupChannelTechnicalDeletes.php
+No syntax errors detected in app/Models/Source.php
+No syntax errors detected in app/Models/SiteSetting.php
+No syntax errors detected in app/Models/TechnicalAccount.php
+No syntax errors detected in app/Models/GroupChannelJoinRequest.php
+No syntax errors detected in app/Models/GroupChannelPublication.php
+No syntax errors detected in app/Models/User.php
+No syntax errors detected in app/Models/SiteMenuItem.php
+No syntax errors detected in app/Models/GroupChannelTechnicalDeleteTask.php
+No syntax errors detected in app/Models/GroupChannelMessage.php
+No syntax errors detected in app/Models/TelegramApi.php
+No syntax errors detected in app/Models/GroupChannelBot.php
+No syntax errors detected in app/Models/SitePage.php
+No syntax errors detected in app/Models/GroupChannelUserState.php
+No syntax errors detected in app/Models/SourceRule.php
+No syntax errors detected in app/Http/Controllers/Controller.php
+No syntax errors detected in app/Http/Controllers/SitePageController.php
+No syntax errors detected in app/Http/Controllers/GroupChannelWebhookController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelWelcomeController.php
+No syntax errors detected in app/Http/Controllers/Admin/TelegramController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelModuleSettingsController.php
+No syntax errors detected in app/Http/Controllers/Admin/SystemMetricsController.php
+No syntax errors detected in app/Http/Controllers/Admin/SiteLoginSettingsController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelPublicationController.php
+No syntax errors detected in app/Http/Controllers/Admin/SitePageController.php
+No syntax errors detected in app/Http/Controllers/Admin/SiteMenuController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelWebhookRegistrationController.php
+No syntax errors detected in app/Http/Controllers/Admin/DashboardController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelTechnicalBulkDeleteController.php
+No syntax errors detected in app/Http/Controllers/Admin/SiteSettingsController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelJoinRequestController.php
+No syntax errors detected in app/Http/Controllers/Admin/SourceController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelBulkDeleteController.php
+No syntax errors detected in app/Http/Controllers/Admin/SiteMediaController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelModuleToggleController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelCheckController.php
+No syntax errors detected in app/Http/Controllers/Admin/GroupChannelController.php
+No syntax errors detected in app/Http/Controllers/Auth/AuthenticatedSessionController.php
+No syntax errors detected in app/Services/GroupChannelWebhookRegistrationService.php
+No syntax errors detected in app/Services/GroupChannelTelethonClient.php
+No syntax errors detected in app/Services/SourceService.php
+No syntax errors detected in app/Services/SystemMetricsService.php
+No syntax errors detected in app/Services/GroupChannelSubscriptionGateService.php
+No syntax errors detected in app/Services/SiteContentService.php
+No syntax errors detected in app/Services/TechnicalAccountService.php
+No syntax errors detected in app/Services/TelethonClient.php
+No syntax errors detected in app/Services/GroupChannelTelegramService.php
+No syntax errors detected in app/Services/GroupChannelWebhookUpdateService.php
+No syntax errors detected in app/Services/SourceScheduler.php
+No syntax errors detected in app/Services/SourceProcessor.php
+No syntax errors detected in app/Services/GroupChannelPublicationService.php
+No syntax errors detected in app/Services/OperationGate.php
+No syntax errors detected in app/Services/TelegramAuthService.php
+No syntax errors detected in app/Services/GroupChannelWebhookService.php
+No syntax errors detected in routes/console.php
+No syntax errors detected in routes/web.php
+No syntax errors detected in database/seeders/DatabaseSeeder.php
+No syntax errors detected in database/factories/UserFactory.php
+No syntax errors detected in database/migrations/2026_07_26_075900_create_group_channel_publications_table.php
+No syntax errors detected in database/migrations/2026_07_26_080000_add_auto_delete_to_group_channel_publications_table.php
+No syntax errors detected in database/migrations/2026_07_25_193000_create_group_channel_bots_table.php
+No syntax errors detected in database/migrations/2026_07_29_000000_create_site_content_tables.php
+No syntax errors detected in database/migrations/2026_07_26_120000_expand_group_channel_bot_features.php
+No syntax errors detected in database/migrations/0001_01_01_000001_create_cache_table.php
+No syntax errors detected in database/migrations/2026_07_27_120000_create_group_channel_technical_delete_tasks_table.php
+No syntax errors detected in database/migrations/0001_01_01_000002_create_jobs_table.php
+No syntax errors detected in database/migrations/0001_01_01_000000_create_users_table.php
+No syntax errors detected in database/migrations/2026_07_25_000100_create_skyguardian_core_tables.php
+No syntax errors detected in database/migrations/2026_07_26_100000_add_module_settings_to_group_channel_bots_table.php
+No syntax errors detected in database/migrations/2026_07_25_000200_reset_source_cursors_after_copy_fix.php
+No syntax errors detected in tests/TestCase.php
+No syntax errors detected in tests/Unit/ExampleTest.php
+No syntax errors detected in tests/Feature/ExampleTest.php
+No syntax errors detected in tests/Feature/TelegramAuthFlowTest.php
+No syntax errors detected in tests/Feature/SiteSettingsCmsTest.php
+No syntax errors detected in tests/Feature/GroupChannelChannelPostTest.php
+No syntax errors detected in tests/Feature/GroupChannelBotFeaturesTest.php
+No syntax errors detected in tests/Feature/SkyGuardianCoreTest.php
+No syntax errors detected in tests/Feature/GroupChannelBotTest.php
+No syntax errors detected in tests/Feature/AdminNavigationTest.php
+No syntax errors detected in tests/Feature/DashboardMetricsPlacementTest.php
+No syntax errors detected in tests/Feature/SiteLoginSettingsTest.php
+No syntax errors detected in tests/Feature/SystemMetricsTest.php
+No syntax errors detected in tests/Feature/Tz2InterfaceTest.php
+No syntax errors detected in tests/Feature/GroupChannelTechnicalAccountBulkDeleteTest.php
+No syntax errors detected in tests/Feature/GroupChannelManagementUiTest.php
+No syntax errors detected in tests/Feature/TelegramAuthServiceTest.php
+No syntax errors detected in tests/Feature/GroupChannelBulkDeleteNoticeTest.php
+
+===== python_syntax =====
+
+===== composer_install =====
+Installing dependencies from lock file (including require-dev)
+Verifying lock file contents can be installed on current platform.
+Package operations: 110 installs, 0 updates, 0 removals
+  - Installing doctrine/inflector (2.1.0): Extracting archive
+  - Installing doctrine/lexer (3.0.1): Extracting archive
+  - Installing dragonmantank/cron-expression (v3.6.0): Extracting archive
+  - Installing symfony/deprecation-contracts (v3.7.1): Extracting archive
+  - Installing psr/container (2.0.2): Extracting archive
+  - Installing fakerphp/faker (v1.24.1): Extracting archive
+  - Installing symfony/polyfill-mbstring (v1.38.2): Extracting archive
+  - Installing symfony/http-foundation (v7.4.14): Extracting archive
+  - Installing fruitcake/php-cors (v1.4.0): Extracting archive
+  - Installing symfony/polyfill-php80 (v1.37.0): Extracting archive
+  - Installing psr/http-message (2.0): Extracting archive
+  - Installing psr/http-client (1.0.3): Extracting archive
+  - Installing ralouphie/getallheaders (3.0.3): Extracting archive
+  - Installing psr/http-factory (1.1.0): Extracting archive
+  - Installing guzzlehttp/psr7 (2.13.0): Extracting archive
+  - Installing guzzlehttp/promises (2.5.1): Extracting archive
+  - Installing guzzlehttp/guzzle (7.15.1): Extracting archive
+  - Installing guzzlehttp/uri-template (v1.0.10): Extracting archive
+  - Installing symfony/polyfill-intl-normalizer (v1.38.0): Extracting archive
+  - Installing symfony/polyfill-intl-grapheme (v1.38.1): Extracting archive
+  - Installing symfony/polyfill-ctype (v1.37.0): Extracting archive
+  - Installing symfony/string (v7.4.13): Extracting archive
+  - Installing symfony/service-contracts (v3.7.1): Extracting archive
+  - Installing symfony/console (v7.4.14): Extracting archive
+  - Installing nunomaduro/termwind (v2.4.0): Extracting archive
+  - Installing voku/portable-ascii (2.1.1): Extracting archive
+  - Installing phpoption/phpoption (1.9.5): Extracting archive
+  - Installing graham-campbell/result-type (v1.1.4): Extracting archive
+  - Installing vlucas/phpdotenv (v5.6.4): Extracting archive
+  - Installing symfony/css-selector (v7.4.9): Extracting archive
+  - Installing tijsverkoyen/css-to-inline-styles (v2.4.0): Extracting archive
+  - Installing symfony/var-dumper (v7.4.14): Extracting archive
+  - Installing symfony/polyfill-uuid (v1.37.0): Extracting archive
+  - Installing symfony/uid (v7.4.9): Extracting archive
+  - Installing symfony/routing (v7.4.13): Extracting archive
+  - Installing symfony/process (v7.4.13): Extracting archive
+  - Installing symfony/polyfill-php86 (v1.38.0): Extracting archive
+  - Installing symfony/polyfill-php85 (v1.38.1): Extracting archive
+  - Installing symfony/polyfill-php84 (v1.38.1): Extracting archive
+  - Installing symfony/polyfill-intl-idn (v1.38.1): Extracting archive
+  - Installing symfony/mime (v7.4.13): Extracting archive
+  - Installing psr/event-dispatcher (1.0.0): Extracting archive
+  - Installing symfony/event-dispatcher-contracts (v3.7.1): Extracting archive
+  - Installing symfony/event-dispatcher (v7.4.14): Extracting archive
+  - Installing psr/log (3.0.2): Extracting archive
+  - Installing egulias/email-validator (4.0.4): Extracting archive
+  - Installing symfony/mailer (v7.4.14): Extracting archive
+  - Installing symfony/error-handler (v7.4.14): Extracting archive
+  - Installing symfony/http-kernel (v7.4.14): Extracting archive
+  - Installing symfony/finder (v7.4.14): Extracting archive
+  - Installing ramsey/collection (2.1.1): Extracting archive
+  - Installing brick/math (0.18.0): Extracting archive
+  - Installing ramsey/uuid (4.9.3): Extracting archive
+  - Installing psr/simple-cache (3.0.0): Extracting archive
+  - Installing symfony/translation-contracts (v3.7.1): Extracting archive
+  - Installing symfony/translation (v7.4.14): Extracting archive
+  - Installing symfony/polyfill-php83 (v1.38.2): Extracting archive
+  - Installing psr/clock (1.0.0): Extracting archive
+  - Installing symfony/clock (v7.4.8): Extracting archive
+  - Installing carbonphp/carbon-doctrine-types (3.2.0): Extracting archive
+  - Installing nesbot/carbon (3.13.1): Extracting archive
+  - Installing monolog/monolog (3.10.0): Extracting archive
+  - Installing league/uri-interfaces (7.8.1): Extracting archive
+  - Installing league/uri (7.8.1): Extracting archive
+  - Installing league/mime-type-detection (1.17.0): Extracting archive
+  - Installing league/flysystem-local (3.31.0): Extracting archive
+  - Installing league/flysystem (3.35.2): Extracting archive
+  - Installing nette/utils (v4.1.5): Extracting archive
+  - Installing nette/schema (v1.3.5): Extracting archive
+  - Installing dflydev/dot-access-data (v3.0.3): Extracting archive
+  - Installing league/config (v1.2.0): Extracting archive
+  - Installing league/commonmark (2.8.3): Extracting archive
+  - Installing laravel/serializable-closure (v2.0.15): Extracting archive
+  - Installing laravel/prompts (v0.3.21): Extracting archive
+  - Installing laravel/framework (v13.22.0): Extracting archive
+  - Installing laravel/pail (v1.2.7): Extracting archive
+  - Installing laravel/agent-detector (v2.0.2): Extracting archive
+  - Installing laravel/pao (v1.1.2): Extracting archive
+  - Installing laravel/pint (v1.29.3): Extracting archive
+  - Installing nikic/php-parser (v5.8.0): Extracting archive
+  - Installing psy/psysh (v0.12.24): Extracting archive
+  - Installing laravel/tinker (v3.0.2): Extracting archive
+  - Installing hamcrest/hamcrest-php (v2.1.1): Extracting archive
+  - Installing mockery/mockery (1.6.12): Extracting archive
+  - Installing filp/whoops (2.18.4): Extracting archive
+  - Installing nunomaduro/collision (v8.9.5): Extracting archive
+  - Installing staabm/side-effects-detector (1.0.5): Extracting archive
+  - Installing sebastian/version (6.0.0): Extracting archive
+  - Installing sebastian/type (6.0.4): Extracting archive
+  - Installing sebastian/recursion-context (7.0.1): Extracting archive
+  - Installing sebastian/object-reflector (5.0.0): Extracting archive
+  - Installing sebastian/object-enumerator (7.0.0): Extracting archive
+  - Installing sebastian/global-state (8.0.3): Extracting archive
+  - Installing sebastian/exporter (7.0.3): Extracting archive
+  - Installing sebastian/environment (8.1.2): Extracting archive
+  - Installing sebastian/diff (7.0.0): Extracting archive
+  - Installing sebastian/comparator (7.1.8): Extracting archive
+  - Installing sebastian/cli-parser (4.2.1): Extracting archive
+  - Installing phpunit/php-timer (8.0.0): Extracting archive
+  - Installing phpunit/php-text-template (5.0.0): Extracting archive
+  - Installing phpunit/php-invoker (6.0.0): Extracting archive
+  - Installing phpunit/php-file-iterator (6.0.1): Extracting archive
+  - Installing theseer/tokenizer (2.0.1): Extracting archive
+  - Installing sebastian/lines-of-code (4.0.1): Extracting archive
+  - Installing sebastian/complexity (5.0.0): Extracting archive
+  - Installing phpunit/php-code-coverage (12.5.7): Extracting archive
+  - Installing phar-io/version (3.2.1): Extracting archive
+  - Installing phar-io/manifest (2.0.4): Extracting archive
+  - Installing myclabs/deep-copy (1.13.4): Extracting archive
+  - Installing phpunit/phpunit (12.5.32): Extracting archive
+Generating optimized autoload files
+> Illuminate\Foundation\ComposerScripts::postAutoloadDump
+> @php artisan package:discover --ansi
+
+  [37;44m INFO [39;49m Discovering packages.  
+
+  laravel/pail [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  laravel/pao [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  laravel/tinker [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nesbot/carbon [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nunomaduro/collision [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+  nunomaduro/termwind [90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m[90m.[39m [32;1mDONE[39;22m
+
+79 packages you are using are looking for funding.
+Use the `composer fund` command to find out more!
+
+===== npm_install =====
+
+added 66 packages in 18s
+
+===== frontend_build =====
+
+> build
+> vite build
+
+[36mvite v8.2.0 [32mbuilding client environment for production...[36m[39m
+[33m[plugin laravel:fonts] Optimized font fallbacks require the optional "fontaine" package. Install it, or set "optimizedFallbacks: false" on your fonts to disable the feature.[39m
+[2Ktransforming...✓ 15 modules transformed.
+rendering chunks...
+computing gzip size...
+public/build/manifest.json                                      4.12 kB │ gzip:  0.71 kB
+public/build/fonts-manifest.json                                5.74 kB │ gzip:  0.71 kB
+public/build/assets/instrument-sans-400-normal-DRC__1Mx.woff2  16.86 kB
+public/build/assets/instrument-sans-500-normal-Dk9ku72i.woff2  17.23 kB
+public/build/assets/instrument-sans-600-normal-B7fBEWYG.woff2  17.40 kB
+public/build/assets/instrument-sans-400-normal-D1W7dsQl.woff   21.24 kB
+public/build/assets/instrument-sans-500-normal-Z6ESRlEs.woff   21.65 kB
+public/build/assets/instrument-sans-600-normal-B9e8oLYv.woff   21.67 kB
+public/build/assets/source-copying-B_er-zjk.css                 1.47 kB │ gzip:  0.63 kB
+public/build/assets/collapsible-cards-DqtQny_8.css              1.50 kB │ gzip:  0.62 kB
+public/build/assets/login-page-ClHu4FLR.css                     1.89 kB │ gzip:  0.76 kB
+public/build/assets/fonts-C9MNnjVw.css                          2.35 kB │ gzip:  0.38 kB
+public/build/assets/group-channel-BLeex38n.css                  3.68 kB │ gzip:  1.11 kB
+public/build/assets/topbar-metrics-moreZTaL.css                 4.40 kB │ gzip:  1.28 kB
+public/build/assets/site-settings-DqyBSCQj.css                  7.62 kB │ gzip:  1.90 kB
+public/build/assets/public-site-y66C4Hb7.css                    8.53 kB │ gzip:  2.44 kB
+public/build/assets/app-C6GzMaHQ.css                           59.02 kB │ gzip: 14.44 kB
+public/build/assets/collapsible-cards-qc0m0BB4.js               0.72 kB │ gzip:  0.40 kB
+public/build/assets/site-settings-CwDkmYNk.js                   0.79 kB │ gzip:  0.39 kB
+public/build/assets/topbar-metrics-BRqGw-fd.js                  2.08 kB │ gzip:  0.97 kB
+public/build/assets/group-channel-management-BQ70Xt0t.js        3.15 kB │ gzip:  1.40 kB
+public/build/assets/app-Ctmo-wgh.js                             5.46 kB │ gzip:  1.89 kB
+public/build/assets/site-page-editor-CWZG85tj.js                9.76 kB │ gzip:  3.84 kB
+
+[32m✓ built in 744ms[39m
+
+   INFO  Application key set successfully.  
+
+
+===== php_tests =====
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true
+
+   PASS  Tests\Feature\AdminNavigationTest
+  ✓ new admin menu items are displayed in the required order             0.34s  
+  ✓ new admin pages are available only after authentication              0.05s  
+
+   PASS  Tests\Feature\DashboardMetricsPlacementTest
+  ✓ vps metrics are displayed on dashboard                               0.02s  
+  ✓ vps metrics are not displayed in topbar on other pages               0.02s  
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ the application returns a successful response                        0.02s  
+
+   PASS  Tests\Feature\GroupChannelBotFeaturesTest
+  ✓ same token can be added for different chats with separate disabled…  0.03s  
+  ✓ admin can send text publication from enabled chat                    0.06s  
+  ✓ poll options are sent as input poll option objects                   0.02s  
+  ✓ webhook requires telegram secret header                              0.02s  
+  ✓ webhook antispam deletes link and stores message                     0.02s  
+  ✓ direct join without required subscription is removed                 0.02s  
+  ✓ join request can be approved from admin panel                        0.02s  
+
+   PASS  Tests\Feature\GroupChannelBotTest
+  ✓ admin can create group channel bot                                   0.02s  
+  ✓ manual check saves bot permissions                                   0.02s  
+
+   PASS  Tests\Feature\GroupChannelBulkDeleteNoticeTest
+  ✓ bulk delete panel explains that old history is unavailable           0.03s  
+
+   PASS  Tests\Feature\GroupChannelChannelPostTest
+  ✓ channel post is saved for bulk delete after webhook delivery         0.02s  
+  ✓ manual webhook registration subscribes to channel posts              0.02s  
+  ✓ module checkbox is saved individually and connects webhook           0.02s  
+  ✓ management page does not show obsolete save functions button         0.03s  
+
+   PASS  Tests\Feature\GroupChannelManagementUiTest
+  ✓ bulk delete preview does not fail for has many relation              0.02s  
+  ✓ saving one module does not reset another module settings             0.02s  
+  ✓ connection check updates compact rights and returns to management m… 0.02s  
+
+   PASS  Tests\Feature\GroupChannelTechnicalAccountBulkDeleteTest
+  ✓ preview uses existing account without prechecking channel rights     0.03s  
+  ✓ confirmation creates pending task for separate worker                0.02s  
+  ✓ separate worker marks task completed                                 0.02s  
+  ✓ management panel lists all existing technical accounts               0.04s  
+
+   PASS  Tests\Feature\SiteLoginSettingsTest
+  ✓ authorization page is managed from site settings                     0.03s  
+  ✓ administrator can update login texts colors and images               0.08s  
+  ✓ preview is available only to authenticated administrator             0.02s  
+  ✓ login security flow is not changed by visual settings                0.22s  
+
+   PASS  Tests\Feature\SiteSettingsCmsTest
+  ✓ site settings contains protected system pages                        0.03s  
+  ✓ administrator can create publish and render page with blocks         0.04s  
+  ✓ draft is available in preview but not publicly                       0.02s  
+  ✓ system page cannot be deleted                                        0.01s  
+  ✓ menu supports external and nested items                              0.02s  
+  ✓ general branding and media upload are saved                          0.04s  
+  ✓ site cms does not modify news alerts or group channels               0.02s  
+
+   PASS  Tests\Feature\SkyGuardianCoreTest
+  ✓ sensitive telegram values are encrypted                              0.02s  
+  ✓ operation gate enforces per account limit                            0.03s  
+  ✓ operation gate enforces global limit                                 0.01s  
+  ✓ manual account check updates only account health data                0.01s  
+  ✓ manual source check does not change last message id                  0.01s  
+  ✓ first automatic processing sets latest message as baseline without…  0.01s  
+  ✓ automatic processing copies new messages without changing manual st… 0.02s  
+  ✓ account and source limits are enforced                               0.01s  
+
+   PASS  Tests\Feature\SystemMetricsTest
+  ✓ guest cannot read system metrics                                     0.02s  
+  ✓ authenticated admin can read system metrics                          0.01s  
+
+   PASS  Tests\Feature\TelegramAuthFlowTest
+  ✓ new account reopens modal at connection step                         0.03s  
+  ✓ code confirmation keeps modal open when 2fa is required              0.03s  
+  ✓ successful code confirmation returns to settings without reopening…  0.02s  
+
+   PASS  Tests\Feature\TelegramAuthServiceTest
+  ✓ phone authorization supports code and two factor password            0.02s  
+  ✓ qr authorization stores temporary state and completes                0.02s  
+
+   PASS  Tests\Feature\Tz2InterfaceTest
+  ✓ public page and login page are available                             0.02s  
+  ✓ admin authentication is working                                      0.23s  
+  ✓ news and air alert sources are separated and crud works              0.06s  
+  ✓ telegram configuration and account crud are connected                0.03s  
+
+  Tests:    57 passed (327 assertions)
+  Duration: 2.27s
+
+
+===== php_format =====
+
+  ............................................................................
+  ....................................
+
+  ──────────────────────────────────────────────────────────────────── Laravel  
+    PASS   ......................................................... 112 files  
+
+
+===== npm_audit =====
+found 0 vulnerabilities
+
+===== raw_blade_echo_locations =====
+resources/views/admin/group-channel.blade.php:57:                    <div><dt>Текст</dt><dd>{!! nl2br(e($preview['text'])) !!}</dd></div>
+resources/views/public/partials/page-block.blade.php:19:        <p>{!! nl2br(e($data['content'] ?? '')) !!}</p>
+resources/views/public/partials/page-block.blade.php:82:        @if(!empty($data['text']))<p>{!! nl2br(e($data['text'])) !!}</p>@endif
+resources/views/public/partials/page-block.blade.php:91:        <div>{!! $data['left_html'] ?? '' !!}</div>
+resources/views/public/partials/page-block.blade.php:92:        <div>{!! $data['right_html'] ?? '' !!}</div>
+resources/views/public/partials/page-block.blade.php:113:    <section class="site-block site-block-html">{!! $data['html'] ?? '' !!}</section>
+
+===== env_outside_config_locations =====
+
+===== workflow_permissions =====
+.github/workflows/full-site-audit-v3.yml-10-
+.github/workflows/full-site-audit-v3.yml:11:permissions:
+.github/workflows/full-site-audit-v3.yml-12-  contents: write
+.github/workflows/full-site-audit-v3.yml-13-
+--
+.github/workflows/focused-site-audit.yml-9-
+.github/workflows/focused-site-audit.yml:10:permissions:
+.github/workflows/focused-site-audit.yml-11-  contents: write
+.github/workflows/focused-site-audit.yml-12-
+--
+.github/workflows/full-site-audit.yml-9-
+.github/workflows/full-site-audit.yml:10:permissions:
+.github/workflows/full-site-audit.yml-11-  contents: write
+.github/workflows/full-site-audit.yml-12-
+--
+.github/workflows/tests.yml-12-
+.github/workflows/tests.yml:13:permissions:
+.github/workflows/tests.yml-14-  contents: write
+.github/workflows/tests.yml-15-
+--
+.github/workflows/bootstrap-laravel.yml-5-
+.github/workflows/bootstrap-laravel.yml:6:permissions:
+.github/workflows/bootstrap-laravel.yml-7-  contents: write
+.github/workflows/bootstrap-laravel.yml-8-
+--
+.github/workflows/deploy.yml-8-
+.github/workflows/deploy.yml:9:permissions:
+.github/workflows/deploy.yml-10-  contents: write
+.github/workflows/deploy.yml-11-

@@ -1,0 +1,180 @@
+
+## Scope
+audit_started_utc=2026-08-01T09:01:54Z
+mode=read-only
+production_changes=forbidden
+production_domain=skyguardian.pp.ua
+main_sha=3227341d9ab316c7976ba994566a430969db908b
+deployed_sha=3227341d9ab316c7976ba994566a430969db908b
+deployment_match=yes
+
+## Host resources
+hostname=bigxaos.whost.systems
+kernel=Linux 6.8.0-111-generic
+uptime=up 1 week, 1 hour, 58 minutes
+cpu_count=2
+load_1_5_15=0.34,0.36,0.36
+memory_total_mb=1812
+memory_available_mb=846
+swap_total_mb=512
+swap_free_mb=201
+root_disk=8581636/36031056KB used=26%
+root_inodes=218112/2293760 used=10%
+app_size=168M
+backups_size=109M
+
+## System services
+service.nginx.service.active=active
+service.nginx.service.enabled=enabled
+service.nginx.service.restarts=0
+service.nginx.service.main_status=0
+service.nginx.service.memory_bytes=3063808
+service.nginx.service.errors_15m=0
+service.nginx.service.errors_24h=0
+service.mysql.service.active=active
+service.mysql.service.enabled=enabled
+service.mysql.service.restarts=0
+service.mysql.service.main_status=0
+service.mysql.service.memory_bytes=224514048
+service.mysql.service.errors_15m=0
+service.mysql.service.errors_24h=0
+service.php8.3-fpm.service.active=active
+service.php8.3-fpm.service.enabled=enabled
+service.php8.3-fpm.service.restarts=0
+service.php8.3-fpm.service.main_status=0
+service.php8.3-fpm.service.memory_bytes=45412352
+service.php8.3-fpm.service.errors_15m=0
+service.php8.3-fpm.service.errors_24h=0
+service.skyguardian-telethon.service.active=active
+service.skyguardian-telethon.service.enabled=enabled
+service.skyguardian-telethon.service.restarts=0
+service.skyguardian-telethon.service.main_status=0
+service.skyguardian-telethon.service.memory_bytes=22200320
+service.skyguardian-telethon.service.errors_15m=0
+service.skyguardian-telethon.service.errors_24h=0
+service.skyguardian-scheduler.service.active=active
+service.skyguardian-scheduler.service.enabled=enabled
+service.skyguardian-scheduler.service.restarts=0
+service.skyguardian-scheduler.service.main_status=0
+service.skyguardian-scheduler.service.memory_bytes=107331584
+service.skyguardian-scheduler.service.errors_15m=0
+service.skyguardian-scheduler.service.errors_24h=0
+service.skyguardian-group-channel-telethon.service.active=active
+service.skyguardian-group-channel-telethon.service.enabled=enabled
+service.skyguardian-group-channel-telethon.service.restarts=0
+service.skyguardian-group-channel-telethon.service.main_status=0
+service.skyguardian-group-channel-telethon.service.memory_bytes=1941504
+service.skyguardian-group-channel-telethon.service.errors_15m=0
+service.skyguardian-group-channel-telethon.service.errors_24h=0
+service.skyguardian-group-channel-delete.service.active=active
+service.skyguardian-group-channel-delete.service.enabled=enabled
+service.skyguardian-group-channel-delete.service.restarts=0
+service.skyguardian-group-channel-delete.service.main_status=0
+service.skyguardian-group-channel-delete.service.memory_bytes=39043072
+service.skyguardian-group-channel-delete.service.errors_15m=0
+service.skyguardian-group-channel-delete.service.errors_24h=0
+service.certbot.timer.active=active
+service.certbot.timer.enabled=enabled
+service.certbot.timer.restarts=
+service.certbot.timer.main_status=
+service.certbot.timer.memory_bytes=
+service.certbot.timer.errors_15m=0
+service.certbot.timer.errors_24h=0
+failed_systemd_units=0
+systemd_failed_units.status=0
+listening_ports.status=0
+telethon_8787_tcp=open
+group_telethon_8788_tcp=open
+
+## TLS and web availability
+nginx_config.status=0
+tls_not_after=Oct 23 07:47:07 2026 GMT
+tls_days_remaining=82
+certbot_timer_active=active
+dns_ipv4=91.238.104.109
+dns_ipv6=::ffff:91.238.104.109
+http.home=200|0.098894|3170|https://skyguardian.pp.ua/
+http.login=200|0.071451|3677|https://skyguardian.pp.ua/admin/login
+http.admin_guest=200|0.089966|3677|https://skyguardian.pp.ua/admin/login
+http.health=200|0.077603|1832|https://skyguardian.pp.ua/up
+http.not_found=404|0.083273|2994|https://skyguardian.pp.ua/audit-not-found-1785574916
+http.robots=200|0.054626|24|https://skyguardian.pp.ua/robots.txt
+http.sitemap=404|0.068013|1122|https://skyguardian.pp.ua/sitemap.xml
+http.env_exposure=403|0.046801|162|https://skyguardian.pp.ua/.env
+http.git_exposure=403|0.023937|162|https://skyguardian.pp.ua/.git/config
+http.log_exposure=404|0.076218|1122|https://skyguardian.pp.ua/storage/logs/laravel.log
+http.vendor_exposure=404|0.083134|1122|https://skyguardian.pp.ua/vendor/composer/installed.json
+header.strict_transport_security=missing
+header.content_security_policy=missing
+header.x_frame_options=missing
+header.x_content_type_options=missing
+header.referrer_policy=missing
+header.permissions_policy=missing
+header.cache_control=no-cache, private
+login_cookie_present=yes
+login_cookie_secure=yes
+login_cookie_httponly=no
+login_cookie_samesite=samesite=lax
+login_csrf_token=yes
+login_password_autocomplete=yes
+home_stack_trace=no
+internal_urls_checked=5
+internal_urls_failed=0
+
+## Production application
+app_directory=present
+env_permissions=640 github-runner:www-data
+artisan_permissions=755 github-runner:www-data
+storage_permissions=775 www-data:www-data
+cache_permissions=775 www-data:www-data
+laravel_log_permissions=664 www-data:www-data
+public_storage_link=no
+vite_manifest=present
+app_git_directory=absent
+artisan_about.status=0
+migration_status.status=0
+schedule_list.status=0
+route_list.status=0
+runtime_database_audit=failed
+laravel_log_size_bytes=36811468
+laravel_errors_today=3127
+relayed_key_errors_today=1563
+scheduler_command_failures_today=1561
+relayed_key_errors_last_10m=0
+scheduler_failures_last_10m=0
+
+## Backup integrity
+backup_count=4
+newest_backup_path=/var/backups/skyguardian/skyguardian-full-20260801T082255Z.tar.gz
+newest_backup_size_bytes=28587411
+newest_backup_age_hours=0
+newest_backup_permissions=600 github-runner:github-runner
+newest_backup_archive_test=passed
+newest_backup_sha256=ba4d790a79f8973ce1aa9d8c140e7db3c3d3847ce1d671b01825b73740952d6e
+
+## Repository and isolated build checks
+repository_public=yes
+package_lock_present=no
+composer_lock_present=yes
+tracked_env_files=1
+raw_blade_echo_count=6
+env_outside_config_count=0
+debug_helper_count=0
+todo_fixme_count=0
+dangerous_php_calls=0
+workflow_write_permissions=6
+composer_validate.status=0
+composer_audit.status=0
+php_lint.status=0
+python_syntax.status=0
+composer_install.status=0
+npm_install.status=0
+frontend_build.status=0
+php_tests.status=0
+php_format.status=0
+npm_audit.status=0
+
+## Final markers
+audit_finished_utc=2026-08-01T09:02:38Z
+audit_completed=yes
+production_modified=no
