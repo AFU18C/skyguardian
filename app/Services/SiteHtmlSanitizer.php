@@ -62,6 +62,7 @@ class SiteHtmlSanitizer
             if ($node instanceof DOMComment) {
                 $parent->removeChild($node);
                 $node = $next;
+
                 continue;
             }
 
@@ -71,6 +72,7 @@ class SiteHtmlSanitizer
                 if (in_array($tag, self::DROP_WITH_CONTENT, true)) {
                     $parent->removeChild($node);
                     $node = $next;
+
                     continue;
                 }
 
@@ -81,6 +83,7 @@ class SiteHtmlSanitizer
                     }
                     $parent->removeChild($node);
                     $node = $next;
+
                     continue;
                 }
 
