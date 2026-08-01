@@ -1,0 +1,11 @@
+repaired_utc=2026-08-01T10:17:15Z
+env_permissions=640 github-runner:www-data
+runtime_db=mysql
+home_status=200
+login_status=200
+health_status=200
+storage_link=yes
+backup_timer=active
+scheduler_active=active
+relayed_errors_last_5m=0
+scheduler_failures_last_5m=0
