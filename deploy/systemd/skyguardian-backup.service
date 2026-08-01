@@ -1,0 +1,17 @@
+[Unit]
+Description=SkyGuardian full backup
+After=mysql.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/var/www/skyguardian
+ExecStart=/usr/local/sbin/skyguardian-full-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/backups/skyguardian /var/www/skyguardian /etc/skyguardian

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SiteMenuItem;
 use App\Models\SitePage;
 use App\Services\SiteContentService;
+use App\Services\SiteHtmlSanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -32,6 +33,8 @@ class SitePageController extends Controller
         'telegram',
         'html',
     ];
+
+    public function __construct(private readonly SiteHtmlSanitizer $htmlSanitizer) {}
 
     public function create(): View
     {
@@ -288,11 +291,7 @@ class SitePageController extends Controller
 
     private function sanitizeHtml(string $html): string
     {
-        $html = preg_replace('#<(script|style|iframe|object|embed)[^>]*>.*?</\1>#is', '', $html) ?? '';
-        $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
-        $html = preg_replace('/javascript\s*:/i', '', $html) ?? '';
-
-        return strip_tags($html, '<p><br><strong><b><em><i><u><s><ul><ol><li><blockquote><a><h2><h3><h4><table><thead><tbody><tr><th><td><span>');
+        return $this->htmlSanitizer->sanitize($html);
     }
 
     private function safeUrl(string $url): string

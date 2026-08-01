@@ -11,7 +11,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   tests:
@@ -25,19 +25,20 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, pdo_sqlite
+          extensions: mbstring, dom, pdo_sqlite
           coverage: none
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Build frontend assets
         run: npm run build
@@ -48,19 +49,14 @@ jobs:
       - name: Apply PHP formatting
         run: vendor/bin/pint
 
-      - name: Commit PHP formatting
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/tz1-implementation' || github.ref == 'refs/heads/tz2-interface')
-        run: |
-          if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add --update
-            git commit -m "Apply Pint formatting"
-            git push
-          fi
-
       - name: Check PHP formatting
         run: git diff --exit-code
+
+      - name: Audit PHP dependencies
+        run: composer audit --no-interaction
+
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
 
       - name: Check Telethon worker syntax
         run: python3 -m py_compile telethon/worker.py telethon/group_channel_worker.py

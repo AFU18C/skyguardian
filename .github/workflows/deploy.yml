@@ -13,7 +13,7 @@ jobs:
   deploy:
     name: Deploy to VPS
     runs-on: self-hosted
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       BEFORE_SHA: ${{ github.event.before }}
 
@@ -45,7 +45,7 @@ jobs:
             storage/framework/cache \
             storage/framework/sessions \
             storage/framework/views \
-            storage/logs \
+            storage/logs/archive \
             bootstrap/cache
 
           sudo chown -R github-runner:www-data /var/www/skyguardian
@@ -66,11 +66,10 @@ jobs:
           .venv/bin/pip install --disable-pip-version-check -r telethon/requirements.txt
 
           if [ -f package-lock.json ]; then
-            npm ci
+            npm ci --no-audit --no-fund
           else
-            npm install
+            npm install --no-audit --no-fund
           fi
-
           npm run build
 
           if [ ! -f .env ]; then
@@ -81,21 +80,76 @@ jobs:
             php artisan key:generate --force
           fi
 
-          php artisan optimize:clear
-          php artisan migrate --force
-          php artisan config:cache
-          php artisan view:cache
+          upsert_env() {
+            local key="$1" value="$2"
+            if grep -qE "^${key}=" .env; then
+              sed -i "s#^${key}=.*#${key}=${value}#" .env
+            else
+              printf '%s=%s\n' "$key" "$value" >> .env
+            fi
+          }
+
+          upsert_env LOG_CHANNEL stack
+          upsert_env LOG_STACK daily
+          upsert_env LOG_DAILY_DAYS 14
+          upsert_env LOG_LEVEL info
+          upsert_env SESSION_SECURE_COOKIE true
+          upsert_env SESSION_HTTP_ONLY true
+          upsert_env SESSION_SAME_SITE lax
+
+          if [ -f storage/logs/laravel.log ] \
+            && [ "$(stat -c '%s' storage/logs/laravel.log)" -gt 10485760 ]; then
+            ARCHIVE="storage/logs/archive/laravel-before-daily-$(date -u +%Y%m%dT%H%M%SZ).log.gz"
+            sudo gzip -c storage/logs/laravel.log > "$ARCHIVE"
+            sudo truncate -s 0 storage/logs/laravel.log
+          fi
+
+          if [ -e public/storage ] && [ ! -L public/storage ]; then
+            rm -rf public/storage
+          fi
+          if [ ! -L public/storage ]; then
+            php artisan storage:link
+          fi
+
+          sudo chown -R www-data:www-data storage bootstrap/cache
+          sudo chmod -R ug+rwX storage bootstrap/cache
+
+          sudo -u www-data php artisan optimize:clear
+          sudo -u www-data php artisan migrate --force
+          sudo -u www-data php artisan config:cache
+          sudo -u www-data php artisan view:cache
+          sudo -u www-data php artisan schedule:list --no-ansi >/dev/null
 
           sudo cp deploy/systemd/skyguardian-telethon.service /etc/systemd/system/skyguardian-telethon.service
           sudo cp deploy/systemd/skyguardian-scheduler.service /etc/systemd/system/skyguardian-scheduler.service
           sudo cp deploy/systemd/skyguardian-group-channel-telethon.service /etc/systemd/system/skyguardian-group-channel-telethon.service
           sudo cp deploy/systemd/skyguardian-group-channel-delete.service /etc/systemd/system/skyguardian-group-channel-delete.service
+          sudo cp deploy/systemd/skyguardian-backup.service /etc/systemd/system/skyguardian-backup.service
+          sudo cp deploy/systemd/skyguardian-backup.timer /etc/systemd/system/skyguardian-backup.timer
+          sudo cp deploy/backup/skyguardian-full-backup.sh /usr/local/sbin/skyguardian-full-backup
+          sudo chmod 750 /usr/local/sbin/skyguardian-full-backup
+
+          sudo mkdir -p /etc/skyguardian
+          if [ ! -f /etc/skyguardian/backup.key ]; then
+            sudo sh -c 'umask 077; openssl rand -base64 48 > /etc/skyguardian/backup.key'
+          fi
+          if [ ! -f /etc/skyguardian/backup.env ]; then
+            printf '%s\n' \
+              '# Optional encrypted offsite backup using rclone.' \
+              '# Example: RCLONE_REMOTE=remote:skyguardian-backups' \
+              'RCLONE_REMOTE=' \
+              'BACKUP_ENCRYPTION_PASSWORD_FILE=/etc/skyguardian/backup.key' \
+              | sudo tee /etc/skyguardian/backup.env >/dev/null
+            sudo chmod 600 /etc/skyguardian/backup.env
+          fi
+
           sudo systemctl daemon-reload
           sudo systemctl enable \
             skyguardian-telethon.service \
             skyguardian-scheduler.service \
             skyguardian-group-channel-telethon.service \
-            skyguardian-group-channel-delete.service
+            skyguardian-group-channel-delete.service \
+            skyguardian-backup.timer
 
           CORE_RESTART_REQUIRED=1
           if [ -n "${BEFORE_SHA:-}" ] \
@@ -118,19 +172,21 @@ jobs:
           sudo systemctl restart \
             skyguardian-group-channel-telethon.service \
             skyguardian-group-channel-delete.service
-
-          sudo chown -R www-data:www-data storage bootstrap/cache
-          sudo chmod -R ug+rwX storage bootstrap/cache
+          sudo systemctl start skyguardian-backup.timer
 
           sudo systemctl reload php8.3-fpm
           sudo nginx -t
           sudo systemctl reload nginx
 
+          curl --fail --silent --show-error --max-time 15 https://skyguardian.pp.ua/up >/dev/null
+          test -L public/storage
+
           sudo systemctl --no-pager --full status \
             skyguardian-telethon.service \
             skyguardian-scheduler.service \
             skyguardian-group-channel-telethon.service \
-            skyguardian-group-channel-delete.service
+            skyguardian-group-channel-delete.service \
+            skyguardian-backup.timer
           echo "SkyGuardian deployed successfully."
 
       - name: Mark deployed revision
