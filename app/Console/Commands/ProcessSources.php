@@ -25,8 +25,8 @@ class ProcessSources extends Command
                 $this->line(sprintf(
                     'Источник %d: найдено %d, переслано %d.',
                     $source->id,
-                    $result['messages_found'],
-                    $result['messages_relayed'],
+                    (int) ($result['messages_found'] ?? 0),
+                    (int) ($result['messages_copied'] ?? 0),
                 ));
             } catch (Throwable $e) {
                 $failed++;
