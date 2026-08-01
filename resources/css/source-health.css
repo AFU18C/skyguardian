@@ -1,0 +1,113 @@
+.sg-source-health-section {
+    margin-top: 22px;
+    padding: 28px;
+    background: rgba(248, 245, 233, .94);
+    border: 1px solid var(--sg-line);
+    box-shadow: 0 16px 38px rgba(36, 39, 31, .1);
+}
+
+.sg-source-health-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(82, 88, 64, .2);
+}
+
+.sg-source-health-head h2 {
+    margin: 0;
+    font-size: clamp(24px, 3vw, 34px);
+}
+
+.sg-source-health-head p {
+    max-width: 720px;
+    margin: 8px 0 0;
+    color: var(--sg-ink-soft);
+}
+
+.sg-source-health-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.sg-source-health-card {
+    position: relative;
+    padding: 21px;
+    background: rgba(255, 253, 246, .88);
+    border: 1px solid rgba(82, 88, 64, .2);
+}
+
+.sg-source-health-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: var(--sg-success);
+}
+
+.sg-source-health-card.is-warning::before { background: var(--sg-warning); }
+.sg-source-health-card.is-critical::before { background: var(--sg-error); }
+.sg-source-health-card.is-disabled::before,
+.sg-source-health-card.is-missing::before { background: #8a8a7d; }
+
+.sg-source-health-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--sg-success);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.sg-source-health-card.is-warning .sg-source-health-status { color: var(--sg-warning); }
+.sg-source-health-card.is-critical .sg-source-health-status { color: var(--sg-error); }
+.sg-source-health-card.is-disabled .sg-source-health-status,
+.sg-source-health-card.is-missing .sg-source-health-status { color: #6e6e64; }
+
+.sg-source-health-status span {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.sg-source-health-card h3 {
+    margin: 16px 0 7px;
+    font-size: 22px;
+}
+
+.sg-source-health-card p {
+    min-height: 38px;
+    margin: 0;
+    color: var(--sg-ink-soft);
+    line-height: 1.45;
+}
+
+.sg-source-health-card dl {
+    margin: 18px 0 0;
+    padding-top: 14px;
+    border-top: 1px solid var(--sg-line);
+}
+
+.sg-source-health-card dt {
+    color: var(--sg-ink-soft);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.sg-source-health-card dd {
+    margin: 5px 0 0;
+    font-weight: 800;
+}
+
+@media (max-width: 760px) {
+    .sg-source-health-section { padding: 20px 16px; }
+    .sg-source-health-grid { grid-template-columns: 1fr; }
+}
