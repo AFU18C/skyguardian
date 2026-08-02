@@ -116,6 +116,32 @@ sudo cp deploy/systemd/skyguardian-backup.timer /etc/systemd/system/skyguardian-
 sudo cp deploy/backup/skyguardian-full-backup.sh /usr/local/sbin/skyguardian-full-backup
 sudo chmod 750 /usr/local/sbin/skyguardian-full-backup
 
+sudo install -d -o root -g root -m 700 /var/backups/skyguardian
+sudo install -d -o root -g www-data -m 750 /var/lib/skyguardian-backup
+
+if ! sudo test -f /var/lib/skyguardian-backup/latest.json; then
+    LATEST_BACKUP="$(sudo find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' -printf '%T@ %p\n' | sort -nr | sed -n '1p' | cut -d' ' -f2-)"
+    if [ -n "$LATEST_BACKUP" ]; then
+        LATEST_CREATED_AT="$(date -u -d "@$(sudo stat -c '%Y' "$LATEST_BACKUP")" +%Y-%m-%dT%H:%M:%SZ)"
+        LATEST_SIZE="$(sudo stat -c '%s' "$LATEST_BACKUP")"
+        printf '{"created_at":"%s","archive":"%s","size_bytes":%s}\n' \
+            "$LATEST_CREATED_AT" "$(basename "$LATEST_BACKUP")" "$LATEST_SIZE" \
+            | sudo tee /var/lib/skyguardian-backup/latest.json >/dev/null
+        sudo chown root:www-data /var/lib/skyguardian-backup/latest.json
+        sudo chmod 640 /var/lib/skyguardian-backup/latest.json
+    fi
+fi
+
+SUDOERS_FILE="$(mktemp)"
+trap 'rm -f "$SUDOERS_FILE"' EXIT
+printf '%s\n' \
+    'www-data ALL=(root) NOPASSWD: /usr/bin/systemctl start --no-block skyguardian-backup.service' \
+    > "$SUDOERS_FILE"
+sudo visudo -cf "$SUDOERS_FILE"
+sudo install -o root -g root -m 440 "$SUDOERS_FILE" /etc/sudoers.d/skyguardian-backup
+rm -f "$SUDOERS_FILE"
+trap - EXIT
+
 sudo mkdir -p /etc/skyguardian
 if [ ! -f /etc/skyguardian/backup.key ]; then
     sudo sh -c 'umask 077; openssl rand -base64 48 > /etc/skyguardian/backup.key'
