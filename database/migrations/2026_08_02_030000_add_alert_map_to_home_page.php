@@ -31,7 +31,7 @@ return new class extends Migration
             'data' => [
                 'title' => 'Карта воздушных тревог Украины',
                 'size' => 'standard',
-                'show_link' => true,
+                'mode' => 'lite',
             ],
         ];
 

@@ -99,7 +99,7 @@ class SiteSettingsCmsTest extends TestCase
             ->assertSee('Только предпросмотр');
     }
 
-    public function test_live_alert_map_is_added_to_home_and_can_be_configured_in_the_editor(): void
+    public function test_live_alert_map_is_added_to_home_and_can_switch_between_lite_and_full_versions(): void
     {
         $user = User::factory()->create();
         $home = SitePage::query()->where('system_key', 'home')->firstOrFail();
@@ -120,7 +120,8 @@ class SiteSettingsCmsTest extends TestCase
             'data' => [
                 'title' => 'Актуальные тревоги',
                 'size' => 'compact',
-                'show_link' => false,
+                'mode' => 'full',
+                'show_link' => true,
                 'url' => 'https://attacker.example/map',
             ],
         ]];
@@ -138,16 +139,34 @@ class SiteSettingsCmsTest extends TestCase
         $this->assertSame([
             'title' => 'Актуальные тревоги',
             'size' => 'compact',
-            'show_link' => false,
+            'mode' => 'full',
         ], $savedBlock['data']);
 
         $this->get('/')
             ->assertOk()
             ->assertSee('Актуальные тревоги')
-            ->assertSee('src="https://alerts.in.ua/lite"', false)
+            ->assertSee('src="https://alerts.in.ua/"', false)
+            ->assertDontSee('src="https://alerts.in.ua/lite"', false)
             ->assertSee('site-alert-map-frame is-compact', false)
             ->assertDontSee('https://attacker.example/map', false)
+            ->assertDontSee('Данные обновляются сервисом alerts.in.ua')
             ->assertDontSee('Открыть полную карту');
+
+        $blocks[0]['data']['mode'] = 'lite';
+
+        $this->actingAs($user)->put(route('admin.site-settings.pages.update', $home), [
+            'title' => $home->title,
+            'slug' => $home->slug,
+            'heading' => $home->heading,
+            'excerpt' => $home->excerpt,
+            'action' => 'publish',
+            'blocks_json' => json_encode($blocks, JSON_UNESCAPED_UNICODE),
+        ])->assertRedirect()->assertSessionHas('toast.type', 'success');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('src="https://alerts.in.ua/lite"', false)
+            ->assertDontSee('src="https://alerts.in.ua/"', false);
     }
 
     public function test_page_hero_can_be_hidden_and_shown_from_the_editor(): void

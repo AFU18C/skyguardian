@@ -469,20 +469,6 @@
     border: 0;
 }
 
-.site-alert-map-meta {
-    display: flex;
-    justify-content: space-between;
-    gap: 14px;
-    margin-top: 10px;
-    color: var(--site-muted);
-    font-size: 12px;
-}
-
-.site-alert-map-meta a {
-    color: var(--site-accent-dark);
-    font-weight: 800;
-}
-
 .site-empty-content {
     min-height: 300px;
     display: grid;
@@ -536,7 +522,6 @@
     .site-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .site-columns,
     .site-contact-card { grid-template-columns: 1fr; }
-    .site-alert-map-meta { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 520px) {

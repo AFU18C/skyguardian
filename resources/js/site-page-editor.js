@@ -204,18 +204,24 @@ onSiteEditorReady(() => {
                 append(
                     field({ label: 'Заголовок', key: 'title', value: data.title ?? 'Карта воздушных тревог Украины' }),
                     field({
+                        label: 'Версия карты',
+                        key: 'mode',
+                        type: 'select',
+                        value: data.mode || 'lite',
+                        options: [['lite', 'Лайт-версия'], ['full', 'Полная версия']],
+                    }),
+                    field({
                         label: 'Размер карты',
                         key: 'size',
                         type: 'select',
                         value: data.size || 'standard',
                         options: [['compact', 'Компактный'], ['standard', 'Стандартный'], ['large', 'Большой']],
                     }),
-                    field({ label: 'Показывать ссылку на полную карту', key: 'show_link', type: 'checkbox', value: data.show_link ?? true }),
                 );
 
                 const note = document.createElement('p');
                 note.className = 'site-block-help';
-                note.textContent = 'Живая карта alerts.in.ua обновляется автоматически. API и токен не требуются.';
+                note.textContent = 'Обе версии карты обновляются автоматически. API и токен не требуются.';
                 grid.append(note);
                 break;
             }
