@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GroupChannelBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelCheckController;
@@ -39,6 +40,10 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::get('/', DashboardController::class)->name('dashboard');
     Route::get('/system/metrics', SystemMetricsController::class)->name('system.metrics');
+    Route::get('/system/backup', [BackupController::class, 'show'])->name('system.backup.show');
+    Route::post('/system/backup', [BackupController::class, 'store'])
+        ->middleware('throttle:3,1')
+        ->name('system.backup.store');
 
     Route::get('/news', [SourceController::class, 'index'])->defaults('sourceType', Source::TYPE_NEWS)->name('news.index');
     Route::post('/news', [SourceController::class, 'store'])->defaults('sourceType', Source::TYPE_NEWS)->name('news.store');

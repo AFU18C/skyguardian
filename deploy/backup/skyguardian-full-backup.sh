@@ -5,21 +5,58 @@ umask 077
 APP_DIR="/var/www/skyguardian"
 BACKUP_ROOT="/var/backups/skyguardian"
 CONFIG_FILE="/etc/skyguardian/backup.env"
+STATUS_ROOT="/var/lib/skyguardian-backup"
+STATUS_FILE="$STATUS_ROOT/status.json"
+LATEST_FILE="$STATUS_ROOT/latest.json"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 WORK_DIR="$BACKUP_ROOT/.work-$STAMP-$RANDOM"
 STAGE_DIR="$WORK_DIR/stage"
 FINAL_ARCHIVE="$BACKUP_ROOT/skyguardian-full-$STAMP.tar.gz"
 DB_CNF="$WORK_DIR/mysql-client.cnf"
 DB_NAME_FILE="$WORK_DIR/database-name.txt"
 
-mkdir -p "$BACKUP_ROOT" "$STAGE_DIR"
+mkdir -p "$BACKUP_ROOT" "$STAGE_DIR" "$STATUS_ROOT"
 chmod 700 "$BACKUP_ROOT"
+chown root:www-data "$STATUS_ROOT"
+chmod 750 "$STATUS_ROOT"
+
+write_status() {
+    local state="$1"
+    local finished_at="$2"
+    local finished_json="null"
+    local temp_file="$STATUS_ROOT/.status-$STAMP-$RANDOM.json"
+
+    if [ -n "$finished_at" ]; then
+        finished_json="\"$finished_at\""
+    fi
+
+    printf '{"state":"%s","started_at":"%s","finished_at":%s}\n' \
+        "$state" \
+        "$STARTED_AT" \
+        "$finished_json" \
+        > "$temp_file"
+    chown root:www-data "$temp_file"
+    chmod 640 "$temp_file"
+    mv -f "$temp_file" "$STATUS_FILE"
+}
 
 cleanup() {
     rm -f "$DB_CNF" "$DB_NAME_FILE"
     rm -rf "$WORK_DIR"
 }
-trap cleanup EXIT
+
+finish() {
+    local result=$?
+
+    if [ "$result" -ne 0 ]; then
+        write_status "failed" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    fi
+    cleanup
+}
+trap finish EXIT
+
+write_status "running" ""
 
 test -f "$APP_DIR/.env"
 test -f "$APP_DIR/artisan"
@@ -122,3 +159,13 @@ if [ -n "${RCLONE_REMOTE:-}" ]; then
 fi
 
 sha256sum "$FINAL_ARCHIVE"
+
+FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+ARCHIVE_SIZE="$(stat -c '%s' "$FINAL_ARCHIVE")"
+LATEST_TEMP="$STATUS_ROOT/.latest-$STAMP-$RANDOM.json"
+printf '{"created_at":"%s","archive":"%s","size_bytes":%s}\n' \
+    "$FINISHED_AT" "$(basename "$FINAL_ARCHIVE")" "$ARCHIVE_SIZE" > "$LATEST_TEMP"
+chown root:www-data "$LATEST_TEMP"
+chmod 640 "$LATEST_TEMP"
+mv -f "$LATEST_TEMP" "$LATEST_FILE"
+write_status "success" "$FINISHED_AT"

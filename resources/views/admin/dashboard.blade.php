@@ -1,5 +1,11 @@
 <x-layouts.admin title="Главная">
-    <section class="sg-dashboard-overview" data-vps-metrics data-metrics-url="{{ route('admin.system.metrics') }}">
+    <section
+        class="sg-dashboard-overview"
+        data-vps-metrics
+        data-metrics-url="{{ route('admin.system.metrics') }}"
+        data-backup-status-url="{{ route('admin.system.backup.show') }}"
+        data-backup-create-url="{{ route('admin.system.backup.store') }}"
+    >
         <header class="sg-dashboard-overview-head">
             <div>
                 <span class="sg-dashboard-eyebrow">Состояние сервера</span>
@@ -62,6 +68,30 @@
                 </div>
                 <div class="sg-dashboard-meter" aria-hidden="true">
                     <span data-vps-meter-fill></span>
+                </div>
+            </article>
+
+            <article class="sg-dashboard-metric sg-dashboard-backup" data-site-backup>
+                <div class="sg-dashboard-metric-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M5 8V4h14v4M5 16v4h14v-4"></path>
+                        <rect x="3" y="8" width="18" height="8" rx="2"></rect>
+                        <path d="M8 12h8M17.5 11.5h.01"></path>
+                    </svg>
+                </div>
+                <div class="sg-dashboard-metric-copy">
+                    <span>Резервная копия сайта</span>
+                    <strong data-backup-state>Проверяем</strong>
+                    <small data-backup-description>Получаем данные о последней копии</small>
+                </div>
+                <div class="sg-dashboard-backup-actions">
+                    <div class="sg-dashboard-backup-last">
+                        <span>Последняя копия</span>
+                        <strong data-backup-last>—</strong>
+                    </div>
+                    <button class="sg-button sg-button-primary" type="button" data-backup-create disabled>
+                        <span>Создать бэкап</span>
+                    </button>
                 </div>
             </article>
         </div>

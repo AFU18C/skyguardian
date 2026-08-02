@@ -61,6 +61,9 @@ jobs:
       - name: Check Telethon worker syntax
         run: python3 -m py_compile telethon/worker.py telethon/group_channel_worker.py
 
+      - name: Check deployment scripts syntax
+        run: bash -n deploy/deploy.sh deploy/backup/skyguardian-full-backup.sh
+
       - name: Install Telethon worker dependencies
         run: python3 -m pip install -r telethon/requirements.txt
 

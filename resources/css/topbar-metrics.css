@@ -201,6 +201,57 @@
     opacity: .72;
 }
 
+.sg-dashboard-backup {
+    grid-column: 1 / -1;
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.sg-dashboard-backup .sg-dashboard-metric-copy > strong {
+    font-size: clamp(23px, 3vw, 32px);
+}
+
+.sg-dashboard-backup-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+}
+
+.sg-dashboard-backup-last {
+    display: grid;
+    gap: 4px;
+    text-align: right;
+}
+
+.sg-dashboard-backup-last > span {
+    color: var(--sg-ink-soft);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+}
+
+.sg-dashboard-backup-last > strong {
+    color: var(--sg-ink);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.sg-dashboard-backup.is-running .sg-dashboard-metric-icon,
+.sg-dashboard-backup.is-running .sg-dashboard-metric-copy > small {
+    color: var(--sg-warning);
+}
+
+.sg-dashboard-backup.is-failed {
+    border-color: rgba(178, 69, 49, .48);
+}
+
+.sg-dashboard-backup.is-failed .sg-dashboard-metric-icon,
+.sg-dashboard-backup.is-failed .sg-dashboard-metric-copy > small {
+    color: var(--sg-error);
+}
+
 .sg-dashboard-overview-foot {
     display: flex;
     align-items: center;
@@ -229,6 +280,21 @@
         width: 48px;
         height: 48px;
     }
+
+    .sg-dashboard-backup {
+        grid-template-columns: 48px minmax(0, 1fr);
+    }
+
+    .sg-dashboard-backup-actions {
+        grid-column: 1 / -1;
+        justify-content: space-between;
+        padding-top: 14px;
+        border-top: 1px solid rgba(82, 88, 64, .16);
+    }
+
+    .sg-dashboard-backup-last {
+        text-align: left;
+    }
 }
 
 @media (max-width: 700px) {
@@ -253,6 +319,16 @@
 
     .sg-dashboard-metric {
         padding: 16px;
+    }
+
+    .sg-dashboard-backup-actions {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .sg-dashboard-backup-actions .sg-button {
+        width: 100%;
     }
 
     .sg-dashboard-overview-foot {
