@@ -38,5 +38,7 @@ class DeploymentSafetyTest extends TestCase
         $this->assertStringContainsString("grep -Fx 'skyguardian/.env'", $script);
         $this->assertStringContainsString('sha256sum -c SHA256SUMS', $script);
         $this->assertStringContainsString('tar -xzf "$FINAL_ARCHIVE"', $script);
+        $this->assertStringContainsString('BACKUP_RETENTION_COUNT=3', $script);
+        $this->assertStringContainsString('${BACKUPS[@]:$BACKUP_RETENTION_COUNT}', $script);
     }
 }
