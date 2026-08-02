@@ -13,3 +13,7 @@ Schedule::command('skyguardian:group-channel-publications:process --limit=20')
 Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50')
     ->everyMinute()
     ->withoutOverlapping(1);
+
+Schedule::command('skyguardian:promo-campaign:status')
+    ->everyMinute()
+    ->withoutOverlapping(1);
