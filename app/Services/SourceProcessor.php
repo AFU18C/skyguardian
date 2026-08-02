@@ -60,6 +60,9 @@ class SourceProcessor
                 $messages,
             ));
             $copiedCount = 0;
+            $failedCount = 0;
+            $copyError = null;
+            $lastProcessedId = $messageIds ? max($messageIds) : null;
 
             if ($messageIds && $source->destination_peer) {
                 $copyResult = $this->telethon->call('copy_messages', $account, [
@@ -69,15 +72,21 @@ class SourceProcessor
                     'settings' => $this->copySettings($source),
                 ]);
                 $copiedCount = (int) ($copyResult['copied_count'] ?? count($messageIds));
+                $failedCount = (int) ($copyResult['failed_count'] ?? 0);
+                if ($failedCount > 0) {
+                    $lastProcessedId = data_get($copyResult, 'last_processed_id');
+                    $firstError = (string) data_get($copyResult, 'failed.0.error', 'Неизвестная ошибка Telegram.');
+                    $copyError = "Не скопировано сообщений: {$failedCount}. {$firstError}";
+                }
             }
 
             $changes = [
-                'last_error' => null,
+                'last_error' => $copyError,
                 'last_success_at' => now(),
             ];
 
-            if ($messageIds) {
-                $changes['last_message_id'] = max($messageIds);
+            if ($lastProcessedId !== null) {
+                $changes['last_message_id'] = max((int) $lastProcessedId, (int) $source->last_message_id);
             }
 
             $source->forceFill($changes)->save();
@@ -88,6 +97,7 @@ class SourceProcessor
                 'initialized' => false,
                 'messages_found' => count($messageIds),
                 'messages_copied' => $copiedCount,
+                'messages_failed' => $failedCount,
                 'last_message_id' => $source->fresh()->last_message_id,
             ];
         } catch (Throwable $e) {

@@ -186,10 +186,65 @@ class SkyGuardianCoreTest extends TestCase
 
         $this->assertFalse($result['initialized']);
         $this->assertSame(2, $result['messages_copied']);
+        $this->assertSame(0, $result['messages_failed']);
         $this->assertSame('available', $source->status);
         $this->assertTrue($source->last_manual_check_at->equalTo($manualTime));
         $this->assertSame(12, $source->last_message_id);
         $this->assertNotNull($source->next_check_at);
+    }
+
+    public function test_partial_copy_failure_is_recorded_without_retrying_processed_batch(): void
+    {
+        $account = $this->createAccount($this->createApi());
+        $source = Source::query()->create([
+            'technical_account_id' => $account->id,
+            'type' => Source::TYPE_NEWS,
+            'name' => 'Новости',
+            'source_peer' => '@source',
+            'destination_peer' => '@destination',
+            'is_active' => true,
+            'last_message_id' => 10,
+        ]);
+
+        $telethon = Mockery::mock(TelethonClient::class);
+        $telethon->shouldReceive('call')->once()->with('fetch_messages', Mockery::type(TechnicalAccount::class), [
+            'peer' => '@source',
+            'min_id' => 10,
+            'limit' => 100,
+        ])->andReturn([
+            'messages' => [
+                ['id' => 11, 'text' => 'copied'],
+                ['id' => 12, 'text' => 'broken'],
+            ],
+        ]);
+        $telethon->shouldReceive('call')->once()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
+            'source_peer' => '@source',
+            'destination_peer' => '@destination',
+            'message_ids' => [11, 12],
+            'settings' => [
+                'copy_mode' => 'original',
+                'strip_links' => false,
+                'strip_hashtags' => false,
+                'strip_mentions' => false,
+                'remove_phrases' => [],
+                'footer_html' => '',
+            ],
+        ])->andReturn([
+            'copied_count' => 1,
+            'failed_count' => 1,
+            'last_processed_id' => 11,
+            'failed' => [
+                ['message_ids' => [12], 'error' => 'broken media'],
+            ],
+        ]);
+
+        $result = (new SourceProcessor($telethon, new OperationGate, new SourceScheduler))->process($source);
+        $source->refresh();
+
+        $this->assertSame(1, $result['messages_copied']);
+        $this->assertSame(1, $result['messages_failed']);
+        $this->assertSame(11, $source->last_message_id);
+        $this->assertSame('Не скопировано сообщений: 1. broken media', $source->last_error);
     }
 
     public function test_account_and_source_limits_are_enforced(): void

@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from telethon import TelegramClient
 from telethon.errors import AuthTokenExpiredError, SessionPasswordNeededError
 from telethon.sessions import StringSession
+from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 
 HOST = os.getenv("SKYGUARDIAN_TELETHON_HOST", "127.0.0.1")
 PORT = int(os.getenv("SKYGUARDIAN_TELETHON_PORT", "8787"))
@@ -138,7 +139,12 @@ def visible_text_length(value: str) -> int:
 
 
 def has_file_media(message: Any) -> bool:
-    return getattr(message, "photo", None) is not None or getattr(message, "document", None) is not None
+    # ``Message.photo`` can also expose the thumbnail of a web-page preview.
+    # Only native Telegram photo/document media may be passed to send_file().
+    return isinstance(
+        getattr(message, "media", None),
+        (MessageMediaPhoto, MessageMediaDocument),
+    )
 
 
 def group_messages(messages: list[Any]) -> list[list[Any]]:
@@ -189,6 +195,42 @@ async def copy_message_group(
     if text and caption is None:
         await send_text(client, destination_peer, text)
     return len(messages)
+
+
+async def copy_message_groups(
+    client: TelegramClient,
+    destination_peer: Any,
+    messages: list[Any],
+    settings: dict[str, Any],
+) -> dict[str, Any]:
+    copied_count = 0
+    failed: list[dict[str, Any]] = []
+    last_processed_id: int | None = None
+
+    for message_group in group_messages(messages):
+        try:
+            copied_count += await copy_message_group(
+                client,
+                destination_peer,
+                message_group,
+                settings,
+            )
+            last_processed_id = max(int(message.id) for message in message_group)
+        except Exception as exc:
+            failed.append({
+                "message_ids": [int(message.id) for message in message_group],
+                "error": str(exc)[:500],
+            })
+            # Return the successful checkpoint. The next scheduled run starts
+            # with this failed group, without re-sending earlier groups.
+            break
+
+    return {
+        "copied_count": copied_count,
+        "failed_count": sum(len(item["message_ids"]) for item in failed),
+        "failed": failed,
+        "last_processed_id": last_processed_id,
+    }
 
 
 def user_payload(user: Any) -> dict[str, Any]:
@@ -401,18 +443,16 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
                 raise RuntimeError("Недостаточно данных для копирования сообщений.")
 
             messages = await client.get_messages(source_peer, ids=message_ids)
-            copied_count = 0
-            for message_group in group_messages(list(messages)):
-                copied_count += await copy_message_group(
-                    client,
-                    destination_peer,
-                    message_group,
-                    settings,
-                )
+            copy_result = await copy_message_groups(
+                client,
+                destination_peer,
+                list(messages),
+                settings,
+            )
             return {
                 "ok": True,
                 "session": client.session.save(),
-                "copied_count": copied_count,
+                **copy_result,
             }
 
         raise RuntimeError(f"Неизвестное действие: {action}")
