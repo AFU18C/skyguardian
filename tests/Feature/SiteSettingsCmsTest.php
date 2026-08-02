@@ -119,8 +119,10 @@ class SiteSettingsCmsTest extends TestCase
             'hidden' => false,
             'data' => [
                 'title' => 'Актуальные тревоги',
+                'show_title' => false,
                 'size' => 'compact',
                 'mode' => 'full',
+                'layout' => 'full',
                 'show_link' => true,
                 'url' => 'https://attacker.example/map',
             ],
@@ -138,21 +140,26 @@ class SiteSettingsCmsTest extends TestCase
         $savedBlock = $home->fresh()->blocks[0];
         $this->assertSame([
             'title' => 'Актуальные тревоги',
+            'show_title' => false,
             'size' => 'compact',
             'mode' => 'full',
+            'layout' => 'full',
         ], $savedBlock['data']);
 
         $this->get('/')
             ->assertOk()
-            ->assertSee('Актуальные тревоги')
+            ->assertDontSee('<h2 class="site-alert-map-title">Актуальные тревоги</h2>', false)
             ->assertSee('src="https://alerts.in.ua/"', false)
             ->assertDontSee('src="https://alerts.in.ua/lite"', false)
+            ->assertSee('class="site-block site-alert-map is-full-block"', false)
             ->assertSee('site-alert-map-frame is-compact', false)
             ->assertDontSee('https://attacker.example/map', false)
             ->assertDontSee('Данные обновляются сервисом alerts.in.ua')
             ->assertDontSee('Открыть полную карту');
 
         $blocks[0]['data']['mode'] = 'lite';
+        $blocks[0]['data']['show_title'] = true;
+        $blocks[0]['data']['layout'] = 'contained';
 
         $this->actingAs($user)->put(route('admin.site-settings.pages.update', $home), [
             'title' => $home->title,
@@ -165,8 +172,10 @@ class SiteSettingsCmsTest extends TestCase
 
         $this->get('/')
             ->assertOk()
+            ->assertSee('<h2 class="site-alert-map-title">Актуальные тревоги</h2>', false)
             ->assertSee('src="https://alerts.in.ua/lite"', false)
-            ->assertDontSee('src="https://alerts.in.ua/"', false);
+            ->assertDontSee('src="https://alerts.in.ua/"', false)
+            ->assertDontSee('is-full-block', false);
     }
 
     public function test_page_hero_can_be_hidden_and_shown_from_the_editor(): void
@@ -199,6 +208,7 @@ class SiteSettingsCmsTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertDontSee('class="site-page-hero"', false)
+            ->assertSee('class="site-main is-at-page-top"', false)
             ->assertSee('class="site-blocks is-at-page-top"', false);
 
         $payload['show_hero'] = '1';
@@ -211,6 +221,8 @@ class SiteSettingsCmsTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('class="site-page-hero"', false)
+            ->assertSee('class="site-main"', false)
+            ->assertDontSee('class="site-main is-at-page-top"', false)
             ->assertSee('class="site-blocks"', false)
             ->assertDontSee('is-at-page-top', false);
     }
