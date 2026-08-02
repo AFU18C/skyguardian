@@ -4,6 +4,7 @@ umask 077
 
 APP_DIR="/var/www/skyguardian"
 BACKUP_ROOT="/var/backups/skyguardian"
+BACKUP_RETENTION_COUNT=3
 CONFIG_FILE="/etc/skyguardian/backup.env"
 STATUS_ROOT="/var/lib/skyguardian-backup"
 STATUS_FILE="$STATUS_ROOT/status.json"
@@ -152,8 +153,8 @@ tar -xzf "$FINAL_ARCHIVE" -C "$VERIFY_DIR"
 chmod 600 "$FINAL_ARCHIVE"
 
 mapfile -t BACKUPS < <(find "$BACKUP_ROOT" -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' -printf '%T@ %p\n' | sort -nr | cut -d' ' -f2-)
-if [ "${#BACKUPS[@]}" -gt 14 ]; then
-    printf '%s\0' "${BACKUPS[@]:14}" | xargs -0r rm -f
+if [ "${#BACKUPS[@]}" -gt "$BACKUP_RETENTION_COUNT" ]; then
+    printf '%s\0' "${BACKUPS[@]:$BACKUP_RETENTION_COUNT}" | xargs -0r rm -f
 fi
 
 if [ -f "$CONFIG_FILE" ]; then
