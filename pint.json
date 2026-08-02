@@ -1,6 +1,6 @@
 {
     "preset": "laravel",
-    "exclude": [
-        "app/Services/DiverseAntiCasinoVisualService.php"
+    "notName": [
+        "DiverseAntiCasinoVisualService.php"
     ]
 }
