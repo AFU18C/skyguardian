@@ -90,6 +90,7 @@ nice -n 10 ionice -c2 -n7 mysqldump \
     --defaults-extra-file="$DB_CNF" \
     --single-transaction \
     --quick \
+    --no-tablespaces \
     --routines \
     --events \
     --triggers \
