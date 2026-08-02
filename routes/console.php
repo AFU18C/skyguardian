@@ -7,7 +7,7 @@ Schedule::command('skyguardian:sources:process --limit=40')
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:group-channel-publications:process --limit=20')
-    ->everyMinute()
+    ->everyTenSeconds()
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50')
@@ -15,5 +15,9 @@ Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50'
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:promo-campaign:status')
+    ->everyMinute()
+    ->withoutOverlapping(1);
+
+Schedule::command('skyguardian:anti-casino-campaign:status')
     ->everyMinute()
     ->withoutOverlapping(1);
