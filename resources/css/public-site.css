@@ -200,6 +200,10 @@
     flex: 1;
 }
 
+.site-main.is-at-page-top {
+    padding-top: clamp(16px, 1.8vw, 24px);
+}
+
 .site-page {
     overflow: hidden;
     background: var(--site-paper);
@@ -262,11 +266,14 @@
 }
 
 .site-blocks {
-    padding: clamp(28px, 6vw, 82px) clamp(20px, 7vw, 92px);
+    --site-blocks-padding-top: clamp(28px, 6vw, 82px);
+    --site-blocks-padding-x: clamp(20px, 7vw, 92px);
+    --site-blocks-padding-bottom: clamp(28px, 6vw, 82px);
+    padding: var(--site-blocks-padding-top) var(--site-blocks-padding-x) var(--site-blocks-padding-bottom);
 }
 
 .site-blocks.is-at-page-top {
-    padding-top: clamp(16px, 1.8vw, 24px);
+    --site-blocks-padding-top: clamp(16px, 1.8vw, 24px);
 }
 
 .site-block {
@@ -456,6 +463,24 @@
     line-height: 1.15;
 }
 
+.site-alert-map.is-full-block {
+    margin-right: calc(0px - var(--site-blocks-padding-x));
+    margin-left: calc(0px - var(--site-blocks-padding-x));
+}
+
+.site-alert-map.is-full-block:first-child:not(.has-title) {
+    margin-top: calc(0px - var(--site-blocks-padding-top));
+}
+
+.site-alert-map.is-full-block:last-child {
+    margin-bottom: calc(0px - var(--site-blocks-padding-bottom));
+}
+
+.site-alert-map.is-full-block .site-alert-map-title {
+    padding-right: var(--site-blocks-padding-x);
+    padding-left: var(--site-blocks-padding-x);
+}
+
 .site-alert-map-frame {
     height: clamp(420px, 56vw, 560px);
     overflow: hidden;
@@ -471,6 +496,19 @@
     height: 100%;
     display: block;
     border: 0;
+}
+
+.site-alert-map.is-full-block .site-alert-map-frame {
+    border-right: 0;
+    border-left: 0;
+}
+
+.site-alert-map.is-full-block:first-child:not(.has-title) .site-alert-map-frame {
+    border-top: 0;
+}
+
+.site-alert-map.is-full-block:last-child .site-alert-map-frame {
+    border-bottom: 0;
 }
 
 .site-empty-content {
@@ -530,11 +568,17 @@
 
 @media (max-width: 520px) {
     .site-main { width: calc(100% - 20px); padding-block: 24px; }
+    .site-main.is-at-page-top { padding-top: 12px; }
     .site-nav { grid-template-columns: 1fr; }
     .site-brand strong { font-size: 16px; }
     .site-brand small { display: none; }
     .site-page-hero h1 { font-size: 42px; }
-    .site-blocks { padding: 28px 18px; }
+    .site-blocks {
+        --site-blocks-padding-top: 28px;
+        --site-blocks-padding-x: 18px;
+        --site-blocks-padding-bottom: 28px;
+    }
+    .site-blocks.is-at-page-top { --site-blocks-padding-top: 16px; }
     .site-gallery { grid-template-columns: 1fr; }
     .site-telegram-card { align-items: flex-start; flex-wrap: wrap; }
     .site-footer { flex-direction: column; }
