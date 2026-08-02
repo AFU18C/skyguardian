@@ -210,6 +210,21 @@ class SiteSettingsCmsTest extends TestCase
             ->assertDontSee('is-full-block', false);
     }
 
+    public function test_full_site_alert_map_is_taller_on_desktop_and_flush_on_mobile(): void
+    {
+        $css = file_get_contents(resource_path('css/public-site.css'));
+
+        $this->assertIsString($css);
+        $this->assertSame(1, preg_match(
+            '/@media \(min-width: 521px\).*?\.site-blocks\.is-full-site-map-only \.site-alert-map\.is-full-site \.site-alert-map-frame\s*\{.*?min-height: calc\(100dvh - 102px\);.*?\}/s',
+            $css,
+        ));
+        $this->assertSame(1, preg_match(
+            '/@media \(max-width: 520px\).*?\.site-main\.is-full-site-map-only\s*\{\s*width: 100%;\s*padding: 0;\s*\}/s',
+            $css,
+        ));
+    }
+
     public function test_page_hero_can_be_hidden_and_shown_from_the_editor(): void
     {
         $user = User::factory()->create();
