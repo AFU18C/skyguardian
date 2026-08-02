@@ -140,12 +140,12 @@ class SiteHtmlSanitizer
             return false;
         }
 
-        if (str_starts_with($url, '/') || str_starts_with($url, '#')) {
-            return true;
-        }
-
         if (str_starts_with($url, '//')) {
             return false;
+        }
+
+        if (str_starts_with($url, '/') || str_starts_with($url, '#')) {
+            return true;
         }
 
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));

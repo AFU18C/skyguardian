@@ -13,15 +13,14 @@ class GroupChannelTelegramService
     public function request(GroupChannelBot $bot, string $method, array $payload = []): mixed
     {
         $response = $this->client($bot)
-            ->post($method, $this->normalizePayload($method, $payload))
-            ->throw()
-            ->json();
+            ->post($method, $this->normalizePayload($method, $payload));
+        $body = $response->json();
 
-        if (! ($response['ok'] ?? false)) {
-            throw new RuntimeException($response['description'] ?? 'Ошибка Telegram API');
+        if (! $response->successful() || ! ($body['ok'] ?? false)) {
+            throw new RuntimeException($body['description'] ?? 'Ошибка Telegram API: HTTP '.$response->status());
         }
 
-        return $response['result'] ?? [];
+        return $body['result'] ?? [];
     }
 
     public function upload(
@@ -40,13 +39,14 @@ class GroupChannelTelegramService
         $request = $this->client($bot)
             ->asMultipart()
             ->attach($field, fopen($absolutePath, 'rb'), basename($absolutePath));
-        $response = $request->post($method, $payload)->throw()->json();
+        $response = $request->post($method, $payload);
+        $body = $response->json();
 
-        if (! ($response['ok'] ?? false)) {
-            throw new RuntimeException($response['description'] ?? 'Ошибка Telegram API');
+        if (! $response->successful() || ! ($body['ok'] ?? false)) {
+            throw new RuntimeException($body['description'] ?? 'Ошибка Telegram API: HTTP '.$response->status());
         }
 
-        return is_array($response['result'] ?? null) ? $response['result'] : [];
+        return is_array($body['result'] ?? null) ? $body['result'] : [];
     }
 
     public function sendMediaGroup(GroupChannelBot $bot, array $items, array $payload = []): array
@@ -78,13 +78,14 @@ class GroupChannelTelegramService
 
         $response = $request->post('sendMediaGroup', array_merge($payload, [
             'media' => json_encode($media, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        ]))->throw()->json();
+        ]));
+        $body = $response->json();
 
-        if (! ($response['ok'] ?? false)) {
-            throw new RuntimeException($response['description'] ?? 'Ошибка Telegram API');
+        if (! $response->successful() || ! ($body['ok'] ?? false)) {
+            throw new RuntimeException($body['description'] ?? 'Ошибка Telegram API: HTTP '.$response->status());
         }
 
-        return is_array($response['result'] ?? null) ? $response['result'] : [];
+        return is_array($body['result'] ?? null) ? $body['result'] : [];
     }
 
     private function normalizePayload(string $method, array $payload): array

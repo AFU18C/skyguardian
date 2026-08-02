@@ -4,14 +4,18 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Vite;
 use Symfony\Component\HttpFoundation\Response;
 
 class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        Vite::useCspNonce();
+
         /** @var Response $response */
         $response = $next($request);
+        $nonce = Vite::cspNonce();
 
         $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         $response->headers->set('Content-Security-Policy', implode('; ', [
@@ -20,8 +24,10 @@ class SecurityHeaders
             "object-src 'none'",
             "frame-ancestors 'self'",
             "form-action 'self'",
-            "script-src 'self' 'unsafe-inline'",
-            "style-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'nonce-{$nonce}'",
+            "style-src 'self' 'nonce-{$nonce}'",
+            "script-src-attr 'none'",
+            "style-src-attr 'none'",
             "img-src 'self' data: https:",
             "font-src 'self' data:",
             "connect-src 'self'",

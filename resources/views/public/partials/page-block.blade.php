@@ -31,7 +31,7 @@
         $columns = max(2, min(4, (int) ($data['columns'] ?? 3)));
     @endphp
     @if($images->isNotEmpty())
-        <section class="site-block site-gallery" style="--site-gallery-columns: {{ $columns }}">
+        <section class="site-block site-gallery site-gallery-columns-{{ $columns }}">
             @foreach($images as $image)
                 <img loading="lazy" src="{{ $image }}" alt="">
             @endforeach

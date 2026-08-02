@@ -323,6 +323,9 @@
     grid-template-columns: repeat(var(--site-gallery-columns, 3), minmax(0, 1fr));
     gap: 12px;
 }
+.site-gallery-columns-2 { --site-gallery-columns: 2; }
+.site-gallery-columns-3 { --site-gallery-columns: 3; }
+.site-gallery-columns-4 { --site-gallery-columns: 4; }
 
 .site-gallery img {
     aspect-ratio: 4 / 3;

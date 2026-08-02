@@ -21,5 +21,10 @@ class SecurityHeadersTest extends TestCase
         $response->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
         $this->assertStringContainsString("default-src 'self'", (string) $response->headers->get('Content-Security-Policy'));
         $this->assertStringContainsString('https://www.youtube-nocookie.com', (string) $response->headers->get('Content-Security-Policy'));
+        $policy = (string) $response->headers->get('Content-Security-Policy');
+        $this->assertStringNotContainsString("'unsafe-inline'", $policy);
+        $this->assertMatchesRegularExpression("/script-src 'self' 'nonce-[A-Za-z0-9+\/_=-]+'/", $policy);
+        $this->assertStringContainsString("script-src-attr 'none'", $policy);
+        $this->assertStringContainsString("style-src-attr 'none'", $policy);
     }
 }

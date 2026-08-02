@@ -1,16 +1,66 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-APP_DIR="/var/www/skyguardian"
+APP_LINK="/var/www/skyguardian"
+DEPLOY_ROOT="/var/www/skyguardian-deploy"
+RELEASES_DIR="$DEPLOY_ROOT/releases"
+SHARED_DIR="$DEPLOY_ROOT/shared"
 WORKSPACE="${GITHUB_WORKSPACE:?GITHUB_WORKSPACE is required}"
-CURRENT_SHA="${GITHUB_SHA:-$(git -C "$WORKSPACE" rev-parse HEAD)}"
-PREVIOUS_SHA="${BEFORE_SHA:-}"
+CURRENT_SHA="${DEPLOY_SHA:-${GITHUB_SHA:-$(git -C "$WORKSPACE" rev-parse HEAD)}}"
+RELEASE_ID="${CURRENT_SHA:0:12}-$(date -u +%Y%m%dT%H%M%SZ)"
+BUILD_DIR="$RELEASES_DIR/.build-$RELEASE_ID"
+RELEASE_DIR="$RELEASES_DIR/$RELEASE_ID"
+PREVIOUS_TARGET=""
+LEGACY_DIR=""
+SWITCHED=0
 
-sudo mkdir -p "$APP_DIR"
+if [ -L "$APP_LINK" ]; then
+    PREVIOUS_TARGET="$(readlink -f "$APP_LINK")"
+elif [ -d "$APP_LINK" ]; then
+    LEGACY_DIR="${APP_LINK}-legacy-$(date -u +%Y%m%dT%H%M%SZ)"
+fi
 
-# Runtime state must never be deleted by rsync. This includes uploaded CMS
-# media, Laravel sessions/cache/logs and the public storage symlink.
-sudo rsync -a --delete \
+sudo install -d -o github-runner -g www-data -m 775 "$DEPLOY_ROOT" "$RELEASES_DIR"
+sudo install -d -o github-runner -g www-data -m 750 "$SHARED_DIR"
+
+if [ ! -f "$SHARED_DIR/.env" ]; then
+    if [ -f "$APP_LINK/.env" ]; then
+        sudo cp -p "$APP_LINK/.env" "$SHARED_DIR/.env"
+    else
+        cp "$WORKSPACE/.env.example" "$SHARED_DIR/.env"
+    fi
+fi
+
+sudo install -d -o www-data -g www-data -m 775 \
+    "$SHARED_DIR/storage/app/public" \
+    "$SHARED_DIR/storage/framework/cache" \
+    "$SHARED_DIR/storage/framework/sessions" \
+    "$SHARED_DIR/storage/framework/views" \
+    "$SHARED_DIR/storage/logs/archive"
+
+if [ -d "$APP_LINK/storage" ] && [ ! -f "$SHARED_DIR/.storage-imported" ]; then
+    sudo rsync -a "$APP_LINK/storage/" "$SHARED_DIR/storage/"
+    sudo touch "$SHARED_DIR/.storage-imported"
+fi
+
+sudo chown -R www-data:www-data "$SHARED_DIR/storage"
+sudo chmod -R ug+rwX "$SHARED_DIR/storage"
+sudo touch "$SHARED_DIR/storage/logs/laravel.log"
+sudo chown www-data:www-data "$SHARED_DIR/storage/logs/laravel.log"
+sudo chmod 664 "$SHARED_DIR/storage/logs/laravel.log"
+sudo chown github-runner:www-data "$SHARED_DIR/.env"
+sudo chmod 640 "$SHARED_DIR/.env"
+
+# The new strict backup implementation is installed before the pre-deploy
+# snapshot so a broken or incomplete archive aborts the deployment.
+sudo cp "$WORKSPACE/deploy/backup/skyguardian-full-backup.sh" /usr/local/sbin/skyguardian-full-backup
+sudo chmod 750 /usr/local/sbin/skyguardian-full-backup
+if sudo systemctl list-unit-files skyguardian-backup.service --no-legend 2>/dev/null | grep -q skyguardian-backup; then
+    sudo systemctl start skyguardian-backup.service
+fi
+
+mkdir -p "$BUILD_DIR"
+rsync -a --delete \
     --exclude=".git" \
     --exclude=".github" \
     --exclude=".env" \
@@ -19,23 +69,13 @@ sudo rsync -a --delete \
     --exclude="vendor" \
     --exclude="storage" \
     --exclude="public/storage" \
-    "$WORKSPACE/" "$APP_DIR/"
+    "$WORKSPACE/" "$BUILD_DIR/"
 
-cd "$APP_DIR"
+ln -s "$SHARED_DIR/.env" "$BUILD_DIR/.env"
+ln -s "$SHARED_DIR/storage" "$BUILD_DIR/storage"
+ln -s "$SHARED_DIR/storage/app/public" "$BUILD_DIR/public/storage"
 
-sudo mkdir -p \
-    storage/app/public \
-    storage/framework/cache \
-    storage/framework/sessions \
-    storage/framework/views \
-    storage/logs/archive \
-    bootstrap/cache
-
-sudo chown -R github-runner:www-data "$APP_DIR"
-sudo chmod -R ug+rwX storage bootstrap/cache
-sudo touch storage/logs/laravel.log
-sudo chown github-runner:www-data storage/logs/laravel.log
-sudo chmod 664 storage/logs/laravel.log
+cd "$BUILD_DIR"
 
 composer install \
     --no-dev \
@@ -43,32 +83,27 @@ composer install \
     --prefer-dist \
     --optimize-autoloader
 
-if [ ! -d .venv ]; then
-    python3 -m venv .venv
-fi
+python3 -m venv .venv
 .venv/bin/pip install --disable-pip-version-check -r telethon/requirements.txt
 
 npm ci --no-audit --no-fund
 npm run build
 
-if [ ! -f .env ]; then
-    cp .env.example .env
-fi
-
-if ! grep -Eq '^APP_KEY=base64:.+' .env; then
-    php artisan key:generate --force
-fi
-
 upsert_env() {
     local key="$1"
     local value="$2"
+    local env_file="$SHARED_DIR/.env"
 
-    if grep -qE "^${key}=" .env; then
-        sed -i "s#^${key}=.*#${key}=${value}#" .env
+    if grep -qE "^${key}=" "$env_file"; then
+        sed -i "s#^${key}=.*#${key}=${value}#" "$env_file"
     else
-        printf '%s=%s\n' "$key" "$value" >> .env
+        printf '%s=%s\n' "$key" "$value" >> "$env_file"
     fi
 }
+
+if ! grep -Eq '^APP_KEY=base64:.+' "$SHARED_DIR/.env"; then
+    php artisan key:generate --force
+fi
 
 upsert_env LOG_CHANNEL stack
 upsert_env LOG_STACK daily
@@ -78,58 +113,42 @@ upsert_env SESSION_SECURE_COOKIE true
 upsert_env SESSION_HTTP_ONLY true
 upsert_env SESSION_SAME_SITE lax
 
-# sed -i recreates the file with the runner's primary group. Restore the
-# production group so PHP-FPM and all www-data services read the real config.
-sudo chown github-runner:www-data .env
-sudo chmod 640 .env
-sudo -u www-data test -r .env
+sudo chown github-runner:www-data "$SHARED_DIR/.env"
+sudo chmod 640 "$SHARED_DIR/.env"
+sudo -u www-data test -r "$SHARED_DIR/.env"
 
-if [ -f storage/logs/laravel.log ] \
-    && [ "$(stat -c '%s' storage/logs/laravel.log)" -gt 10485760 ]; then
-    ARCHIVE="storage/logs/archive/laravel-before-daily-$(date -u +%Y%m%dT%H%M%SZ).log.gz"
-    sudo gzip -c storage/logs/laravel.log > "$ARCHIVE"
-    sudo truncate -s 0 storage/logs/laravel.log
-fi
-
-if [ -e public/storage ] && [ ! -L public/storage ]; then
-    rm -rf public/storage
-fi
-if [ ! -L public/storage ]; then
-    php artisan storage:link
-fi
-
-sudo chown -R www-data:www-data storage bootstrap/cache
-sudo chmod -R ug+rwX storage bootstrap/cache
-
+sudo install -d -o www-data -g www-data -m 775 bootstrap/cache
 sudo -u www-data php artisan optimize:clear
 sudo -u www-data php artisan migrate --force
 sudo -u www-data php artisan config:cache
 sudo -u www-data php artisan view:cache
 sudo -u www-data php artisan schedule:list --no-ansi >/dev/null
 
-sudo cp deploy/systemd/skyguardian-telethon.service /etc/systemd/system/skyguardian-telethon.service
-sudo cp deploy/systemd/skyguardian-scheduler.service /etc/systemd/system/skyguardian-scheduler.service
-sudo cp deploy/systemd/skyguardian-group-channel-telethon.service /etc/systemd/system/skyguardian-group-channel-telethon.service
-sudo cp deploy/systemd/skyguardian-group-channel-delete.service /etc/systemd/system/skyguardian-group-channel-delete.service
-sudo cp deploy/systemd/skyguardian-backup.service /etc/systemd/system/skyguardian-backup.service
-sudo cp deploy/systemd/skyguardian-backup.timer /etc/systemd/system/skyguardian-backup.timer
-sudo cp deploy/backup/skyguardian-full-backup.sh /usr/local/sbin/skyguardian-full-backup
-sudo chmod 750 /usr/local/sbin/skyguardian-full-backup
+cd "$RELEASES_DIR"
+mv "$BUILD_DIR" "$RELEASE_DIR"
+
+sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-telethon.service" /etc/systemd/system/skyguardian-telethon.service
+sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-scheduler.service" /etc/systemd/system/skyguardian-scheduler.service
+sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-group-channel-telethon.service" /etc/systemd/system/skyguardian-group-channel-telethon.service
+sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-group-channel-delete.service" /etc/systemd/system/skyguardian-group-channel-delete.service
+sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-backup.service" /etc/systemd/system/skyguardian-backup.service
+sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-backup.timer" /etc/systemd/system/skyguardian-backup.timer
 
 sudo install -d -o root -g root -m 700 /var/backups/skyguardian
 sudo install -d -o root -g www-data -m 750 /var/lib/skyguardian-backup
+sudo install -d -o root -g root -m 700 /etc/skyguardian
 
-if ! sudo test -f /var/lib/skyguardian-backup/latest.json; then
-    LATEST_BACKUP="$(sudo find /var/backups/skyguardian -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' -printf '%T@ %p\n' | sort -nr | sed -n '1p' | cut -d' ' -f2-)"
-    if [ -n "$LATEST_BACKUP" ]; then
-        LATEST_CREATED_AT="$(date -u -d "@$(sudo stat -c '%Y' "$LATEST_BACKUP")" +%Y-%m-%dT%H:%M:%SZ)"
-        LATEST_SIZE="$(sudo stat -c '%s' "$LATEST_BACKUP")"
-        printf '{"created_at":"%s","archive":"%s","size_bytes":%s}\n' \
-            "$LATEST_CREATED_AT" "$(basename "$LATEST_BACKUP")" "$LATEST_SIZE" \
-            | sudo tee /var/lib/skyguardian-backup/latest.json >/dev/null
-        sudo chown root:www-data /var/lib/skyguardian-backup/latest.json
-        sudo chmod 640 /var/lib/skyguardian-backup/latest.json
-    fi
+if ! sudo test -f /etc/skyguardian/backup.key; then
+    sudo sh -c 'umask 077; openssl rand -base64 48 > /etc/skyguardian/backup.key'
+fi
+if ! sudo test -f /etc/skyguardian/backup.env; then
+    printf '%s\n' \
+        '# Optional encrypted offsite backup using rclone.' \
+        '# Example: RCLONE_REMOTE=remote:skyguardian-backups' \
+        'RCLONE_REMOTE=' \
+        'BACKUP_ENCRYPTION_PASSWORD_FILE=/etc/skyguardian/backup.key' \
+        | sudo tee /etc/skyguardian/backup.env >/dev/null
+    sudo chmod 600 /etc/skyguardian/backup.env
 fi
 
 SUDOERS_FILE="$(mktemp)"
@@ -142,20 +161,6 @@ sudo install -o root -g root -m 440 "$SUDOERS_FILE" /etc/sudoers.d/skyguardian-b
 rm -f "$SUDOERS_FILE"
 trap - EXIT
 
-sudo mkdir -p /etc/skyguardian
-if [ ! -f /etc/skyguardian/backup.key ]; then
-    sudo sh -c 'umask 077; openssl rand -base64 48 > /etc/skyguardian/backup.key'
-fi
-if [ ! -f /etc/skyguardian/backup.env ]; then
-    printf '%s\n' \
-        '# Optional encrypted offsite backup using rclone.' \
-        '# Example: RCLONE_REMOTE=remote:skyguardian-backups' \
-        'RCLONE_REMOTE=' \
-        'BACKUP_ENCRYPTION_PASSWORD_FILE=/etc/skyguardian/backup.key' \
-        | sudo tee /etc/skyguardian/backup.env >/dev/null
-    sudo chmod 600 /etc/skyguardian/backup.env
-fi
-
 sudo systemctl daemon-reload
 sudo systemctl enable \
     skyguardian-telethon.service \
@@ -164,29 +169,50 @@ sudo systemctl enable \
     skyguardian-group-channel-delete.service \
     skyguardian-backup.timer
 
-CORE_RESTART_REQUIRED=1
-if [ -n "$PREVIOUS_SHA" ] \
-    && [ "$PREVIOUS_SHA" != "0000000000000000000000000000000000000000" ] \
-    && git -C "$WORKSPACE" cat-file -e "$PREVIOUS_SHA^{commit}" 2>/dev/null; then
-    CHANGED_FILES="$(git -C "$WORKSPACE" diff --name-only "$PREVIOUS_SHA" "$CURRENT_SHA")"
-    if [ -n "$CHANGED_FILES" ] \
-        && ! printf '%s\n' "$CHANGED_FILES" \
-            | grep -Ev '^(database/migrations/2026_07_27_120000_create_group_channel_technical_delete_tasks_table\.php|\.github/workflows/deploy\.yml|deploy/deploy\.sh)$' \
-            >/dev/null; then
-        CORE_RESTART_REQUIRED=0
-    fi
-fi
+atomic_link() {
+    local target="$1"
+    local temporary="${APP_LINK}.next-$RELEASE_ID"
 
-if [ "$CORE_RESTART_REQUIRED" -eq 1 ]; then
-    sudo systemctl restart skyguardian-telethon.service skyguardian-scheduler.service
+    sudo ln -s "$target" "$temporary"
+    sudo mv -Tf "$temporary" "$APP_LINK"
+}
+
+rollback() {
+    local result=$?
+    if [ "$result" -eq 0 ] || [ "$SWITCHED" -ne 1 ]; then
+        return "$result"
+    fi
+
+    echo "Deployment failed after release switch; restoring previous release." >&2
+    if [ -n "$PREVIOUS_TARGET" ] && [ -d "$PREVIOUS_TARGET" ]; then
+        atomic_link "$PREVIOUS_TARGET"
+    elif [ -n "$LEGACY_DIR" ] && [ -d "$LEGACY_DIR" ]; then
+        sudo rm -f "$APP_LINK"
+        sudo mv "$LEGACY_DIR" "$APP_LINK"
+    fi
+
+    sudo systemctl restart \
+        skyguardian-telethon.service \
+        skyguardian-scheduler.service \
+        skyguardian-group-channel-telethon.service \
+        skyguardian-group-channel-delete.service || true
+    sudo systemctl reload php8.3-fpm || true
+
+    return "$result"
+}
+trap rollback EXIT
+
+if [ -n "$LEGACY_DIR" ]; then
+    sudo mv "$APP_LINK" "$LEGACY_DIR"
+    sudo ln -s "$RELEASE_DIR" "$APP_LINK"
 else
-    sudo systemctl is-active --quiet skyguardian-telethon.service \
-        || sudo systemctl start skyguardian-telethon.service
-    sudo systemctl is-active --quiet skyguardian-scheduler.service \
-        || sudo systemctl start skyguardian-scheduler.service
+    atomic_link "$RELEASE_DIR"
 fi
+SWITCHED=1
 
 sudo systemctl restart \
+    skyguardian-telethon.service \
+    skyguardian-scheduler.service \
     skyguardian-group-channel-telethon.service \
     skyguardian-group-channel-delete.service
 sudo systemctl start skyguardian-backup.timer
@@ -198,7 +224,9 @@ sudo systemctl reload nginx
 curl --fail --silent --show-error --max-time 15 https://skyguardian.pp.ua/up >/dev/null
 curl --fail --silent --show-error --max-time 15 https://skyguardian.pp.ua/ >/dev/null
 curl --fail --silent --show-error --max-time 15 https://skyguardian.pp.ua/admin/login >/dev/null
-test -L public/storage
+test -L "$APP_LINK"
+test "$(readlink -f "$APP_LINK")" = "$RELEASE_DIR"
+test -L "$APP_LINK/public/storage"
 
 sudo systemctl --no-pager --full status \
     skyguardian-telethon.service \
@@ -207,4 +235,15 @@ sudo systemctl --no-pager --full status \
     skyguardian-group-channel-delete.service \
     skyguardian-backup.timer
 
-echo "SkyGuardian deployed successfully."
+SWITCHED=0
+trap - EXIT
+
+mapfile -t OLD_RELEASES < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d ! -name '.build-*' -printf '%T@ %p\n' | sort -nr | cut -d' ' -f2- | tail -n +6)
+for old_release in "${OLD_RELEASES[@]}"; do
+    resolved="$(readlink -f "$old_release")"
+    if [[ "$resolved" == "$RELEASES_DIR"/* ]] && [ "$resolved" != "$RELEASE_DIR" ] && [ "$resolved" != "$PREVIOUS_TARGET" ]; then
+        sudo rm -rf -- "$resolved"
+    fi
+done
+
+echo "SkyGuardian release $RELEASE_ID deployed successfully."

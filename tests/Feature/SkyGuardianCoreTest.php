@@ -179,6 +179,7 @@ class SkyGuardianCoreTest extends TestCase
                 'remove_phrases' => ['реклама', 'лишнее'],
                 'footer_html' => '<b>SkyGuardian</b>',
                 'blocked_keywords' => ['казино', 'ставки'],
+                'resume_partial' => null,
             ],
         ])->andReturn(['copied_count' => 2]);
 
@@ -231,6 +232,7 @@ class SkyGuardianCoreTest extends TestCase
                 'remove_phrases' => [],
                 'footer_html' => '',
                 'blocked_keywords' => [],
+                'resume_partial' => null,
             ],
         ])->andReturn([
             'copied_count' => 1,

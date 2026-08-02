@@ -56,7 +56,7 @@
             @csrf
             @if($editing) @method('PUT') @endif
             <input type="hidden" name="blocks_json" value="{{ old('blocks_json', json_encode($pageBlocks, JSON_UNESCAPED_UNICODE)) }}">
-            <script type="application/json" data-initial-blocks>@json($pageBlocks)</script>
+            <script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}" type="application/json" data-initial-blocks>@json($pageBlocks)</script>
 
             <div class="site-editor-layout">
                 <div class="site-editor-main">

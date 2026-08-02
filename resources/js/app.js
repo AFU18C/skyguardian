@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+
 const ready = (callback) => {
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', callback, { once: true });
@@ -86,7 +88,12 @@ ready(() => {
     });
 
     document.querySelectorAll('form').forEach((form) => {
-        form.addEventListener('submit', () => {
+        form.addEventListener('submit', (event) => {
+            if (form.matches('[data-preview-form]')) {
+                event.preventDefault();
+                return;
+            }
+
             const button = form.querySelector('[data-submit-button]');
             if (!button || button.disabled) return;
             button.disabled = true;
@@ -184,22 +191,16 @@ ready(() => {
 
     const qrTargets = document.querySelectorAll('[data-qr-url]');
     if (qrTargets.length) {
-        let attempts = 0;
-        const renderQrCodes = () => {
-            if (typeof window.QRCode === 'undefined') {
-                if (attempts++ < 50) window.setTimeout(renderQrCodes, 100);
-                return;
-            }
-            qrTargets.forEach((target) => {
-                target.innerHTML = '';
-                new window.QRCode(target, {
-                    text: target.dataset.qrUrl,
+        qrTargets.forEach((target) => {
+            const canvas = document.createElement('canvas');
+            target.replaceChildren(canvas);
+            QRCode.toCanvas(canvas, target.dataset.qrUrl, {
                     width: 220,
-                    height: 220,
-                    correctLevel: window.QRCode.CorrectLevel.M,
+                    errorCorrectionLevel: 'M',
+                    margin: 1,
+                }, (error) => {
+                    if (error) target.textContent = 'Не удалось построить QR-код.';
                 });
             });
-        };
-        renderQrCodes();
     }
 });

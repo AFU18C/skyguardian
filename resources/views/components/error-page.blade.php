@@ -11,7 +11,7 @@
 <body>
 <main class="sg-error-page">
     <section class="sg-error-card">
-        <div class="sg-public-emblem" style="margin: 0 auto 24px">SG</div>
+        <div class="sg-public-emblem sg-error-emblem">SG</div>
         <div class="sg-error-code">{{ $code }}</div>
         <h1>{{ $title }}</h1>
         <p>{{ $message }}</p>

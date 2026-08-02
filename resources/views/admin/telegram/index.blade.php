@@ -201,9 +201,4 @@
         <div data-open-modal-on-load="account-edit-{{ $openAccountId }}" data-modal-scroll-to="#account-connection-{{ $openAccountId }}"></div>
     @endif
 
-    @push('scripts')
-        @if ($hasQrCode)
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
-        @endif
-    @endpush
 </x-layouts.admin>

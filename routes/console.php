@@ -9,3 +9,7 @@ Schedule::command('skyguardian:sources:process --limit=40')
 Schedule::command('skyguardian:group-channel-publications:process --limit=20')
     ->everyMinute()
     ->withoutOverlapping(1);
+
+Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50')
+    ->everyMinute()
+    ->withoutOverlapping(1);

@@ -31,6 +31,8 @@ class GroupChannelPublicationService
             throw new RuntimeException('Сначала выполните ручную проверку подключения, чтобы определить Chat ID.');
         }
 
+        $this->claimForSending($publication);
+
         try {
             $result = $this->sendByType($publication);
             $messageIds = $this->messageIds($result);
@@ -39,6 +41,7 @@ class GroupChannelPublicationService
 
             $publication->update([
                 'status' => GroupChannelPublication::STATUS_SENT,
+                'sending_started_at' => null,
                 'sent_at' => $sentAt,
                 'delete_at' => $publication->delete_after_minutes
                     ? $sentAt->copy()->addMinutes($publication->delete_after_minutes)
@@ -50,6 +53,7 @@ class GroupChannelPublicationService
         } catch (Throwable $e) {
             $publication->update([
                 'status' => GroupChannelPublication::STATUS_ERROR,
+                'sending_started_at' => null,
                 'last_error' => $e->getMessage(),
             ]);
 
@@ -71,22 +75,85 @@ class GroupChannelPublicationService
             throw new RuntimeException('Модуль автоудаления выключен для этого чата.');
         }
 
-        try {
-            foreach ($messageIds as $messageId) {
+        $remainingIds = array_values(array_map('strval', $messageIds));
+        $errors = [];
+
+        foreach ($remainingIds as $messageId) {
+            try {
                 $this->telegram->request($bot, 'deleteMessage', [
                     'chat_id' => $bot->chat_id,
                     'message_id' => $messageId,
                 ]);
-            }
+                $remainingIds = array_values(array_diff($remainingIds, [$messageId]));
+                $publication->update(['telegram_message_ids' => $remainingIds]);
+            } catch (Throwable $e) {
+                if ($this->alreadyDeleted($e)) {
+                    $remainingIds = array_values(array_diff($remainingIds, [$messageId]));
+                    $publication->update(['telegram_message_ids' => $remainingIds]);
 
+                    continue;
+                }
+
+                $errors[] = '#'.$messageId.': '.$e->getMessage();
+            }
+        }
+
+        if ($remainingIds === []) {
             $publication->update([
                 'deleted_at_telegram' => now(),
                 'last_error' => null,
             ]);
-        } catch (Throwable $e) {
-            $publication->update(['last_error' => $e->getMessage()]);
-            throw $e;
+
+            return;
         }
+
+        $message = 'Не удалены сообщения: '.implode('; ', $errors);
+        $publication->update(['last_error' => $message]);
+
+        throw new RuntimeException($message);
+    }
+
+    private function claimForSending(GroupChannelPublication $publication): void
+    {
+        $claimed = GroupChannelPublication::query()
+            ->whereKey($publication->id)
+            ->whereNull('sent_at')
+            ->where(function ($query): void {
+                $query->whereIn('status', [
+                    GroupChannelPublication::STATUS_DRAFT,
+                    GroupChannelPublication::STATUS_SCHEDULED,
+                    GroupChannelPublication::STATUS_ERROR,
+                ])->orWhere(function ($query): void {
+                    $query->where('status', GroupChannelPublication::STATUS_SENDING)
+                        ->where('sending_started_at', '<=', now()->subMinutes(10));
+                });
+            })
+            ->update([
+                'status' => GroupChannelPublication::STATUS_SENDING,
+                'sending_started_at' => now(),
+                'last_error' => null,
+            ]);
+
+        if ($claimed === 1) {
+            $publication->refresh()->loadMissing('bot');
+
+            return;
+        }
+
+        $publication->refresh();
+        if ($publication->status === GroupChannelPublication::STATUS_SENT || $publication->sent_at) {
+            throw new RuntimeException('Публикация уже отправлена.');
+        }
+
+        throw new RuntimeException('Публикация уже отправляется другим процессом.');
+    }
+
+    private function alreadyDeleted(Throwable $error): bool
+    {
+        $message = mb_strtolower($error->getMessage());
+
+        return str_contains($message, 'message to delete not found')
+            || str_contains($message, 'message_id_invalid');
     }
 
     private function sendByType(GroupChannelPublication $publication): array

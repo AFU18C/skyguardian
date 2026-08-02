@@ -14,6 +14,8 @@ class GroupChannelPublication extends Model
 
     public const STATUS_SCHEDULED = 'scheduled';
 
+    public const STATUS_SENDING = 'sending';
+
     public const STATUS_SENT = 'sent';
 
     public const STATUS_ERROR = 'error';
@@ -50,6 +52,7 @@ class GroupChannelPublication extends Model
         'disable_notification',
         'status',
         'scheduled_at',
+        'sending_started_at',
         'delete_after_minutes',
         'sent_at',
         'delete_at',
@@ -75,6 +78,7 @@ class GroupChannelPublication extends Model
             'telegram_message_ids' => 'array',
             'disable_notification' => 'boolean',
             'scheduled_at' => 'datetime',
+            'sending_started_at' => 'datetime',
             'sent_at' => 'datetime',
             'delete_at' => 'datetime',
             'deleted_at_telegram' => 'datetime',

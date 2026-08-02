@@ -20,4 +20,14 @@ class SiteHtmlSanitizerTest extends TestCase
         $this->assertStringContainsString('https://example.com', $clean);
         $this->assertStringContainsString('rel="noreferrer noopener nofollow"', $clean);
     }
+
+    public function test_cms_html_rejects_protocol_relative_external_links(): void
+    {
+        $clean = app(SiteHtmlSanitizer::class)->sanitize(
+            '<a href="//external.example/path">внешняя ссылка</a><a href="/inside">внутренняя</a>',
+        );
+
+        $this->assertStringNotContainsString('//external.example', $clean);
+        $this->assertStringContainsString('href="/inside"', $clean);
+    }
 }
