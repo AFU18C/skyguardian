@@ -198,7 +198,8 @@ class SiteSettingsCmsTest extends TestCase
         $this->assertFalse($home->fresh()->show_hero);
         $this->get('/')
             ->assertOk()
-            ->assertDontSee('class="site-page-hero"', false);
+            ->assertDontSee('class="site-page-hero"', false)
+            ->assertSee('class="site-blocks is-at-page-top"', false);
 
         $payload['show_hero'] = '1';
         $this->actingAs($user)
@@ -209,7 +210,9 @@ class SiteSettingsCmsTest extends TestCase
         $this->assertTrue($home->fresh()->show_hero);
         $this->get('/')
             ->assertOk()
-            ->assertSee('class="site-page-hero"', false);
+            ->assertSee('class="site-page-hero"', false)
+            ->assertSee('class="site-blocks"', false)
+            ->assertDontSee('is-at-page-top', false);
     }
 
     public function test_system_page_cannot_be_deleted(): void
