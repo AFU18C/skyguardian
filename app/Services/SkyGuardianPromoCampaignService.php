@@ -108,7 +108,7 @@ class SkyGuardianPromoCampaignService
                     'post_link' => $username && $publication->telegram_message_id
                         ? 'https://t.me/'.$username.'/'.$publication->telegram_message_id
                         : null,
-                    'last_error' => $publication->last_error,
+                    'last_error' => $this->redactSensitiveError($publication->last_error),
                 ];
             })
             ->sortBy('number')
@@ -122,6 +122,25 @@ class SkyGuardianPromoCampaignService
                 'generated_at' => now()->toIso8601String(),
                 'posts' => $items,
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        );
+    }
+
+    private function redactSensitiveError(?string $error): ?string
+    {
+        if ($error === null || $error === '') {
+            return $error;
+        }
+
+        $redacted = preg_replace(
+            '~https://api\.telegram\.org/bot[^/\s]+~i',
+            'https://api.telegram.org/bot[REDACTED]',
+            $error,
+        );
+
+        return preg_replace(
+            '~\b\d{6,15}:[A-Za-z0-9_-]{20,}\b~',
+            '[TELEGRAM_BOT_TOKEN_REDACTED]',
+            $redacted ?? $error,
         );
     }
 
