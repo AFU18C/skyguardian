@@ -71,7 +71,7 @@
                     </header>
                 @endif
 
-                <div class="site-blocks">
+                <div @class(['site-blocks', 'is-at-page-top' => ! $page->show_hero])>
                     @forelse(collect($page->blocks ?? [])->reject(fn ($block) => (bool) ($block['hidden'] ?? false)) as $block)
                         @include('public.partials.page-block', ['block' => $block])
                     @empty
