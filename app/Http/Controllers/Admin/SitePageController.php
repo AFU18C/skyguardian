@@ -286,11 +286,19 @@ class SitePageController extends Controller
                 if ($block['type'] === 'alert_map') {
                     $size = (string) ($data['size'] ?? 'standard');
                     $mode = (string) ($data['mode'] ?? 'lite');
+                    $layout = (string) ($data['layout'] ?? 'contained');
+                    $showTitle = filter_var(
+                        $data['show_title'] ?? true,
+                        FILTER_VALIDATE_BOOLEAN,
+                        FILTER_NULL_ON_FAILURE,
+                    );
 
                     $data = [
                         'title' => Str::limit(trim((string) ($data['title'] ?? 'Карта воздушных тревог Украины')), 180, ''),
+                        'show_title' => $showTitle ?? true,
                         'size' => in_array($size, ['compact', 'standard', 'large'], true) ? $size : 'standard',
                         'mode' => in_array($mode, ['lite', 'full'], true) ? $mode : 'lite',
+                        'layout' => in_array($layout, ['contained', 'full'], true) ? $layout : 'contained',
                     ];
                 }
 

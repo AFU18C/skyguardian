@@ -58,7 +58,7 @@
             @endif
         </header>
 
-        <main class="site-main">
+        <main @class(['site-main', 'is-at-page-top' => ! $page->show_hero])>
             <article class="site-page">
                 @if($page->show_hero)
                     <header class="site-page-hero">
