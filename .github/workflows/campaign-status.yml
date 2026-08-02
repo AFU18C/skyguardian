@@ -20,6 +20,14 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - name: Process due campaign posts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd /var/www/skyguardian
+          sudo -u www-data php artisan skyguardian:group-channel-publications:process --limit=20
+          sudo -u www-data php artisan skyguardian:promo-campaign:status
+
       - name: Publish campaign status to issue
         uses: actions/github-script@v8
         with:
