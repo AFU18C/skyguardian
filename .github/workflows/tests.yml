@@ -35,6 +35,9 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Prepare test environment
+        run: cp .env.example .env
+
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund
 

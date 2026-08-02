@@ -376,10 +376,14 @@ class GroupChannelBotFeaturesTest extends TestCase
             'secret' => $bot->webhook_secret,
         ]);
 
-        Http::fake(['*' => Http::response([
-            'ok' => false,
-            'description' => 'Temporary Telegram error',
-        ], 500)]);
+        Http::fake([
+            '*' => Http::sequence()
+                ->push([
+                    'ok' => false,
+                    'description' => 'Temporary Telegram error',
+                ], 500)
+                ->push(['ok' => true, 'result' => true]),
+        ]);
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson($url, $payload)
             ->assertStatus(500);
@@ -389,7 +393,6 @@ class GroupChannelBotFeaturesTest extends TestCase
             'attempts' => 1,
         ]);
 
-        Http::fake(['*' => Http::response(['ok' => true, 'result' => true])]);
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson($url, $payload)
             ->assertOk();
