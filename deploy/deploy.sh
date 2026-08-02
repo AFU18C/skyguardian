@@ -89,6 +89,12 @@ python3 -m venv .venv
 npm ci --no-audit --no-fund
 npm run build
 
+# Laravel caches may contain absolute paths. Finalize the immutable release
+# path before generating any cache so those paths remain valid after switch.
+cd "$RELEASES_DIR"
+mv "$BUILD_DIR" "$RELEASE_DIR"
+cd "$RELEASE_DIR"
+
 upsert_env() {
     local key="$1"
     local value="$2"
@@ -123,9 +129,6 @@ sudo -u www-data php artisan migrate --force
 sudo -u www-data php artisan config:cache
 sudo -u www-data php artisan view:cache
 sudo -u www-data php artisan schedule:list --no-ansi >/dev/null
-
-cd "$RELEASES_DIR"
-mv "$BUILD_DIR" "$RELEASE_DIR"
 
 sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-telethon.service" /etc/systemd/system/skyguardian-telethon.service
 sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-scheduler.service" /etc/systemd/system/skyguardian-scheduler.service

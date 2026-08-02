@@ -18,6 +18,11 @@ class DeploymentSafetyTest extends TestCase
         $this->assertStringContainsString('skyguardian-backup.service', $script);
         $this->assertStringContainsString('sudo -u www-data test -r "$SHARED_DIR/.env"', $script);
         $this->assertStringContainsString('https://skyguardian.pp.ua/admin/login', $script);
+        $this->assertLessThan(
+            strpos($script, 'sudo -u www-data php artisan config:cache'),
+            strpos($script, 'mv "$BUILD_DIR" "$RELEASE_DIR"'),
+            'Release directory must be finalized before Laravel caches absolute paths.',
+        );
         $this->assertStringContainsString('bash deploy/deploy.sh', $workflow);
         $this->assertStringContainsString('workflow_run:', $workflow);
         $this->assertStringContainsString("github.event.workflow_run.conclusion == 'success'", $workflow);
