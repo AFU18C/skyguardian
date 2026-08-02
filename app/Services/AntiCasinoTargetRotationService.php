@@ -124,7 +124,7 @@ class AntiCasinoTargetRotationService
             ? "🎯 КАНАЛ У ФОКУСІ: {$target['name']} ({$target['handle']})\nУ публічній стрічці зафіксована реклама казино та ставок. Канал продав рекламодавцю не просто місце — він використав довіру своєї аудиторії."
             : "🎯 КАНАЛ У ФОКУСІ: {$target['name']} ({$target['handle']})\nПублічне питання: канал рекламував або планує рекламувати казино? Якщо так — він продає гральному бізнесу довіру підписників. Вимагаємо відкритої відповіді.";
 
-        $tags = "#AntiCasino1000 #AC".str_pad((string) $index, 4, '0', STR_PAD_LEFT)." {$target['tags']} #РекламаКазино #ОнлайнКазино #Лудоманія #SkyGuardian {$marker}";
+        $tags = '#AntiCasino1000 #AC'.str_pad((string) $index, 4, '0', STR_PAD_LEFT)." {$target['tags']} #РекламаКазино #ОнлайнКазино #Лудоманія #SkyGuardian {$marker}";
         $result = implode("\n\n", [$headline, $opening, $fact, $focus, $call, $source, $skyGuardian, $tags]);
 
         if (mb_strlen($result) <= 1024) {
@@ -132,7 +132,7 @@ class AntiCasinoTargetRotationService
         }
 
         $available = max(80, 1024 - mb_strlen(implode("\n\n", [$headline, $fact, $focus, $call, $source, $skyGuardian, $tags])) - 2);
-        $opening = rtrim(mb_substr($opening, 0, $available), " ,.;:—-").'…';
+        $opening = rtrim(mb_substr($opening, 0, $available), ' ,.;:—-').'…';
 
         return mb_substr(implode("\n\n", [$headline, $opening, $fact, $focus, $call, $source, $skyGuardian, $tags]), 0, 1024);
     }
