@@ -179,6 +179,12 @@ class SiteSettingsCmsTest extends TestCase
 
         $blocks[0]['data']['show_title'] = false;
         $blocks[0]['data']['layout'] = 'site';
+        array_unshift($blocks, [
+            'id' => 'empty-text-before-map',
+            'type' => 'text',
+            'hidden' => false,
+            'data' => ['content' => '   ', 'align' => 'center'],
+        ]);
 
         $this->actingAs($user)->put(route('admin.site-settings.pages.update', $home), [
             'title' => $home->title,
@@ -190,7 +196,9 @@ class SiteSettingsCmsTest extends TestCase
             'blocks_json' => json_encode($blocks, JSON_UNESCAPED_UNICODE),
         ])->assertRedirect()->assertSessionHas('toast.type', 'success');
 
-        $this->assertSame('site', $home->fresh()->blocks[0]['data']['layout']);
+        $savedFullSiteMap = collect($home->fresh()->blocks)
+            ->firstWhere('type', 'alert_map');
+        $this->assertSame('site', $savedFullSiteMap['data']['layout']);
 
         $this->get('/')
             ->assertOk()
@@ -198,6 +206,7 @@ class SiteSettingsCmsTest extends TestCase
             ->assertSee('class="site-page has-full-site-map is-full-site-map-only"', false)
             ->assertSee('class="site-blocks is-at-page-top has-full-site-map is-full-site-map-only"', false)
             ->assertSee('class="site-block site-alert-map is-full-site"', false)
+            ->assertDontSee('class="site-block site-block-text align-center"', false)
             ->assertDontSee('is-full-block', false);
     }
 

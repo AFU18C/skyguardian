@@ -6,6 +6,8 @@
     $faviconUrl = !empty($siteSettings['favicon_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($siteSettings['favicon_path']) : null;
     $visibleBlocks = collect($page->blocks ?? [])
         ->filter(fn ($block) => is_array($block) && ! (bool) ($block['hidden'] ?? false))
+        ->filter(fn ($block) => ($block['type'] ?? null) !== 'text'
+            || trim((string) ($block['data']['content'] ?? '')) !== '')
         ->values();
     $hasFullSiteMap = $visibleBlocks->contains(
         fn ($block) => ($block['type'] ?? null) === 'alert_map' && ($block['data']['layout'] ?? 'contained') === 'site',
