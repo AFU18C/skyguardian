@@ -45,6 +45,13 @@ class GroupChannelWebhookService
         $this->storeMessage($bot, $messageId, $userId, $from, $text, $hasLink, $message);
         $this->handleNewMembers($bot, $message['new_chat_members'] ?? []);
 
+        $systemMessageRule = $this->systemMessageRule($bot, $message);
+        if ($systemMessageRule !== null) {
+            $this->deleteMessage($bot, $messageId, $systemMessageRule);
+
+            return;
+        }
+
         if (! $userId || ($from['is_bot'] ?? false)) {
             return;
         }
@@ -325,6 +332,97 @@ class GroupChannelWebhookService
         }
 
         return $this->rateLimitRule($bot, $state);
+    }
+
+    private function systemMessageRule(GroupChannelBot $bot, array $message): ?string
+    {
+        if (! $bot->moduleEnabled('system_messages')) {
+            return null;
+        }
+
+        $groups = [
+            'member_events' => [
+                'new_chat_members',
+                'left_chat_member',
+                'chat_owner_left',
+                'chat_owner_changed',
+            ],
+            'pinned_messages' => ['pinned_message'],
+            'chat_changes' => [
+                'new_chat_title',
+                'new_chat_photo',
+                'delete_chat_photo',
+                'message_auto_delete_timer_changed',
+                'chat_background_set',
+                'community_chat_added',
+                'community_chat_removed',
+            ],
+            'video_chats' => [
+                'video_chat_scheduled',
+                'video_chat_started',
+                'video_chat_ended',
+                'video_chat_participants_invited',
+                'voice_chat_scheduled',
+                'voice_chat_started',
+                'voice_chat_ended',
+                'voice_chat_participants_invited',
+            ],
+            'forum_topics' => [
+                'forum_topic_created',
+                'forum_topic_closed',
+                'forum_topic_reopened',
+                'forum_topic_edited',
+                'general_forum_topic_hidden',
+                'general_forum_topic_unhidden',
+            ],
+            'other_events' => [
+                'group_chat_created',
+                'supergroup_chat_created',
+                'channel_chat_created',
+                'migrate_to_chat_id',
+                'migrate_from_chat_id',
+                'proximity_alert_triggered',
+                'write_access_allowed',
+                'connected_website',
+                'users_shared',
+                'chat_shared',
+                'gift',
+                'unique_gift',
+                'gift_upgrade_sent',
+                'giveaway_created',
+                'giveaway_completed',
+                'boost_added',
+                'checklist_tasks_done',
+                'checklist_tasks_added',
+                'direct_message_price_changed',
+                'paid_message_price_changed',
+                'managed_bot_created',
+                'poll_option_added',
+                'poll_option_deleted',
+                'suggested_post_approved',
+                'suggested_post_approval_failed',
+                'suggested_post_declined',
+                'suggested_post_paid',
+                'suggested_post_refunded',
+                'successful_payment',
+                'refunded_payment',
+                'web_app_data',
+            ],
+        ];
+
+        foreach ($groups as $setting => $fields) {
+            if (! $bot->moduleSetting('system_messages', $setting, true)) {
+                continue;
+            }
+
+            foreach ($fields as $field) {
+                if (array_key_exists($field, $message)) {
+                    return 'system_'.$setting;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function rateLimitRule(GroupChannelBot $bot, GroupChannelUserState $state): ?string

@@ -18,6 +18,7 @@ class GroupChannelBot extends Model
         'polls' => 'Опросы и голосования',
         'bulk_delete' => 'Массовое удаление',
         'technical_account_bulk_delete' => 'Удаление через техаккаунт',
+        'system_messages' => 'Удаление системных сообщений',
         'antispam' => 'Антиспам',
         'welcome' => 'Приветствие новых пользователей',
         'subscription_check' => 'Проверка подписки',
@@ -118,6 +119,14 @@ class GroupChannelBot extends Model
             'delete_short_messages' => false,
             'min_length' => 2,
             'suspicious_symbols' => false,
+        ];
+        $defaults['system_messages'] += [
+            'member_events' => true,
+            'pinned_messages' => true,
+            'chat_changes' => true,
+            'video_chats' => true,
+            'forum_topics' => true,
+            'other_events' => true,
         ];
         $defaults['welcome'] += [
             'text' => '',

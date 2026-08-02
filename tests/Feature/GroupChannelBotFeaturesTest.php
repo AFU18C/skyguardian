@@ -155,6 +155,79 @@ class GroupChannelBotFeaturesTest extends TestCase
             && (string) $request['message_id'] === '55');
     }
 
+    public function test_system_messages_module_deletes_join_notice_after_processing_member(): void
+    {
+        $bot = $this->botWithModules(['system_messages']);
+
+        Http::fake([
+            '*' => Http::response(['ok' => true, 'result' => true]),
+        ]);
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson(route('group-channel.webhook', [
+                'fingerprint' => $bot->token_fingerprint,
+                'secret' => $bot->webhook_secret,
+            ]), [
+                'update_id' => 10,
+                'message' => [
+                    'message_id' => 80,
+                    'date' => now()->timestamp,
+                    'chat' => ['id' => -100500, 'type' => 'supergroup'],
+                    'from' => ['id' => 1, 'is_bot' => false],
+                    'new_chat_members' => [[
+                        'id' => 105,
+                        'is_bot' => false,
+                        'first_name' => 'Иван',
+                    ]],
+                ],
+            ])->assertOk();
+
+        $this->assertDatabaseHas('group_channel_user_states', [
+            'group_channel_bot_id' => $bot->id,
+            'telegram_user_id' => '105',
+        ]);
+        $this->assertDatabaseHas('group_channel_messages', [
+            'group_channel_bot_id' => $bot->id,
+            'telegram_message_id' => '80',
+            'matched_rule' => 'system_member_events',
+        ]);
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/deleteMessage')
+            && (string) $request['message_id'] === '80');
+    }
+
+    public function test_system_messages_module_respects_disabled_event_category(): void
+    {
+        $bot = $this->botWithModules(['system_messages'], [
+            'system_messages' => ['pinned_messages' => false],
+        ]);
+
+        Http::fake([
+            '*' => Http::response(['ok' => true, 'result' => true]),
+        ]);
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson(route('group-channel.webhook', [
+                'fingerprint' => $bot->token_fingerprint,
+                'secret' => $bot->webhook_secret,
+            ]), [
+                'update_id' => 11,
+                'message' => [
+                    'message_id' => 81,
+                    'date' => now()->timestamp,
+                    'chat' => ['id' => -100500, 'type' => 'supergroup'],
+                    'from' => ['id' => 1, 'is_bot' => false],
+                    'pinned_message' => ['message_id' => 79],
+                ],
+            ])->assertOk();
+
+        Http::assertNotSent(fn (Request $request): bool => str_ends_with($request->url(), '/deleteMessage'));
+        $this->assertDatabaseHas('group_channel_messages', [
+            'group_channel_bot_id' => $bot->id,
+            'telegram_message_id' => '81',
+            'matched_rule' => null,
+        ]);
+    }
+
     public function test_direct_join_without_required_subscription_is_removed(): void
     {
         $bot = $this->botWithModules(['subscription_check', 'welcome'], [

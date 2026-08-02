@@ -11,6 +11,7 @@ use Illuminate\Validation\Rule;
 class GroupChannelModuleSettingsController extends Controller
 {
     private const CONFIGURABLE_MODULES = [
+        'system_messages',
         'antispam',
         'welcome',
         'subscription_check',
@@ -25,6 +26,12 @@ class GroupChannelModuleSettingsController extends Controller
     {
         $data = $request->validate([
             'module' => ['required', Rule::in(self::CONFIGURABLE_MODULES)],
+            'settings.system_messages.member_events' => ['nullable', 'boolean'],
+            'settings.system_messages.pinned_messages' => ['nullable', 'boolean'],
+            'settings.system_messages.chat_changes' => ['nullable', 'boolean'],
+            'settings.system_messages.video_chats' => ['nullable', 'boolean'],
+            'settings.system_messages.forum_topics' => ['nullable', 'boolean'],
+            'settings.system_messages.other_events' => ['nullable', 'boolean'],
             'settings.antispam.delete_links' => ['nullable', 'boolean'],
             'settings.antispam.delete_new_member_messages' => ['nullable', 'boolean'],
             'settings.antispam.new_member_minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
@@ -103,6 +110,14 @@ class GroupChannelModuleSettingsController extends Controller
     private function booleanKeys(string $module): array
     {
         return match ($module) {
+            'system_messages' => [
+                'member_events',
+                'pinned_messages',
+                'chat_changes',
+                'video_chats',
+                'forum_topics',
+                'other_events',
+            ],
             'antispam' => [
                 'delete_links',
                 'delete_new_member_messages',
