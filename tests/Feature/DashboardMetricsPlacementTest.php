@@ -21,7 +21,11 @@ class DashboardMetricsPlacementTest extends TestCase
             ->assertSee('data-vps-metrics', false)
             ->assertSee('Процессор')
             ->assertSee('Оперативная память')
-            ->assertSee('Диск');
+            ->assertSee('Диск')
+            ->assertSee('Резервная копия сайта')
+            ->assertSee('Создать бэкап')
+            ->assertSee(route('admin.system.backup.show'), false)
+            ->assertSee(route('admin.system.backup.store'), false);
     }
 
     public function test_vps_metrics_are_not_displayed_in_topbar_on_other_pages(): void
