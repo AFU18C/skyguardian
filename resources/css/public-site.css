@@ -446,6 +446,43 @@
 .site-telegram-card p { margin: 5px 0 0; color: var(--site-muted); }
 .site-telegram-card a { color: var(--site-accent-dark); font-weight: 900; }
 
+.site-alert-map-title {
+    margin: 0 0 18px;
+    font-size: clamp(24px, 3vw, 38px);
+    line-height: 1.15;
+}
+
+.site-alert-map-frame {
+    height: clamp(420px, 56vw, 560px);
+    overflow: hidden;
+    background: #202124;
+    border: 1px solid var(--site-line);
+}
+
+.site-alert-map-frame.is-compact { height: clamp(340px, 44vw, 440px); }
+.site-alert-map-frame.is-large { height: clamp(500px, 68vw, 720px); }
+
+.site-alert-map-frame iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+}
+
+.site-alert-map-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 10px;
+    color: var(--site-muted);
+    font-size: 12px;
+}
+
+.site-alert-map-meta a {
+    color: var(--site-accent-dark);
+    font-weight: 800;
+}
+
 .site-empty-content {
     min-height: 300px;
     display: grid;
@@ -499,6 +536,7 @@
     .site-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .site-columns,
     .site-contact-card { grid-template-columns: 1fr; }
+    .site-alert-map-meta { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 520px) {

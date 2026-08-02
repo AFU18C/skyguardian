@@ -32,7 +32,7 @@ class SecurityHeaders
             "font-src 'self' data:",
             "connect-src 'self'",
             "media-src 'self' https:",
-            'frame-src https://www.youtube-nocookie.com https://player.vimeo.com',
+            'frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://alerts.in.ua',
             'upgrade-insecure-requests',
         ]));
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');

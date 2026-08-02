@@ -99,6 +99,57 @@ class SiteSettingsCmsTest extends TestCase
             ->assertSee('Только предпросмотр');
     }
 
+    public function test_live_alert_map_is_added_to_home_and_can_be_configured_in_the_editor(): void
+    {
+        $user = User::factory()->create();
+        $home = SitePage::query()->where('system_key', 'home')->firstOrFail();
+
+        $this->assertTrue(collect($home->blocks)->contains(
+            fn (array $block): bool => ($block['type'] ?? null) === 'alert_map',
+        ));
+
+        $this->actingAs($user)
+            ->get(route('admin.site-settings.pages.edit', $home))
+            ->assertOk()
+            ->assertSee('Карта тревог');
+
+        $blocks = [[
+            'id' => 'custom-alert-map',
+            'type' => 'alert_map',
+            'hidden' => false,
+            'data' => [
+                'title' => 'Актуальные тревоги',
+                'size' => 'compact',
+                'show_link' => false,
+                'url' => 'https://attacker.example/map',
+            ],
+        ]];
+
+        $this->actingAs($user)->put(route('admin.site-settings.pages.update', $home), [
+            'title' => $home->title,
+            'slug' => $home->slug,
+            'heading' => $home->heading,
+            'excerpt' => $home->excerpt,
+            'action' => 'publish',
+            'blocks_json' => json_encode($blocks, JSON_UNESCAPED_UNICODE),
+        ])->assertRedirect()->assertSessionHas('toast.type', 'success');
+
+        $savedBlock = $home->fresh()->blocks[0];
+        $this->assertSame([
+            'title' => 'Актуальные тревоги',
+            'size' => 'compact',
+            'show_link' => false,
+        ], $savedBlock['data']);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Актуальные тревоги')
+            ->assertSee('src="https://alerts.in.ua/lite"', false)
+            ->assertSee('site-alert-map-frame is-compact', false)
+            ->assertDontSee('https://attacker.example/map', false)
+            ->assertDontSee('Открыть полную карту');
+    }
+
     public function test_system_page_cannot_be_deleted(): void
     {
         $user = User::factory()->create();

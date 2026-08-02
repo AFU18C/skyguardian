@@ -113,6 +113,7 @@
                                         <option value="columns">Две колонки</option>
                                         <option value="contacts">Контакты</option>
                                         <option value="telegram">Telegram-ссылка</option>
+                                        <option value="alert_map">Карта тревог</option>
                                         <option value="html">HTML-блок</option>
                                     </select>
                                 </div>

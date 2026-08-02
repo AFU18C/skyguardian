@@ -437,6 +437,17 @@
 .site-block-upload-status.is-error { color: var(--sg-error); }
 .site-block-upload-status.is-success { color: var(--sg-success); }
 
+.site-block-help {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 10px 12px;
+    color: var(--sg-ink-soft);
+    background: #fffdf6;
+    border: 1px solid var(--sg-line);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .site-editor-danger {
     padding: 16px;
     background: #f7e8e4;
