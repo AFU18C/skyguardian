@@ -36,6 +36,27 @@ return new class extends Migration
                     'updated_at' => now(),
                 ]);
         }
+
+        $fundraisingPost = <<<'TEXT'
+💰 НЕ 50%. НЕ 70%. ПОКАЖІТЬ 100%.
+
+«Труха Україна» збирає гроші для військових. Тоді питання просте: де єдиний публічний звіт по кожному збору — скільки зайшло, що купили, за якою ціною, кому передали і який залишок?
+
+Скрін переказу — це не повний аудит. Якщо кожна гривня справді йде військовим, покажіть документи так, щоб перевірити міг кожен. Ми не звинувачуємо — ми вимагаємо прозорості.
+
+Поки великі канали торгують увагою, SkyGuardian дає прямий доступ до карти загроз:
+https://skyguardian.pp.ua/
+
+#SkyGuardianStart #SkyGuardianStart08 #ТрухаУкраїна #ТрухаУкраина #Труха #ЗбірДляЗСУ #ДопомогаЗСУ #Благодійність #Прозорість #ЗСУ #НовиниУкраїни
+TEXT;
+
+        GroupChannelPublication::query()
+            ->where('status', GroupChannelPublication::STATUS_SCHEDULED)
+            ->where('text', 'like', '%#SkyGuardianStart08%')
+            ->update([
+                'text' => $fundraisingPost,
+                'updated_at' => now(),
+            ]);
     }
 
     public function down(): void
