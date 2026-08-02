@@ -212,7 +212,7 @@ class SkyGuardianPromoCampaignService
         return pack('N', strlen($data))
             .$type
             .$data
-            .pack('N', crc32($type.$data) & 0xffffffff);
+            .pack('N', crc32($type.$data) & 0xFFFFFFFF);
     }
 
     private function enablePublicationModules(GroupChannelBot $bot): void
