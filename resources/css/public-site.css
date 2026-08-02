@@ -612,6 +612,13 @@
     font-size: 12px;
 }
 
+@media (min-width: 521px) {
+    .site-blocks.is-full-site-map-only .site-alert-map.is-full-site .site-alert-map-frame {
+        min-height: calc(100vh - 102px);
+        min-height: calc(100dvh - 102px);
+    }
+}
+
 @media (max-width: 820px) {
     .site-header {
         position: static;
@@ -638,6 +645,7 @@
 @media (max-width: 520px) {
     .site-main { width: calc(100% - 20px); padding-block: 24px; }
     .site-main.is-at-page-top { padding-top: 12px; }
+    .site-main.is-full-site-map-only { width: 100%; padding: 0; }
     .site-nav { grid-template-columns: 1fr; }
     .site-brand strong { font-size: 16px; }
     .site-brand small { display: none; }
