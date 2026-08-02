@@ -203,12 +203,20 @@ onSiteEditorReady(() => {
             case 'alert_map': {
                 append(
                     field({ label: 'Заголовок', key: 'title', value: data.title ?? 'Карта воздушных тревог Украины' }),
+                    field({ label: 'Показывать заголовок карты', key: 'show_title', type: 'checkbox', value: data.show_title ?? true }),
                     field({
                         label: 'Версия карты',
                         key: 'mode',
                         type: 'select',
                         value: data.mode || 'lite',
                         options: [['lite', 'Лайт-версия'], ['full', 'Полная версия']],
+                    }),
+                    field({
+                        label: 'Отображение карты',
+                        key: 'layout',
+                        type: 'select',
+                        value: data.layout || 'contained',
+                        options: [['contained', 'Внутри блока — как сейчас'], ['full', 'На весь блок']],
                     }),
                     field({
                         label: 'Размер карты',
@@ -221,7 +229,7 @@ onSiteEditorReady(() => {
 
                 const note = document.createElement('p');
                 note.className = 'site-block-help';
-                note.textContent = 'Обе версии карты обновляются автоматически. API и токен не требуются.';
+                note.textContent = 'Обе версии карты обновляются автоматически. Вариант «На весь блок» убирает боковые поля вокруг карты.';
                 grid.append(note);
                 break;
             }
