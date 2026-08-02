@@ -169,6 +169,7 @@ class SitePageController extends Controller
             ],
             'heading' => ['nullable', 'string', 'max:220'],
             'excerpt' => ['nullable', 'string', 'max:2000'],
+            'show_hero' => ['nullable', 'boolean'],
             'action' => ['required', Rule::in(['draft', 'publish', 'hide'])],
             'published_at' => ['nullable', 'date'],
             'show_in_menu' => ['nullable', 'boolean'],
@@ -230,6 +231,9 @@ class SitePageController extends Controller
             'slug' => Str::slug($data['slug']),
             'heading' => trim((string) ($data['heading'] ?? '')) ?: null,
             'excerpt' => trim((string) ($data['excerpt'] ?? '')) ?: null,
+            'show_hero' => $request->has('show_hero')
+                ? $request->boolean('show_hero')
+                : ($page->exists ? $page->show_hero : true),
             'status' => $status,
             'show_in_menu' => $request->boolean('show_in_menu'),
             'menu_label' => trim((string) ($data['menu_label'] ?? '')) ?: null,

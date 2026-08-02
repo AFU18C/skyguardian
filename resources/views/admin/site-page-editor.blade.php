@@ -88,6 +88,14 @@
                                 <label for="site-page-excerpt">Краткое описание</label>
                                 <textarea id="site-page-excerpt" name="excerpt" rows="4" maxlength="2000">{{ old('excerpt', $page->excerpt) }}</textarea>
                             </div>
+                            <input type="hidden" name="show_hero" value="0">
+                            <label class="sg-switch-row">
+                                <span>
+                                    <strong>Показывать верхний блок</strong>
+                                    <small>Название сайта, заголовок, описание и основное изображение страницы.</small>
+                                </span>
+                                <input name="show_hero" type="checkbox" value="1" @checked((bool) old('show_hero', $page->exists ? $page->show_hero : true))>
+                            </label>
                         </div>
                     </section>
 

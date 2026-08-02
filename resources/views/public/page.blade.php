@@ -60,14 +60,16 @@
 
         <main class="site-main">
             <article class="site-page">
-                <header class="site-page-hero">
-                    <p class="site-kicker">{{ $siteSettings['site_name'] ?? 'SkyGuardian' }}</p>
-                    <h1>{{ $page->effectiveHeading() }}</h1>
-                    @if($page->excerpt)<p class="site-page-excerpt">{{ $page->excerpt }}</p>@endif
-                    @if($page->featured_image_path)
-                        <img class="site-featured-image" src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($page->featured_image_path) }}" alt="{{ $page->effectiveHeading() }}">
-                    @endif
-                </header>
+                @if($page->show_hero)
+                    <header class="site-page-hero">
+                        <p class="site-kicker">{{ $siteSettings['site_name'] ?? 'SkyGuardian' }}</p>
+                        <h1>{{ $page->effectiveHeading() }}</h1>
+                        @if($page->excerpt)<p class="site-page-excerpt">{{ $page->excerpt }}</p>@endif
+                        @if($page->featured_image_path)
+                            <img class="site-featured-image" src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($page->featured_image_path) }}" alt="{{ $page->effectiveHeading() }}">
+                        @endif
+                    </header>
+                @endif
 
                 <div class="site-blocks">
                     @forelse(collect($page->blocks ?? [])->reject(fn ($block) => (bool) ($block['hidden'] ?? false)) as $block)

@@ -23,6 +23,7 @@ class SitePage extends Model
         'slug',
         'heading',
         'excerpt',
+        'show_hero',
         'status',
         'is_system',
         'system_key',
@@ -40,6 +41,7 @@ class SitePage extends Model
 
     protected $casts = [
         'is_system' => 'boolean',
+        'show_hero' => 'boolean',
         'show_in_menu' => 'boolean',
         'open_in_new_tab' => 'boolean',
         'published_at' => 'datetime',
