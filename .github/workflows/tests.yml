@@ -60,3 +60,9 @@ jobs:
 
       - name: Check Telethon worker syntax
         run: python3 -m py_compile telethon/worker.py telethon/group_channel_worker.py
+
+      - name: Install Telethon worker dependencies
+        run: python3 -m pip install -r telethon/requirements.txt
+
+      - name: Run Telethon worker tests
+        run: python3 -m unittest discover -s telethon/tests -p 'test_*.py'
