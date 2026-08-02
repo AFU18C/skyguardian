@@ -176,6 +176,29 @@ class SiteSettingsCmsTest extends TestCase
             ->assertSee('src="https://alerts.in.ua/lite"', false)
             ->assertDontSee('src="https://alerts.in.ua/"', false)
             ->assertDontSee('is-full-block', false);
+
+        $blocks[0]['data']['show_title'] = false;
+        $blocks[0]['data']['layout'] = 'site';
+
+        $this->actingAs($user)->put(route('admin.site-settings.pages.update', $home), [
+            'title' => $home->title,
+            'slug' => $home->slug,
+            'heading' => $home->heading,
+            'excerpt' => $home->excerpt,
+            'show_hero' => '0',
+            'action' => 'publish',
+            'blocks_json' => json_encode($blocks, JSON_UNESCAPED_UNICODE),
+        ])->assertRedirect()->assertSessionHas('toast.type', 'success');
+
+        $this->assertSame('site', $home->fresh()->blocks[0]['data']['layout']);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('class="site-main is-at-page-top has-full-site-map is-full-site-map-only"', false)
+            ->assertSee('class="site-page has-full-site-map is-full-site-map-only"', false)
+            ->assertSee('class="site-blocks is-at-page-top has-full-site-map is-full-site-map-only"', false)
+            ->assertSee('class="site-block site-alert-map is-full-site"', false)
+            ->assertDontSee('is-full-block', false);
     }
 
     public function test_page_hero_can_be_hidden_and_shown_from_the_editor(): void

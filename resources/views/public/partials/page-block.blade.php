@@ -117,7 +117,7 @@
         $mapModeValue = (string) ($data['mode'] ?? 'lite');
         $mapMode = in_array($mapModeValue, ['lite', 'full'], true) ? $mapModeValue : 'lite';
         $mapLayoutValue = (string) ($data['layout'] ?? 'contained');
-        $mapLayout = in_array($mapLayoutValue, ['contained', 'full'], true) ? $mapLayoutValue : 'contained';
+        $mapLayout = in_array($mapLayoutValue, ['contained', 'full', 'site'], true) ? $mapLayoutValue : 'contained';
         $mapShowTitle = filter_var($data['show_title'] ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
         $mapUrl = $mapMode === 'full' ? 'https://alerts.in.ua/' : 'https://alerts.in.ua/lite';
     @endphp
@@ -125,6 +125,7 @@
         'site-block',
         'site-alert-map',
         'is-full-block' => $mapLayout === 'full',
+        'is-full-site' => $mapLayout === 'site',
         'has-title' => $mapShowTitle && $mapTitle !== '',
     ])>
         @if($mapShowTitle && $mapTitle !== '')<h2 class="site-alert-map-title">{{ $mapTitle }}</h2>@endif

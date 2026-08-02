@@ -298,7 +298,7 @@ class SitePageController extends Controller
                         'show_title' => $showTitle ?? true,
                         'size' => in_array($size, ['compact', 'standard', 'large'], true) ? $size : 'standard',
                         'mode' => in_array($mode, ['lite', 'full'], true) ? $mode : 'lite',
-                        'layout' => in_array($layout, ['contained', 'full'], true) ? $layout : 'contained',
+                        'layout' => in_array($layout, ['contained', 'full', 'site'], true) ? $layout : 'contained',
                     ];
                 }
 
