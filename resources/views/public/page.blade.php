@@ -4,6 +4,13 @@
     $socialImage = $page->social_image_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($page->social_image_path) : null;
     $logoUrl = !empty($siteSettings['logo_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($siteSettings['logo_path']) : null;
     $faviconUrl = !empty($siteSettings['favicon_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($siteSettings['favicon_path']) : null;
+    $visibleBlocks = collect($page->blocks ?? [])
+        ->filter(fn ($block) => is_array($block) && ! (bool) ($block['hidden'] ?? false))
+        ->values();
+    $hasFullSiteMap = $visibleBlocks->contains(
+        fn ($block) => ($block['type'] ?? null) === 'alert_map' && ($block['data']['layout'] ?? 'contained') === 'site',
+    );
+    $isFullSiteMapOnly = $hasFullSiteMap && $visibleBlocks->count() === 1 && ! $page->show_hero;
 @endphp
 
 <x-layouts.guest
@@ -58,8 +65,17 @@
             @endif
         </header>
 
-        <main @class(['site-main', 'is-at-page-top' => ! $page->show_hero])>
-            <article class="site-page">
+        <main @class([
+            'site-main',
+            'is-at-page-top' => ! $page->show_hero,
+            'has-full-site-map' => $hasFullSiteMap,
+            'is-full-site-map-only' => $isFullSiteMapOnly,
+        ])>
+            <article @class([
+                'site-page',
+                'has-full-site-map' => $hasFullSiteMap,
+                'is-full-site-map-only' => $isFullSiteMapOnly,
+            ])>
                 @if($page->show_hero)
                     <header class="site-page-hero">
                         <p class="site-kicker">{{ $siteSettings['site_name'] ?? 'SkyGuardian' }}</p>
@@ -71,8 +87,13 @@
                     </header>
                 @endif
 
-                <div @class(['site-blocks', 'is-at-page-top' => ! $page->show_hero])>
-                    @forelse(collect($page->blocks ?? [])->reject(fn ($block) => (bool) ($block['hidden'] ?? false)) as $block)
+                <div @class([
+                    'site-blocks',
+                    'is-at-page-top' => ! $page->show_hero,
+                    'has-full-site-map' => $hasFullSiteMap,
+                    'is-full-site-map-only' => $isFullSiteMapOnly,
+                ])>
+                    @forelse($visibleBlocks as $block)
                         @include('public.partials.page-block', ['block' => $block])
                     @empty
                         <section class="site-empty-content">

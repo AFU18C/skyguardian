@@ -216,7 +216,11 @@ onSiteEditorReady(() => {
                         key: 'layout',
                         type: 'select',
                         value: data.layout || 'contained',
-                        options: [['contained', 'Внутри блока — как сейчас'], ['full', 'На весь блок']],
+                        options: [
+                            ['contained', 'Внутри блока — как сейчас'],
+                            ['full', 'На весь блок'],
+                            ['site', 'Без блока — на весь сайт'],
+                        ],
                     }),
                     field({
                         label: 'Размер карты',
@@ -229,7 +233,7 @@ onSiteEditorReady(() => {
 
                 const note = document.createElement('p');
                 note.className = 'site-block-help';
-                note.textContent = 'Обе версии карты обновляются автоматически. Вариант «На весь блок» убирает боковые поля вокруг карты.';
+                note.textContent = 'Обе версии карты обновляются автоматически. «На весь блок» убирает внутренние поля, а «Без блока» растягивает карту на всю ширину сайта.';
                 grid.append(note);
                 break;
             }
