@@ -32,6 +32,7 @@ onSiteEditorReady(() => {
         columns: 'Две колонки',
         contacts: 'Контакты',
         telegram: 'Telegram-ссылка',
+        alert_map: 'Карта тревог',
         html: 'HTML-блок',
     };
 
@@ -199,6 +200,25 @@ onSiteEditorReady(() => {
                     field({ label: 'Описание', key: 'text', value: data.text || '' }),
                 );
                 break;
+            case 'alert_map': {
+                append(
+                    field({ label: 'Заголовок', key: 'title', value: data.title ?? 'Карта воздушных тревог Украины' }),
+                    field({
+                        label: 'Размер карты',
+                        key: 'size',
+                        type: 'select',
+                        value: data.size || 'standard',
+                        options: [['compact', 'Компактный'], ['standard', 'Стандартный'], ['large', 'Большой']],
+                    }),
+                    field({ label: 'Показывать ссылку на полную карту', key: 'show_link', type: 'checkbox', value: data.show_link ?? true }),
+                );
+
+                const note = document.createElement('p');
+                note.className = 'site-block-help';
+                note.textContent = 'Живая карта alerts.in.ua обновляется автоматически. API и токен не требуются.';
+                grid.append(note);
+                break;
+            }
             case 'html':
                 append(field({ label: 'HTML', key: 'html', type: 'textarea', value: data.html || '', rows: 12, placeholder: '<p>Разрешённый HTML-код</p>' }));
                 break;

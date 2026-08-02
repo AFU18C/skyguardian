@@ -31,6 +31,7 @@ class SitePageController extends Controller
         'columns',
         'contacts',
         'telegram',
+        'alert_map',
         'html',
     ];
 
@@ -276,6 +277,21 @@ class SitePageController extends Controller
                     if (isset($data[$urlKey])) {
                         $data[$urlKey] = $this->safeUrl((string) $data[$urlKey]);
                     }
+                }
+
+                if ($block['type'] === 'alert_map') {
+                    $size = (string) ($data['size'] ?? 'standard');
+                    $showLink = filter_var(
+                        $data['show_link'] ?? true,
+                        FILTER_VALIDATE_BOOLEAN,
+                        FILTER_NULL_ON_FAILURE,
+                    );
+
+                    $data = [
+                        'title' => Str::limit(trim((string) ($data['title'] ?? 'Карта воздушных тревог Украины')), 180, ''),
+                        'size' => in_array($size, ['compact', 'standard', 'large'], true) ? $size : 'standard',
+                        'show_link' => $showLink ?? true,
+                    ];
                 }
 
                 return [

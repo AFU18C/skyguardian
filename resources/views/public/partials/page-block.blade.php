@@ -109,6 +109,32 @@
         <a href="{{ $data['url'] }}" target="_blank" rel="noopener">Открыть</a>
     </section>
 
+@elseif($type === 'alert_map')
+    @php
+        $mapTitle = trim((string) ($data['title'] ?? 'Карта воздушных тревог Украины'));
+        $mapSizeValue = (string) ($data['size'] ?? 'standard');
+        $mapSize = in_array($mapSizeValue, ['compact', 'standard', 'large'], true) ? $mapSizeValue : 'standard';
+        $showMapLink = filter_var($data['show_link'] ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
+    @endphp
+    <section class="site-block site-alert-map">
+        @if($mapTitle !== '')<h2 class="site-alert-map-title">{{ $mapTitle }}</h2>@endif
+        <div class="site-alert-map-frame is-{{ $mapSize }}">
+            <iframe
+                src="https://alerts.in.ua/lite"
+                title="{{ $mapTitle !== '' ? $mapTitle : 'Карта воздушных тревог Украины' }}"
+                loading="lazy"
+                referrerpolicy="strict-origin-when-cross-origin"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            ></iframe>
+        </div>
+        @if($showMapLink)
+            <div class="site-alert-map-meta">
+                <span>Данные обновляются сервисом alerts.in.ua</span>
+                <a href="https://alerts.in.ua/" target="_blank" rel="noopener noreferrer">Открыть полную карту</a>
+            </div>
+        @endif
+    </section>
+
 @elseif($type === 'html')
     <section class="site-block site-block-html">{!! $data['html'] ?? '' !!}</section>
 @endif
