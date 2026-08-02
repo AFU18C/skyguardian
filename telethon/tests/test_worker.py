@@ -125,6 +125,44 @@ class WorkerCopyTest(unittest.TestCase):
         self.assertEqual([11], result["failed"][0]["message_ids"])
         self.assertEqual("broken media", result["failed"][0]["error"])
 
+    def test_long_caption_retry_resumes_with_text_without_resending_media(self) -> None:
+        message = SimpleNamespace(
+            id=20,
+            grouped_id=None,
+            message="Длинный текст " * 100,
+            media=Mock(spec=MessageMediaPhoto),
+        )
+        first_client = SimpleNamespace(
+            send_file=AsyncMock(),
+            send_message=AsyncMock(side_effect=RuntimeError("temporary text failure")),
+        )
+
+        first = asyncio.run(worker.copy_message_groups(
+            first_client,
+            "@destination",
+            [message],
+            {"copy_mode": "original"},
+        ))
+
+        self.assertEqual({"message_ids": [20], "stage": "text_after_media"}, first["partial_delivery"])
+        first_client.send_file.assert_awaited_once()
+
+        resume_client = SimpleNamespace(send_file=AsyncMock(), send_message=AsyncMock())
+        second = asyncio.run(worker.copy_message_groups(
+            resume_client,
+            "@destination",
+            [message],
+            {
+                "copy_mode": "original",
+                "resume_partial": first["partial_delivery"],
+            },
+        ))
+
+        self.assertEqual(20, second["last_processed_id"])
+        self.assertIsNone(second["partial_delivery"])
+        resume_client.send_file.assert_not_awaited()
+        resume_client.send_message.assert_awaited_once()
+
 
 if __name__ == "__main__":
     unittest.main()

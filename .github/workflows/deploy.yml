@@ -1,34 +1,51 @@
 name: Deploy SkyGuardian
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - SkyGuardian Tests
+    types:
+      - completed
 
 permissions:
   contents: write
 
+concurrency:
+  group: skyguardian-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
-    name: Deploy to VPS
+    name: Deploy tested main to VPS
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: self-hosted
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
-      BEFORE_SHA: ${{ github.event.before }}
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout tested revision
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 2
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 0
 
-      - name: Deploy Laravel application
+      - name: Verify deployment revision belongs to main
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+
+      - name: Deploy Laravel release
         shell: bash
         run: bash deploy/deploy.sh
 
       - name: Mark deployed revision
         shell: bash
         run: |
-          git tag -f deployed "$GITHUB_SHA"
+          git tag -f deployed "$DEPLOY_SHA"
           git push origin refs/tags/deployed --force

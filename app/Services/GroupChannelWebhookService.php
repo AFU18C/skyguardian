@@ -66,10 +66,6 @@ class GroupChannelWebhookService
             && ! $state->verified_at
             && ($state->joined_at || $state->verification_expires_at)
         ) {
-            if ($this->completeVerificationFromMessage($bot, $message, $state, $text)) {
-                return;
-            }
-
             if ($state->verification_expires_at?->isPast()) {
                 $this->telegram->request($bot, 'banChatMember', [
                     'chat_id' => $bot->chat_id,
@@ -77,6 +73,10 @@ class GroupChannelWebhookService
                     'revoke_messages' => true,
                 ]);
 
+                return;
+            }
+
+            if ($this->completeVerificationFromMessage($bot, $message, $state, $text)) {
                 return;
             }
 
@@ -244,6 +244,27 @@ class GroupChannelWebhookService
             'group_channel_bot_id' => $bot->id,
             'telegram_user_id' => $userId,
         ]);
+
+        if (! $state->verification_expires_at || $state->verification_expires_at->isPast()) {
+            if ($callbackId) {
+                $this->telegram->request($bot, 'answerCallbackQuery', [
+                    'callback_query_id' => $callbackId,
+                    'text' => 'Время проверки истекло.',
+                    'show_alert' => true,
+                ]);
+            }
+
+            if ($state->verification_expires_at?->isPast()) {
+                $this->telegram->request($bot, 'banChatMember', [
+                    'chat_id' => $bot->chat_id,
+                    'user_id' => $userId,
+                    'revoke_messages' => true,
+                ]);
+            }
+
+            return;
+        }
+
         $this->markVerified($bot, $state);
 
         if ($callbackId) {

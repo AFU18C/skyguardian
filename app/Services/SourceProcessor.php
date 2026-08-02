@@ -63,6 +63,7 @@ class SourceProcessor
             $failedCount = 0;
             $copyError = null;
             $lastProcessedId = $messageIds ? max($messageIds) : null;
+            $pendingCopy = $source->pending_copy;
 
             if ($messageIds && $source->destination_peer) {
                 $copyResult = $this->telethon->call('copy_messages', $account, [
@@ -73,6 +74,7 @@ class SourceProcessor
                 ]);
                 $copiedCount = (int) ($copyResult['copied_count'] ?? count($messageIds));
                 $failedCount = (int) ($copyResult['failed_count'] ?? 0);
+                $pendingCopy = data_get($copyResult, 'partial_delivery');
                 if ($failedCount > 0) {
                     $lastProcessedId = data_get($copyResult, 'last_processed_id');
                     $firstError = (string) data_get($copyResult, 'failed.0.error', 'Неизвестная ошибка Telegram.');
@@ -83,6 +85,7 @@ class SourceProcessor
             $changes = [
                 'last_error' => $copyError,
                 'last_success_at' => now(),
+                'pending_copy' => $pendingCopy,
             ];
 
             if ($lastProcessedId !== null) {
@@ -122,6 +125,7 @@ class SourceProcessor
             'remove_phrases' => array_values(array_filter(array_map('trim', $removePhrases))),
             'footer_html' => (string) $this->ruleValue($source, 'footer_html', ''),
             'blocked_keywords' => array_values(array_filter(array_map('trim', $blockedKeywords))),
+            'resume_partial' => $source->pending_copy,
         ];
     }
 

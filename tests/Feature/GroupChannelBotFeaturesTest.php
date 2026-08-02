@@ -5,10 +5,14 @@ namespace Tests\Feature;
 use App\Models\GroupChannelBot;
 use App\Models\GroupChannelJoinRequest;
 use App\Models\GroupChannelPublication;
+use App\Models\GroupChannelUserState;
+use App\Models\GroupChannelWebhookUpdate;
 use App\Models\User;
+use App\Services\GroupChannelPublicationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 use Tests\TestCase;
 
 class GroupChannelBotFeaturesTest extends TestCase
@@ -311,6 +315,172 @@ class GroupChannelBotFeaturesTest extends TestCase
             $joinRequest->fresh()->status,
         );
         Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/approveChatJoinRequest'));
+    }
+
+    public function test_processed_webhook_update_is_not_applied_twice(): void
+    {
+        $bot = $this->botWithModules(['antispam'], [
+            'antispam' => ['delete_links' => true],
+        ]);
+        Http::fake(['*' => Http::response(['ok' => true, 'result' => true])]);
+        $payload = [
+            'update_id' => 500,
+            'message' => [
+                'message_id' => 501,
+                'date' => now()->timestamp,
+                'chat' => ['id' => -100500, 'type' => 'supergroup'],
+                'from' => ['id' => 99, 'is_bot' => false],
+                'text' => 'https://example.com',
+                'entities' => [['type' => 'url', 'offset' => 0, 'length' => 19]],
+            ],
+        ];
+        $url = route('group-channel.webhook', [
+            'fingerprint' => $bot->token_fingerprint,
+            'secret' => $bot->webhook_secret,
+        ]);
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson($url, $payload)
+            ->assertOk();
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson($url, $payload)
+            ->assertOk();
+
+        $this->assertDatabaseCount('group_channel_webhook_updates', 1);
+        $this->assertDatabaseHas('group_channel_webhook_updates', [
+            'telegram_update_id' => 500,
+            'status' => GroupChannelWebhookUpdate::STATUS_PROCESSED,
+            'attempts' => 1,
+        ]);
+        Http::assertSentCount(1);
+    }
+
+    public function test_failed_webhook_update_is_retried_instead_of_acknowledged(): void
+    {
+        $bot = $this->botWithModules(['antispam'], [
+            'antispam' => ['delete_links' => true],
+        ]);
+        $payload = [
+            'update_id' => 510,
+            'message' => [
+                'message_id' => 511,
+                'date' => now()->timestamp,
+                'chat' => ['id' => -100500, 'type' => 'supergroup'],
+                'from' => ['id' => 99, 'is_bot' => false],
+                'text' => 'https://example.com',
+                'entities' => [['type' => 'url', 'offset' => 0, 'length' => 19]],
+            ],
+        ];
+        $url = route('group-channel.webhook', [
+            'fingerprint' => $bot->token_fingerprint,
+            'secret' => $bot->webhook_secret,
+        ]);
+
+        Http::fake(['*' => Http::response([
+            'ok' => false,
+            'description' => 'Temporary Telegram error',
+        ], 500)]);
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson($url, $payload)
+            ->assertStatus(500);
+        $this->assertDatabaseHas('group_channel_webhook_updates', [
+            'telegram_update_id' => 510,
+            'status' => GroupChannelWebhookUpdate::STATUS_FAILED,
+            'attempts' => 1,
+        ]);
+
+        Http::fake(['*' => Http::response(['ok' => true, 'result' => true])]);
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson($url, $payload)
+            ->assertOk();
+        $this->assertDatabaseHas('group_channel_webhook_updates', [
+            'telegram_update_id' => 510,
+            'status' => GroupChannelWebhookUpdate::STATUS_PROCESSED,
+            'attempts' => 2,
+        ]);
+    }
+
+    public function test_expired_verification_callback_does_not_verify_user(): void
+    {
+        $bot = $this->botWithModules(['human_verification']);
+        $state = GroupChannelUserState::query()->create([
+            'group_channel_bot_id' => $bot->id,
+            'telegram_user_id' => '700',
+            'joined_at' => now()->subMinutes(10),
+            'verification_expires_at' => now()->subMinute(),
+        ]);
+        Http::fake(['*' => Http::response(['ok' => true, 'result' => true])]);
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson(route('group-channel.webhook', [
+                'fingerprint' => $bot->token_fingerprint,
+                'secret' => $bot->webhook_secret,
+            ]), [
+                'update_id' => 520,
+                'callback_query' => [
+                    'id' => 'callback-520',
+                    'from' => ['id' => 700],
+                    'data' => 'sg_verify:'.$bot->id.':700',
+                    'message' => ['chat' => ['id' => -100500]],
+                ],
+            ])->assertOk();
+
+        $this->assertNull($state->fresh()->verified_at);
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/banChatMember'));
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/answerCallbackQuery')
+            && $request['text'] === 'Время проверки истекло.');
+    }
+
+    public function test_sent_publication_cannot_be_sent_again(): void
+    {
+        $bot = $this->botWithModules(['publications']);
+        $publication = $bot->publications()->create([
+            'type' => GroupChannelPublication::TYPE_TEXT,
+            'text' => 'Одна публикация',
+            'status' => GroupChannelPublication::STATUS_DRAFT,
+        ]);
+        Http::fake(['*' => Http::response(['ok' => true, 'result' => ['message_id' => 800]])]);
+        $service = app(GroupChannelPublicationService::class);
+
+        $service->send($publication);
+
+        try {
+            $service->send($publication->fresh());
+            $this->fail('Повторная отправка должна быть заблокирована.');
+        } catch (RuntimeException $e) {
+            $this->assertSame('Публикация уже отправлена.', $e->getMessage());
+        }
+        Http::assertSentCount(1);
+    }
+
+    public function test_album_deletion_continues_after_already_deleted_message(): void
+    {
+        $bot = $this->botWithModules(['publications', 'auto_delete_publications']);
+        $publication = $bot->publications()->create([
+            'type' => GroupChannelPublication::TYPE_ALBUM,
+            'text' => 'Альбом',
+            'status' => GroupChannelPublication::STATUS_SENT,
+            'sent_at' => now(),
+            'telegram_message_id' => '901',
+            'telegram_message_ids' => ['901', '902'],
+        ]);
+        Http::fake(function (Request $request) {
+            if ((string) $request['message_id'] === '901') {
+                return Http::response([
+                    'ok' => false,
+                    'description' => 'Bad Request: message to delete not found',
+                ], 400);
+            }
+
+            return Http::response(['ok' => true, 'result' => true]);
+        });
+
+        app(GroupChannelPublicationService::class)->delete($publication);
+
+        $publication->refresh();
+        $this->assertNotNull($publication->deleted_at_telegram);
+        $this->assertSame([], $publication->telegram_message_ids);
+        Http::assertSentCount(2);
     }
 
     private function botWithModules(array $enabled, array $overrides = []): GroupChannelBot

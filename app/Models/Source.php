@@ -21,6 +21,7 @@ class Source extends Model
         'technical_account_id', 'type', 'name', 'source_peer', 'destination_peer',
         'is_active', 'check_interval', 'check_interval_unit', 'next_check_at',
         'last_message_id', 'status', 'last_error', 'last_manual_check_at', 'last_success_at',
+        'pending_copy',
     ];
 
     protected $attributes = [
@@ -52,6 +53,7 @@ class Source extends Model
             'last_message_id' => 'integer',
             'last_manual_check_at' => 'datetime',
             'last_success_at' => 'datetime',
+            'pending_copy' => 'array',
         ];
     }
 

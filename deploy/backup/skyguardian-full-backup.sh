@@ -98,15 +98,14 @@ nice -n 10 ionice -c2 -n7 mysqldump \
 
 rm -f "$DB_CNF" "$DB_NAME_FILE"
 
-set +e
 nice -n 10 ionice -c2 -n7 tar \
-    --warning=no-file-changed \
-    --ignore-failed-read \
+    --dereference \
+    --exclude='skyguardian/storage/framework/cache/*' \
+    --exclude='skyguardian/storage/framework/sessions/*' \
+    --exclude='skyguardian/storage/framework/views/*' \
+    --exclude='skyguardian/storage/logs/*' \
     -czf "$STAGE_DIR/application.tar.gz" \
     -C /var/www skyguardian
-APP_STATUS=$?
-set -e
-[ "$APP_STATUS" -le 1 ]
 
 CONFIG_PATHS=(
     etc/nginx
@@ -118,7 +117,6 @@ for service in /etc/systemd/system/skyguardian*.service /etc/systemd/system/skyg
     [ -e "$service" ] && CONFIG_PATHS+=("${service#/}")
 done
 nice -n 10 ionice -c2 -n7 tar \
-    --ignore-failed-read \
     -czf "$STAGE_DIR/server-config.tar.gz" \
     -C / "${CONFIG_PATHS[@]}"
 
@@ -129,10 +127,28 @@ printf 'created_utc=%s\napp_dir=%s\n' "$STAMP" "$APP_DIR" > "$STAGE_DIR/MANIFEST
 (
     cd "$STAGE_DIR"
     sha256sum database.sql.gz application.tar.gz server-config.tar.gz > SHA256SUMS
+    gzip -t database.sql.gz
+    tar -tzf application.tar.gz > application-files.txt
+    grep -Fx 'skyguardian/.env' application-files.txt >/dev/null
+    grep -Fx 'skyguardian/artisan' application-files.txt >/dev/null
+    grep -Fx 'skyguardian/composer.lock' application-files.txt >/dev/null
+    grep -Eq '^skyguardian/storage/app(/|$)' application-files.txt
+    tar -tzf server-config.tar.gz >/dev/null
 )
 
 tar -czf "$FINAL_ARCHIVE" -C "$STAGE_DIR" .
 tar -tzf "$FINAL_ARCHIVE" >/dev/null
+
+VERIFY_DIR="$WORK_DIR/verify"
+mkdir -p "$VERIFY_DIR"
+tar -xzf "$FINAL_ARCHIVE" -C "$VERIFY_DIR"
+(
+    cd "$VERIFY_DIR"
+    sha256sum -c SHA256SUMS
+    gzip -t database.sql.gz
+    tar -tzf application.tar.gz >/dev/null
+    tar -tzf server-config.tar.gz >/dev/null
+)
 chmod 600 "$FINAL_ARCHIVE"
 
 mapfile -t BACKUPS < <(find "$BACKUP_ROOT" -maxdepth 1 -type f -name 'skyguardian-full-*.tar.gz' -printf '%T@ %p\n' | sort -nr | cut -d' ' -f2-)
@@ -155,6 +171,7 @@ if [ -n "${RCLONE_REMOTE:-}" ]; then
         -out "$ENCRYPTED" \
         -pass "file:$KEY_FILE"
     rclone copyto "$ENCRYPTED" "${RCLONE_REMOTE%/}/$(basename "$ENCRYPTED")"
+    rclone check "$ENCRYPTED" "${RCLONE_REMOTE%/}/$(basename "$ENCRYPTED")" --one-way
     rm -f "$ENCRYPTED"
 fi
 

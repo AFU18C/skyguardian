@@ -37,6 +37,13 @@ class QrFlow:
 qr_flows: dict[str, QrFlow] = {}
 
 
+class PartialCopyError(RuntimeError):
+    def __init__(self, message: str, message_ids: list[int], stage: str) -> None:
+        super().__init__(message)
+        self.message_ids = message_ids
+        self.stage = stage
+
+
 class TelegramHtmlSanitizer(HTMLParser):
     allowed_tags = {
         "b": "b",
@@ -184,6 +191,25 @@ async def send_text(client: TelegramClient, destination_peer: Any, text: str) ->
     return True
 
 
+async def send_text_with_retry(
+    client: TelegramClient,
+    destination_peer: Any,
+    text: str,
+    attempts: int = 3,
+) -> bool:
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return await send_text(client, destination_peer, text)
+        except Exception as exc:
+            last_error = exc
+            if attempt + 1 < attempts:
+                await asyncio.sleep(0.25 * (attempt + 1))
+    if last_error is not None:
+        raise last_error
+    return False
+
+
 async def copy_message_group(
     client: TelegramClient,
     destination_peer: Any,
@@ -194,6 +220,15 @@ async def copy_message_group(
         return 0
 
     text = build_html_text(messages, settings)
+    message_ids = [int(message.id) for message in messages]
+    resume = settings.get("resume_partial") or {}
+    resume_ids = [int(value) for value in resume.get("message_ids") or []]
+    if resume.get("stage") == "text_after_media" and resume_ids == message_ids:
+        try:
+            return len(messages) if await send_text_with_retry(client, destination_peer, text) else 0
+        except Exception as exc:
+            raise PartialCopyError(str(exc), message_ids, "text_after_media") from exc
+
     if settings.get("copy_mode") == "text_only":
         return len(messages) if await send_text(client, destination_peer, text) else 0
 
@@ -209,7 +244,10 @@ async def copy_message_group(
         parse_mode="html",
     )
     if text and caption is None:
-        await send_text(client, destination_peer, text)
+        try:
+            await send_text_with_retry(client, destination_peer, text)
+        except Exception as exc:
+            raise PartialCopyError(str(exc), message_ids, "text_after_media") from exc
     return len(messages)
 
 
@@ -222,6 +260,7 @@ async def copy_message_groups(
     copied_count = 0
     failed: list[dict[str, Any]] = []
     last_processed_id: int | None = None
+    partial_delivery: dict[str, Any] | None = None
 
     for message_group in group_messages(messages):
         try:
@@ -232,6 +271,16 @@ async def copy_message_groups(
                 settings,
             )
             last_processed_id = max(int(message.id) for message in message_group)
+        except PartialCopyError as exc:
+            failed.append({
+                "message_ids": exc.message_ids,
+                "error": str(exc)[:500],
+            })
+            partial_delivery = {
+                "message_ids": exc.message_ids,
+                "stage": exc.stage,
+            }
+            break
         except Exception as exc:
             failed.append({
                 "message_ids": [int(message.id) for message in message_group],
@@ -246,6 +295,7 @@ async def copy_message_groups(
         "failed_count": sum(len(item["message_ids"]) for item in failed),
         "failed": failed,
         "last_processed_id": last_processed_id,
+        "partial_delivery": partial_delivery,
     }
 
 

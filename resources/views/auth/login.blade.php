@@ -26,6 +26,10 @@
     :favicon="$faviconUrl"
     :theme="$siteSettings['theme'] ?? 'classic'"
 >
+    <style nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
+        .sg-login-page { {!! $loginStyle !!} }
+    </style>
+
     @if($isPreview)
         <div class="sg-login-preview-bar">
             <strong>Предпросмотр авторизации</strong>
@@ -34,7 +38,7 @@
         </div>
     @endif
 
-    <main class="sg-login-page {{ $isPreview ? 'is-preview' : '' }}" style="{{ $loginStyle }}">
+    <main class="sg-login-page {{ $isPreview ? 'is-preview' : '' }}">
         <section class="sg-login-visual">
             <div class="sg-login-visual-content">
                 @if($logoUrl)
@@ -51,7 +55,7 @@
         </section>
 
         <section class="sg-login-form-wrap">
-            <form class="sg-login-form" method="POST" action="{{ route('admin.login.store') }}" @if($isPreview) onsubmit="return false" @endif>
+            <form class="sg-login-form" method="POST" action="{{ route('admin.login.store') }}" @if($isPreview) data-preview-form @endif>
                 @csrf
                 <div class="sg-form-heading">
                     <p class="sg-eyebrow">{{ $siteSettings['login_form_eyebrow'] ?? 'Административная панель' }}</p>
