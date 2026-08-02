@@ -153,6 +153,7 @@ class SkyGuardianCoreTest extends TestCase
             ['key' => 'strip_mentions', 'value' => ['value' => false], 'is_active' => true, 'priority' => 40],
             ['key' => 'remove_phrases', 'value' => ['value' => "реклама\nлишнее"], 'is_active' => true, 'priority' => 50],
             ['key' => 'footer_html', 'value' => ['value' => '<b>SkyGuardian</b>'], 'is_active' => true, 'priority' => 60],
+            ['key' => 'blocked_keywords', 'value' => ['value' => "казино\nставки"], 'is_active' => true, 'priority' => 70],
         ]);
 
         $telethon = Mockery::mock(TelethonClient::class);
@@ -177,6 +178,7 @@ class SkyGuardianCoreTest extends TestCase
                 'strip_mentions' => false,
                 'remove_phrases' => ['реклама', 'лишнее'],
                 'footer_html' => '<b>SkyGuardian</b>',
+                'blocked_keywords' => ['казино', 'ставки'],
             ],
         ])->andReturn(['copied_count' => 2]);
 
@@ -228,6 +230,7 @@ class SkyGuardianCoreTest extends TestCase
                 'strip_mentions' => false,
                 'remove_phrases' => [],
                 'footer_html' => '',
+                'blocked_keywords' => [],
             ],
         ])->andReturn([
             'copied_count' => 1,

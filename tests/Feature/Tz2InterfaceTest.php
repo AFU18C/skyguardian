@@ -72,16 +72,15 @@ class Tz2InterfaceTest extends TestCase
             'strip_mentions' => '1',
             'remove_phrases' => "реклама\nподписывайтесь на источник",
             'footer_html' => '<b>SkyGuardian</b><script>alert(1)</script><a href="javascript:alert(1)" onclick="alert(2)">bad</a>',
-            'rules' => [
-                ['key' => 'include_keywords', 'value' => 'важно', 'is_active' => '1', 'priority' => 100],
-            ],
+            'blocked_keywords_enabled' => '1',
+            'blocked_keywords' => "казино\nставки на спорт",
         ])->assertSessionHasNoErrors();
 
         $source = Source::query()->firstOrFail();
         $this->assertSame(Source::TYPE_NEWS, $source->type);
         $this->assertTrue($source->is_active);
         $this->assertNull($source->last_message_id);
-        $this->assertDatabaseHas('source_rules', ['source_id' => $source->id, 'key' => 'include_keywords']);
+        $this->assertDatabaseHas('source_rules', ['source_id' => $source->id, 'key' => 'blocked_keywords', 'is_active' => true]);
         $this->assertDatabaseHas('source_rules', ['source_id' => $source->id, 'key' => 'copy_mode']);
         $this->assertDatabaseHas('source_rules', ['source_id' => $source->id, 'key' => 'strip_links']);
 
@@ -95,6 +94,7 @@ class Tz2InterfaceTest extends TestCase
             ->assertOk()
             ->assertSee('Новости региона')
             ->assertSee('Копирование сообщений')
+            ->assertSee('Запрещённые слова')
             ->assertSee('Свой текст внизу публикации');
 
         $airAlertResponse = $this->actingAs($user)->get(route('admin.air-alert.index'));
@@ -121,8 +121,9 @@ class Tz2InterfaceTest extends TestCase
             'strip_mentions' => '0',
             'remove_phrases' => '',
             'footer_html' => '<i>Обновлено</i>',
+            'blocked_keywords_enabled' => '0',
+            'blocked_keywords' => "казино\nставки на спорт",
             'reset_cursor' => '1',
-            'rules' => [],
         ])->assertSessionHasNoErrors();
 
         $source->refresh();
@@ -130,6 +131,7 @@ class Tz2InterfaceTest extends TestCase
         $this->assertFalse($source->is_active);
         $this->assertNull($source->last_message_id);
         $this->assertSame('text_only', data_get($source->rules()->where('key', 'copy_mode')->firstOrFail()->value, 'value'));
+        $this->assertFalse($source->rules()->where('key', 'blocked_keywords')->firstOrFail()->is_active);
 
         $this->actingAs($user)->delete(route('admin.news.destroy', $source));
         $this->assertDatabaseMissing('sources', ['id' => $source->id]);

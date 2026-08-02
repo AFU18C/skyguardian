@@ -147,6 +147,19 @@ def has_file_media(message: Any) -> bool:
     )
 
 
+def contains_blocked_keyword(messages: list[Any], settings: dict[str, Any]) -> bool:
+    keywords = [
+        str(keyword).strip().casefold()
+        for keyword in settings.get("blocked_keywords") or []
+        if str(keyword).strip()
+    ]
+    if not keywords:
+        return False
+
+    source_text = "\n".join(str(getattr(message, "message", None) or "") for message in messages).casefold()
+    return any(keyword in source_text for keyword in keywords)
+
+
 def group_messages(messages: list[Any]) -> list[list[Any]]:
     grouped: list[list[Any]] = []
     positions: dict[int, int] = {}
@@ -177,6 +190,9 @@ async def copy_message_group(
     messages: list[Any],
     settings: dict[str, Any],
 ) -> int:
+    if contains_blocked_keyword(messages, settings):
+        return 0
+
     text = build_html_text(messages, settings)
     if settings.get("copy_mode") == "text_only":
         return len(messages) if await send_text(client, destination_peer, text) else 0

@@ -120,39 +120,6 @@ ready(() => {
     renderClock();
     window.setInterval(renderClock, 1000);
 
-    document.querySelectorAll('[data-rule-repeater]').forEach((repeater) => {
-        const list = repeater.querySelector('[data-rule-list]');
-        const template = repeater.querySelector('[data-rule-template]');
-
-        const renumber = () => {
-            list.querySelectorAll('[data-rule-row]').forEach((row, index) => {
-                row.querySelectorAll('[data-name]').forEach((input) => {
-                    const field = input.dataset.name === 'is_active_hidden' ? 'is_active' : input.dataset.name;
-                    input.name = `rules[${index}][${field}]`;
-                    if (input.dataset.name === 'priority' && !input.value) input.value = String((index + 1) * 100);
-                });
-                row.querySelectorAll('[name^="rules["]').forEach((input) => {
-                    input.name = input.name.replace(/rules\[\d+]/, `rules[${index}]`);
-                });
-            });
-        };
-
-        repeater.querySelector('[data-add-rule]')?.addEventListener('click', () => {
-            const fragment = template.content.cloneNode(true);
-            list.appendChild(fragment);
-            renumber();
-            list.lastElementChild?.querySelector('input:not([type="hidden"])')?.focus();
-        });
-
-        list.addEventListener('click', (event) => {
-            const remove = event.target.closest('[data-remove-rule]');
-            if (!remove) return;
-            remove.closest('[data-rule-row]')?.remove();
-            renumber();
-        });
-        renumber();
-    });
-
     document.querySelectorAll('[data-rich-editor]').forEach((editor) => {
         const surface = editor.querySelector('[data-editor-surface]');
         const input = editor.querySelector('[data-editor-input]');

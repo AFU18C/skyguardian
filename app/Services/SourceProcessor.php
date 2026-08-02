@@ -112,6 +112,7 @@ class SourceProcessor
     private function copySettings(Source $source): array
     {
         $removePhrases = preg_split('/\R/u', (string) $this->ruleValue($source, 'remove_phrases', '')) ?: [];
+        $blockedKeywords = preg_split('/\R/u', (string) $this->ruleValue($source, 'blocked_keywords', '')) ?: [];
 
         return [
             'copy_mode' => (string) $this->ruleValue($source, 'copy_mode', 'original'),
@@ -120,6 +121,7 @@ class SourceProcessor
             'strip_mentions' => (bool) $this->ruleValue($source, 'strip_mentions', false),
             'remove_phrases' => array_values(array_filter(array_map('trim', $removePhrases))),
             'footer_html' => (string) $this->ruleValue($source, 'footer_html', ''),
+            'blocked_keywords' => array_values(array_filter(array_map('trim', $blockedKeywords))),
         ];
     }
 

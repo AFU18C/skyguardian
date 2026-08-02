@@ -61,6 +61,44 @@ class WorkerCopyTest(unittest.TestCase):
             link_preview=False,
         )
 
+    def test_post_with_blocked_keyword_is_skipped_case_insensitively(self) -> None:
+        client = SimpleNamespace(send_message=AsyncMock(), send_file=AsyncMock())
+        messages = [
+            SimpleNamespace(id=10, message="Лучшее КАЗИНО города", media=None, grouped_id=None),
+            SimpleNamespace(id=11, message="Обычная новость", media=None, grouped_id=None),
+        ]
+
+        result = asyncio.run(worker.copy_message_groups(
+            client,
+            "@destination",
+            messages,
+            {"blocked_keywords": ["казино"], "copy_mode": "original"},
+        ))
+
+        self.assertEqual(1, result["copied_count"])
+        self.assertEqual(11, result["last_processed_id"])
+        client.send_message.assert_awaited_once_with(
+            "@destination",
+            "Обычная новость",
+            parse_mode="html",
+            link_preview=False,
+        )
+        client.send_file.assert_not_awaited()
+
+    def test_disabled_blocked_keyword_filter_does_not_change_copying(self) -> None:
+        client = SimpleNamespace(send_message=AsyncMock(), send_file=AsyncMock())
+        message = SimpleNamespace(id=10, message="Казино", media=None)
+
+        copied = asyncio.run(worker.copy_message_group(
+            client,
+            "@destination",
+            [message],
+            {"blocked_keywords": [], "copy_mode": "original"},
+        ))
+
+        self.assertEqual(1, copied)
+        client.send_message.assert_awaited_once()
+
     def test_failed_group_returns_checkpoint_without_recopying_previous_groups(self) -> None:
         messages = [
             SimpleNamespace(id=10, grouped_id=None),
