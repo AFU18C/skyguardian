@@ -116,10 +116,18 @@
         $mapSize = in_array($mapSizeValue, ['compact', 'standard', 'large'], true) ? $mapSizeValue : 'standard';
         $mapModeValue = (string) ($data['mode'] ?? 'lite');
         $mapMode = in_array($mapModeValue, ['lite', 'full'], true) ? $mapModeValue : 'lite';
+        $mapLayoutValue = (string) ($data['layout'] ?? 'contained');
+        $mapLayout = in_array($mapLayoutValue, ['contained', 'full'], true) ? $mapLayoutValue : 'contained';
+        $mapShowTitle = filter_var($data['show_title'] ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
         $mapUrl = $mapMode === 'full' ? 'https://alerts.in.ua/' : 'https://alerts.in.ua/lite';
     @endphp
-    <section class="site-block site-alert-map">
-        @if($mapTitle !== '')<h2 class="site-alert-map-title">{{ $mapTitle }}</h2>@endif
+    <section @class([
+        'site-block',
+        'site-alert-map',
+        'is-full-block' => $mapLayout === 'full',
+        'has-title' => $mapShowTitle && $mapTitle !== '',
+    ])>
+        @if($mapShowTitle && $mapTitle !== '')<h2 class="site-alert-map-title">{{ $mapTitle }}</h2>@endif
         <div class="site-alert-map-frame is-{{ $mapSize }}">
             <iframe
                 src="{{ $mapUrl }}"
