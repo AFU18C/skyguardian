@@ -14,6 +14,7 @@ class GroupChannelModuleToggleController extends Controller
 {
     private const WEBHOOK_MODULES = [
         'bulk_delete',
+        'system_messages',
         'antispam',
         'welcome',
         'subscription_check',

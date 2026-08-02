@@ -29,6 +29,7 @@
             'publications',
             'bulk_delete',
             'technical_account_bulk_delete',
+            'system_messages',
             'antispam',
             'welcome',
             'subscription_check',

@@ -109,6 +109,20 @@
         <button class="sg-button sg-button-secondary" type="submit">Показать количество</button>
     </form>
 
+@elseif($module === 'system_messages')
+    <form method="POST" action="{{ route('admin.group-channel.module-settings.update', $bot) }}">
+        @csrf @method('PUT')
+        <input type="hidden" name="module" value="system_messages">
+        <p>Бот удаляет только служебные сообщения Telegram. Обычные сообщения участников не затрагиваются.</p>
+        <label class="sg-switch-row"><strong>Вступил / добавлен / вышел / удалён</strong><input type="checkbox" name="settings[system_messages][member_events]" value="1" @checked($bot->moduleSetting('system_messages','member_events',true))></label>
+        <label class="sg-switch-row"><strong>Закрепил сообщение</strong><input type="checkbox" name="settings[system_messages][pinned_messages]" value="1" @checked($bot->moduleSetting('system_messages','pinned_messages',true))></label>
+        <label class="sg-switch-row"><strong>Изменил название, фото или автоудаление</strong><input type="checkbox" name="settings[system_messages][chat_changes]" value="1" @checked($bot->moduleSetting('system_messages','chat_changes',true))></label>
+        <label class="sg-switch-row"><strong>Запустил или завершил видеочат</strong><input type="checkbox" name="settings[system_messages][video_chats]" value="1" @checked($bot->moduleSetting('system_messages','video_chats',true))></label>
+        <label class="sg-switch-row"><strong>Создал или изменил тему форума</strong><input type="checkbox" name="settings[system_messages][forum_topics]" value="1" @checked($bot->moduleSetting('system_messages','forum_topics',true))></label>
+        <label class="sg-switch-row"><strong>Другие системные события</strong><input type="checkbox" name="settings[system_messages][other_events]" value="1" @checked($bot->moduleSetting('system_messages','other_events',true))></label>
+        <div class="sg-record-actions"><button class="sg-button sg-button-primary" type="submit">Сохранить удаление системных сообщений</button></div>
+    </form>
+
 @elseif($module === 'antispam')
     <form method="POST" action="{{ route('admin.group-channel.module-settings.update', $bot) }}">
         @csrf @method('PUT')

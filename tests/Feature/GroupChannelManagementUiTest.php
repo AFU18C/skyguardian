@@ -66,6 +66,34 @@ class GroupChannelManagementUiTest extends TestCase
         $this->assertTrue($bot->moduleSetting('antispam', 'delete_links'));
     }
 
+    public function test_system_message_settings_are_saved_without_changing_other_modules(): void
+    {
+        $user = User::factory()->create();
+        $bot = $this->botWithModules(['system_messages', 'antispam'], [
+            'antispam' => ['delete_links' => true],
+        ]);
+
+        $this->actingAs($user)->put(
+            route('admin.group-channel.module-settings.update', $bot),
+            [
+                'module' => 'system_messages',
+                'settings' => [
+                    'system_messages' => [
+                        'member_events' => '1',
+                        'chat_changes' => '1',
+                    ],
+                ],
+            ],
+        )->assertRedirect();
+
+        $bot->refresh();
+        $this->assertTrue($bot->moduleSetting('system_messages', 'member_events'));
+        $this->assertFalse($bot->moduleSetting('system_messages', 'pinned_messages'));
+        $this->assertTrue($bot->moduleSetting('system_messages', 'chat_changes'));
+        $this->assertFalse($bot->moduleSetting('system_messages', 'other_events'));
+        $this->assertTrue($bot->moduleSetting('antispam', 'delete_links'));
+    }
+
     public function test_connection_check_updates_compact_rights_and_returns_to_management_modal(): void
     {
         $user = User::factory()->create();
