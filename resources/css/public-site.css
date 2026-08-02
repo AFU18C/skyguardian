@@ -265,6 +265,10 @@
     padding: clamp(28px, 6vw, 82px) clamp(20px, 7vw, 92px);
 }
 
+.site-blocks.is-at-page-top {
+    padding-top: clamp(16px, 1.8vw, 24px);
+}
+
 .site-block {
     margin: 0 0 34px;
 }
