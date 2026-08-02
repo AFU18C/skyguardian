@@ -150,6 +150,49 @@ class SiteSettingsCmsTest extends TestCase
             ->assertDontSee('Открыть полную карту');
     }
 
+    public function test_page_hero_can_be_hidden_and_shown_from_the_editor(): void
+    {
+        $user = User::factory()->create();
+        $home = SitePage::query()->where('system_key', 'home')->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('admin.site-settings.pages.edit', $home))
+            ->assertOk()
+            ->assertSee('Показывать верхний блок')
+            ->assertSee('name="show_hero" type="checkbox" value="1" checked', false);
+
+        $payload = [
+            'title' => $home->title,
+            'slug' => $home->slug,
+            'heading' => $home->heading,
+            'excerpt' => $home->excerpt,
+            'show_hero' => '0',
+            'action' => 'publish',
+            'blocks_json' => json_encode($home->blocks, JSON_UNESCAPED_UNICODE),
+        ];
+
+        $this->actingAs($user)
+            ->put(route('admin.site-settings.pages.update', $home), $payload)
+            ->assertRedirect()
+            ->assertSessionHas('toast.type', 'success');
+
+        $this->assertFalse($home->fresh()->show_hero);
+        $this->get('/')
+            ->assertOk()
+            ->assertDontSee('class="site-page-hero"', false);
+
+        $payload['show_hero'] = '1';
+        $this->actingAs($user)
+            ->put(route('admin.site-settings.pages.update', $home), $payload)
+            ->assertRedirect()
+            ->assertSessionHas('toast.type', 'success');
+
+        $this->assertTrue($home->fresh()->show_hero);
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('class="site-page-hero"', false);
+    }
+
     public function test_system_page_cannot_be_deleted(): void
     {
         $user = User::factory()->create();
