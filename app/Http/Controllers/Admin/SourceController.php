@@ -16,15 +16,6 @@ use Throwable;
 
 class SourceController extends Controller
 {
-    private const RESERVED_RULE_KEYS = [
-        'copy_mode',
-        'strip_links',
-        'strip_hashtags',
-        'strip_mentions',
-        'remove_phrases',
-        'footer_html',
-    ];
-
     public function index(Request $request): View
     {
         $type = $this->type($request);
@@ -152,12 +143,9 @@ class SourceController extends Controller
             'strip_mentions' => ['nullable', 'boolean'],
             'remove_phrases' => ['nullable', 'string', 'max:10000'],
             'footer_html' => ['nullable', 'string', 'max:10000'],
+            'blocked_keywords_enabled' => ['nullable', 'boolean'],
+            'blocked_keywords' => ['nullable', 'string', 'max:10000'],
             'reset_cursor' => ['nullable', 'boolean'],
-            'rules' => ['nullable', 'array', 'max:20'],
-            'rules.*.key' => ['required', 'string', 'max:64', 'distinct', Rule::notIn(self::RESERVED_RULE_KEYS)],
-            'rules.*.value' => ['nullable', 'string', 'max:5000'],
-            'rules.*.is_active' => ['nullable', 'boolean'],
-            'rules.*.priority' => ['nullable', 'integer', 'min:0', 'max:10000'],
         ]);
     }
 
@@ -175,33 +163,30 @@ class SourceController extends Controller
 
     private function saveRules(Source $source, array $validated): void
     {
-        $source->rules()->delete();
-
         $settings = [
-            ['key' => 'copy_mode', 'value' => $validated['copy_mode'], 'priority' => 10],
-            ['key' => 'strip_links', 'value' => (bool) ($validated['strip_links'] ?? false), 'priority' => 20],
-            ['key' => 'strip_hashtags', 'value' => (bool) ($validated['strip_hashtags'] ?? false), 'priority' => 30],
-            ['key' => 'strip_mentions', 'value' => (bool) ($validated['strip_mentions'] ?? false), 'priority' => 40],
-            ['key' => 'remove_phrases', 'value' => trim((string) ($validated['remove_phrases'] ?? '')), 'priority' => 50],
-            ['key' => 'footer_html', 'value' => $this->sanitizeFooterHtml((string) ($validated['footer_html'] ?? '')), 'priority' => 60],
+            ['key' => 'copy_mode', 'value' => $validated['copy_mode'], 'is_active' => true, 'priority' => 10],
+            ['key' => 'strip_links', 'value' => (bool) ($validated['strip_links'] ?? false), 'is_active' => true, 'priority' => 20],
+            ['key' => 'strip_hashtags', 'value' => (bool) ($validated['strip_hashtags'] ?? false), 'is_active' => true, 'priority' => 30],
+            ['key' => 'strip_mentions', 'value' => (bool) ($validated['strip_mentions'] ?? false), 'is_active' => true, 'priority' => 40],
+            ['key' => 'remove_phrases', 'value' => trim((string) ($validated['remove_phrases'] ?? '')), 'is_active' => true, 'priority' => 50],
+            ['key' => 'footer_html', 'value' => $this->sanitizeFooterHtml((string) ($validated['footer_html'] ?? '')), 'is_active' => true, 'priority' => 60],
+            [
+                'key' => 'blocked_keywords',
+                'value' => trim((string) ($validated['blocked_keywords'] ?? '')),
+                'is_active' => (bool) ($validated['blocked_keywords_enabled'] ?? false),
+                'priority' => 70,
+            ],
         ];
 
         foreach ($settings as $setting) {
-            $source->rules()->create([
-                'key' => $setting['key'],
-                'value' => ['value' => $setting['value']],
-                'is_active' => true,
-                'priority' => $setting['priority'],
-            ]);
-        }
-
-        foreach ($validated['rules'] ?? [] as $index => $rule) {
-            $source->rules()->create([
-                'key' => $rule['key'],
-                'value' => ['value' => $rule['value'] ?? ''],
-                'is_active' => (bool) ($rule['is_active'] ?? false),
-                'priority' => (int) ($rule['priority'] ?? (($index + 1) * 100)),
-            ]);
+            $source->rules()->updateOrCreate(
+                ['key' => $setting['key']],
+                [
+                    'value' => ['value' => $setting['value']],
+                    'is_active' => $setting['is_active'],
+                    'priority' => $setting['priority'],
+                ],
+            );
         }
     }
 

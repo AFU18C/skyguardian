@@ -5,7 +5,6 @@
     $sourceNamePlaceholder = $type === \App\Models\Source::TYPE_NEWS
         ? 'Например: Новости региона'
         : 'Например: Канал воздушных тревог';
-    $reservedRuleKeys = ['copy_mode', 'strip_links', 'strip_hashtags', 'strip_mentions', 'remove_phrases', 'footer_html'];
     $storedRules = $isEdit ? $source->rules->keyBy('key') : collect();
     $setting = static function (string $key, mixed $default = null) use ($useOld, $isEdit, $storedRules): mixed {
         if ($useOld) {
@@ -18,18 +17,9 @@
     };
     $copyMode = (string) $setting('copy_mode', 'original');
     $footerHtml = (string) $setting('footer_html', '');
-    $rulesData = $useOld
-        ? old('rules', [])
-        : ($isEdit
-            ? $source->rules
-                ->reject(fn ($rule) => in_array($rule->key, $reservedRuleKeys, true))
-                ->map(fn ($rule) => [
-                    'key' => $rule->key,
-                    'value' => data_get($rule->value, 'value', ''),
-                    'is_active' => $rule->is_active,
-                    'priority' => $rule->priority,
-                ])->values()->all()
-            : []);
+    $blockedKeywordsEnabled = $useOld
+        ? (bool) old('blocked_keywords_enabled', false)
+        : ($isEdit ? (bool) $storedRules->get('blocked_keywords')?->is_active : false);
 @endphp
 
 <form method="POST" action="{{ $action }}" class="sg-form" data-dirty-form data-source-form>
@@ -183,54 +173,30 @@
         @endif
     </section>
 
-    <section class="sg-rules" data-rule-repeater>
+    <section class="sg-rules">
         <div class="sg-section-heading">
             <div>
-                <h3>Дополнительные правила</h3>
-                <p>Необязательные технические правила для последующих обработчиков.</p>
+                <h3>Запрещённые слова</h3>
+                <p>Не публиковать пост целиком, если в его тексте найдено заданное слово или фраза.</p>
             </div>
-            <button class="sg-button sg-button-secondary sg-button-small" type="button" data-add-rule>Добавить правило</button>
         </div>
 
-        <div class="sg-rule-list" data-rule-list>
-            @foreach ($rulesData as $index => $rule)
-                <div class="sg-rule-row" data-rule-row>
-                    <label class="sg-field">
-                        <span>Ключ <b>*</b></span>
-                        <input type="text" name="rules[{{ $index }}][key]" value="{{ $rule['key'] ?? '' }}" maxlength="64" required>
-                    </label>
-                    <label class="sg-field sg-rule-value">
-                        <span>Значение</span>
-                        <input type="text" name="rules[{{ $index }}][value]" value="{{ $rule['value'] ?? '' }}" maxlength="5000">
-                    </label>
-                    <label class="sg-field sg-rule-priority">
-                        <span>Приоритет</span>
-                        <input type="number" name="rules[{{ $index }}][priority]" value="{{ $rule['priority'] ?? (($index + 1) * 100) }}" min="0" max="10000">
-                    </label>
-                    <label class="sg-check sg-rule-active">
-                        <input type="hidden" name="rules[{{ $index }}][is_active]" value="0">
-                        <input type="checkbox" name="rules[{{ $index }}][is_active]" value="1" @checked((bool) ($rule['is_active'] ?? true))>
-                        <span>Активно</span>
-                    </label>
-                    <button class="sg-icon-button sg-rule-remove" type="button" data-remove-rule aria-label="Удалить правило">×</button>
-                </div>
-            @endforeach
-        </div>
+        <label class="sg-switch-row">
+            <span><strong>Включить фильтр</strong><small>Выключенный фильтр не влияет на копирование сообщений.</small></span>
+            <input type="hidden" name="blocked_keywords_enabled" value="0">
+            <input type="checkbox" name="blocked_keywords_enabled" value="1" @checked($blockedKeywordsEnabled)>
+        </label>
 
-        <template data-rule-template>
-            <div class="sg-rule-row" data-rule-row>
-                <label class="sg-field"><span>Ключ <b>*</b></span><input type="text" data-name="key" maxlength="64" required></label>
-                <label class="sg-field sg-rule-value"><span>Значение</span><input type="text" data-name="value" maxlength="5000"></label>
-                <label class="sg-field sg-rule-priority"><span>Приоритет</span><input type="number" data-name="priority" min="0" max="10000"></label>
-                <label class="sg-check sg-rule-active"><input type="hidden" data-name="is_active_hidden" value="0"><input type="checkbox" data-name="is_active" value="1" checked><span>Активно</span></label>
-                <button class="sg-icon-button sg-rule-remove" type="button" data-remove-rule aria-label="Удалить правило">×</button>
-            </div>
-        </template>
+        <label class="sg-field">
+            <span>Слова и фразы</span>
+            <textarea name="blocked_keywords" maxlength="10000" placeholder="Например:&#10;казино&#10;ставки на спорт">{{ $setting('blocked_keywords', '') }}</textarea>
+            <small>Каждое слово или фразу указывай с новой строки. Регистр не учитывается.</small>
+            @if ($useOld) @error('blocked_keywords')<small class="sg-field-error">{{ $message }}</small>@enderror @endif
+        </label>
     </section>
 
     @if ($useOld)
-        @error('rules')<p class="sg-field-error">{{ $message }}</p>@enderror
-        @error('rules.*.key')<p class="sg-field-error">{{ $message }}</p>@enderror
+        @error('blocked_keywords_enabled')<p class="sg-field-error">{{ $message }}</p>@enderror
     @endif
 
     <div class="sg-form-actions">
