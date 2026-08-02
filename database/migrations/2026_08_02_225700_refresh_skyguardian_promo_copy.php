@@ -2,7 +2,6 @@
 
 use App\Models\GroupChannelPublication;
 use Illuminate\Database\Migrations\Migration;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -16,7 +15,7 @@ return new class extends Migration
         $posts = json_decode((string) file_get_contents($path), true);
 
         if (! is_array($posts)) {
-            throw new RuntimeException('Не удалось прочитать тексты промо-кампании.');
+            throw new \RuntimeException('Не удалось прочитать тексты промо-кампании.');
         }
 
         foreach ($posts as $post) {
