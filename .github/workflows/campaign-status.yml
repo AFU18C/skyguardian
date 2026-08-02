@@ -27,32 +27,53 @@ jobs:
           cd /var/www/skyguardian
           sudo -u www-data php artisan skyguardian:group-channel-publications:process --limit=20
           sudo -u www-data php artisan skyguardian:promo-campaign:status
+          sudo -u www-data php artisan skyguardian:anti-casino-campaign:status
 
       - name: Publish campaign status to issue
         uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
-            const path = '/var/www/skyguardian/public/storage/skyguardian-campaign-status.json';
+            const promoPath = '/var/www/skyguardian/public/storage/skyguardian-campaign-status.json';
+            const antiCasinoPath = '/var/www/skyguardian/public/storage/anti-casino-campaign-status.json';
             const marker = '<!-- skyguardian-campaign-status -->';
 
-            if (!fs.existsSync(path)) {
-              core.setFailed(`Status file not found: ${path}`);
+            if (!fs.existsSync(promoPath)) {
+              core.setFailed(`Status file not found: ${promoPath}`);
               return;
             }
 
-            const status = JSON.parse(fs.readFileSync(path, 'utf8'));
+            if (!fs.existsSync(antiCasinoPath)) {
+              core.setFailed(`Status file not found: ${antiCasinoPath}`);
+              return;
+            }
+
+            const status = JSON.parse(fs.readFileSync(promoPath, 'utf8'));
+            const antiCasino = JSON.parse(fs.readFileSync(antiCasinoPath, 'utf8'));
             const rows = (status.posts || []).map((post) => {
               const link = post.post_link ? `[Відкрити](${post.post_link})` : '—';
               const error = post.last_error ? String(post.last_error).replaceAll('|', '\\|') : '—';
               return `| ${post.number ?? '—'} | ${post.status ?? '—'} | ${post.scheduled_at ?? '—'} | ${post.sent_at ?? '—'} | ${link} | ${error} |`;
             });
+            const counts = antiCasino.statuses || {};
 
             const body = [
               marker,
-              '## Статус промо-кампании SkyGuardian',
+              '## Статус кампаний SkyGuardian',
               '',
-              `Обновлено: ${status.generated_at ?? new Date().toISOString()}`,
+              `Обновлено: ${antiCasino.generated_at ?? status.generated_at ?? new Date().toISOString()}`,
+              '',
+              '### Антиказино — 1000 фото-постов',
+              '',
+              `- Всего создано: **${antiCasino.total ?? 0}**`,
+              `- Отправлено: **${counts.sent ?? 0}**`,
+              `- В очереди: **${counts.scheduled ?? 0}**`,
+              `- Ошибок: **${counts.error ?? 0}**`,
+              `- Первый слот: **${antiCasino.first_scheduled_at ?? '—'}**`,
+              `- Последний слот: **${antiCasino.last_scheduled_at ?? '—'}**`,
+              `- Последняя отправка: **${antiCasino.latest_sent_at ?? '—'}**`,
+              '',
+              '### Первая промо-кампания',
               '',
               '| № | Статус | Запланировано | Отправлено | Пост | Ошибка |',
               '|---:|---|---|---|---|---|',
