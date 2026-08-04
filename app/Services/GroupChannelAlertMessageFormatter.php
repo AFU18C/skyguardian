@@ -14,16 +14,31 @@ final class GroupChannelAlertMessageFormatter
         string $time,
         array $regions,
         array $details = [],
+        ?string $startTime = null,
+        ?int $durationMinutes = null,
     ): string {
-        $timeLabel = $kind === 'end' ? 'Відбій' : 'Початок';
         $message = '<b>'.self::escape(self::headline($kind, $threatType))."</b>\n\n";
         $message .= self::formatRegions($kind, $regions);
 
-        foreach (self::unique($details) as $detail) {
-            $message .= "\n\n🎯 ".self::escape(mb_substr($detail, 0, 500));
-        }
+        if ($kind !== 'end') {
+            foreach (self::unique($details) as $detail) {
+                $message .= "\n\n🎯 ".self::escape(mb_substr($detail, 0, 500));
+            }
 
-        $message .= "\n\n🕒 <b>{$timeLabel}: ".self::escape($time).'</b>';
+            $message .= "\n\n🕒 <b>Початок: ".self::escape($time).'</b>';
+        } else {
+            if ($startTime !== null && trim($startTime) !== '') {
+                $message .= "\n\n🕒 <b>Початок: ".self::escape($startTime).'</b>';
+            }
+
+            $message .= "\n🕒 <b>Відбій: ".self::escape($time).'</b>';
+
+            if ($durationMinutes !== null) {
+                $message .= "\n⏱ <b>Тривалість: ".self::escape(
+                    self::formatDuration($durationMinutes),
+                ).'</b>';
+            }
+        }
 
         if (mb_strlen($message) <= 4096) {
             return $message;
@@ -105,6 +120,29 @@ final class GroupChannelAlertMessageFormatter
         return $blocks !== []
             ? implode("\n\n", $blocks)
             : '📍 <b>Невідома локація</b>';
+    }
+
+    private static function formatDuration(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+        $days = intdiv($minutes, 1440);
+        $hours = intdiv($minutes % 1440, 60);
+        $remainingMinutes = $minutes % 60;
+        $parts = [];
+
+        if ($days > 0) {
+            $parts[] = $days.' д';
+        }
+
+        if ($hours > 0) {
+            $parts[] = $hours.' год';
+        }
+
+        if ($remainingMinutes > 0 || $parts === []) {
+            $parts[] = $remainingMinutes.' хв';
+        }
+
+        return implode(' ', $parts);
     }
 
     private static function locationRank(string $location): int

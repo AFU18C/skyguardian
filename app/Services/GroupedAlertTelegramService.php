@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\GroupChannelBot;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
@@ -23,7 +24,9 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
         $results = [];
 
         foreach ($this->splitByOblast($alert) as $oblastAlert) {
-            $results[] = $this->deliverAlert($bot, $payload, $oblastAlert);
+            $results[] = $oblastAlert['kind'] === 'end'
+                ? $this->deliverEndAlert($bot, $payload, $oblastAlert)
+                : $this->deliverStartAlert($bot, $payload, $oblastAlert);
         }
 
         return $results !== [] ? end($results) : null;
@@ -32,29 +35,16 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
     /**
      * @param  array{kind: string, threat_type: string, time: string, oblast: string, regions: array<int, string>, details: array<int, string>}  $alert
      */
-    private function deliverAlert(GroupChannelBot $bot, array $payload, array $alert): mixed
+    private function deliverStartAlert(GroupChannelBot $bot, array $payload, array $alert): mixed
     {
         $cacheKey = $this->cacheKey($bot, $alert);
-
-        if ($alert['kind'] === 'end') {
-            Cache::forget($cacheKey);
-
-            return parent::request($bot, 'sendMessage', [
-                ...$payload,
-                'text' => GroupChannelAlertMessageFormatter::render(
-                    $alert['kind'],
-                    $alert['threat_type'],
-                    $alert['time'],
-                    $alert['regions'],
-                    $alert['details'],
-                ),
-                'parse_mode' => 'HTML',
-            ]);
-        }
-
         $cached = Cache::get($cacheKey, []);
         $regions = $this->unique([
             ...((array) ($cached['regions'] ?? [])),
+            ...$alert['regions'],
+        ]);
+        $allRegions = $this->unique([
+            ...((array) ($cached['all_regions'] ?? $cached['regions'] ?? [])),
             ...$alert['regions'],
         ]);
         $details = $this->unique([
@@ -64,6 +54,9 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
         $time = is_string($cached['time'] ?? null)
             ? $cached['time']
             : $alert['time'];
+        $startedAt = is_string($cached['started_at'] ?? null)
+            ? $cached['started_at']
+            : $this->startedAt($time)->toIso8601String();
         $text = GroupChannelAlertMessageFormatter::render(
             $alert['kind'],
             $alert['threat_type'],
@@ -89,7 +82,15 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
                     'text' => $text,
                     'parse_mode' => 'HTML',
                 ]);
-                $this->remember($cacheKey, $messageId, $time, $regions, $details);
+                $this->remember(
+                    $cacheKey,
+                    $messageId,
+                    $time,
+                    $startedAt,
+                    $regions,
+                    $allRegions,
+                    $details,
+                );
 
                 return $result;
             } catch (Throwable) {
@@ -107,10 +108,142 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             : null;
 
         if ($newMessageId !== null) {
-            $this->remember($cacheKey, $newMessageId, $time, $regions, $details);
+            $this->remember(
+                $cacheKey,
+                $newMessageId,
+                $time,
+                $startedAt,
+                $regions,
+                $allRegions,
+                $details,
+            );
         }
 
         return $result;
+    }
+
+    /**
+     * @param  array{kind: string, threat_type: string, time: string, oblast: string, regions: array<int, string>, details: array<int, string>}  $alert
+     */
+    private function deliverEndAlert(GroupChannelBot $bot, array $payload, array $alert): mixed
+    {
+        [$cacheKey, $cached, $threatType] = $this->findCachedAlert($bot, $alert);
+        $messageId = is_numeric($cached['message_id'] ?? null)
+            ? (int) $cached['message_id']
+            : null;
+
+        if ($cacheKey === null || $messageId === null) {
+            return parent::request($bot, 'sendMessage', [
+                ...$payload,
+                'text' => GroupChannelAlertMessageFormatter::render(
+                    'end',
+                    $threatType,
+                    $alert['time'],
+                    $alert['regions'],
+                ),
+                'parse_mode' => 'HTML',
+            ]);
+        }
+
+        $activeRegions = $this->remainingRegions(
+            (array) ($cached['regions'] ?? []),
+            $alert['regions'],
+        );
+        $allRegions = $this->unique((array) (
+            $cached['all_regions'] ?? $cached['regions'] ?? $alert['regions']
+        ));
+        $startTime = is_string($cached['time'] ?? null)
+            ? $cached['time']
+            : null;
+        $startedAt = is_string($cached['started_at'] ?? null)
+            ? $cached['started_at']
+            : ($startTime !== null ? $this->startedAt($startTime)->toIso8601String() : null);
+
+        if ($activeRegions !== []) {
+            $text = GroupChannelAlertMessageFormatter::render(
+                'start',
+                $threatType,
+                $startTime ?? $alert['time'],
+                $activeRegions,
+                (array) ($cached['details'] ?? []),
+            );
+
+            try {
+                $result = parent::request($bot, 'editMessageText', [
+                    'chat_id' => $payload['chat_id'] ?? $bot->chat_id,
+                    'message_id' => $messageId,
+                    'text' => $text,
+                    'parse_mode' => 'HTML',
+                ]);
+                $this->remember(
+                    $cacheKey,
+                    $messageId,
+                    $startTime ?? $alert['time'],
+                    $startedAt ?? $this->startedAt($alert['time'])->toIso8601String(),
+                    $activeRegions,
+                    $allRegions,
+                    (array) ($cached['details'] ?? []),
+                );
+
+                return $result;
+            } catch (Throwable) {
+                $result = parent::request($bot, 'sendMessage', [
+                    ...$payload,
+                    'text' => $text,
+                    'parse_mode' => 'HTML',
+                ]);
+                $newMessageId = is_numeric($result['message_id'] ?? null)
+                    ? (int) $result['message_id']
+                    : null;
+
+                if ($newMessageId !== null) {
+                    $this->remember(
+                        $cacheKey,
+                        $newMessageId,
+                        $startTime ?? $alert['time'],
+                        $startedAt ?? $this->startedAt($alert['time'])->toIso8601String(),
+                        $activeRegions,
+                        $allRegions,
+                        (array) ($cached['details'] ?? []),
+                    );
+                }
+
+                return $result;
+            }
+        }
+
+        $durationMinutes = $startedAt !== null
+            ? $this->durationMinutes($startedAt, $alert['time'])
+            : null;
+        $text = GroupChannelAlertMessageFormatter::render(
+            'end',
+            $threatType,
+            $alert['time'],
+            $allRegions,
+            [],
+            $startTime,
+            $durationMinutes,
+        );
+
+        try {
+            $result = parent::request($bot, 'editMessageText', [
+                'chat_id' => $payload['chat_id'] ?? $bot->chat_id,
+                'message_id' => $messageId,
+                'text' => $text,
+                'parse_mode' => 'HTML',
+            ]);
+            Cache::forget($cacheKey);
+
+            return $result;
+        } catch (Throwable) {
+            Cache::forget($cacheKey);
+
+            return parent::request($bot, 'sendMessage', [
+                ...$payload,
+                'text' => $text,
+                'parse_mode' => 'HTML',
+            ]);
+        }
     }
 
     /**
@@ -190,6 +323,49 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
     }
 
     /**
+     * @param  array{threat_type: string, oblast: string, regions: array<int, string>}  $alert
+     * @return array{0: string|null, 1: array<string, mixed>, 2: string}
+     */
+    private function findCachedAlert(GroupChannelBot $bot, array $alert): array
+    {
+        $types = $alert['threat_type'] !== ''
+            ? [$alert['threat_type']]
+            : ['', ...array_values(GroupChannelBot::ALERT_TYPES)];
+        $types = array_values(array_unique($types));
+        $bestKey = null;
+        $bestCached = [];
+        $bestType = $alert['threat_type'];
+        $bestScore = -1;
+        $bestUpdatedAt = '';
+
+        foreach ($types as $threatType) {
+            $candidate = [...$alert, 'threat_type' => $threatType];
+            $key = $this->cacheKey($bot, $candidate);
+            $cached = Cache::get($key, []);
+
+            if (! is_numeric($cached['message_id'] ?? null)) {
+                continue;
+            }
+
+            $score = count((array) ($cached['regions'] ?? []))
+                - count($this->remainingRegions((array) ($cached['regions'] ?? []), $alert['regions']));
+            $updatedAt = is_string($cached['updated_at'] ?? null)
+                ? $cached['updated_at']
+                : '';
+
+            if ($score > $bestScore || ($score === $bestScore && $updatedAt > $bestUpdatedAt)) {
+                $bestKey = $key;
+                $bestCached = $cached;
+                $bestType = $threatType;
+                $bestScore = $score;
+                $bestUpdatedAt = $updatedAt;
+            }
+        }
+
+        return [$bestKey, $bestCached, $bestType];
+    }
+
+    /**
      * @param  array{threat_type: string, oblast: string}  $alert
      */
     private function cacheKey(GroupChannelBot $bot, array $alert): string
@@ -204,21 +380,82 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
 
     /**
      * @param  array<int, string>  $regions
+     * @param  array<int, string>  $allRegions
      * @param  array<int, string>  $details
      */
     private function remember(
         string $key,
         int $messageId,
         string $time,
+        string $startedAt,
         array $regions,
+        array $allRegions,
         array $details,
     ): void {
         Cache::put($key, [
             'message_id' => $messageId,
             'time' => $time,
+            'started_at' => $startedAt,
             'regions' => $regions,
+            'all_regions' => $allRegions,
             'details' => $details,
-        ], now()->addHours(12));
+            'updated_at' => now()->toIso8601String(),
+        ], now()->addDays(7));
+    }
+
+    /**
+     * @param  array<int, string>  $activeRegions
+     * @param  array<int, string>  $clearedRegions
+     * @return array<int, string>
+     */
+    private function remainingRegions(array $activeRegions, array $clearedRegions): array
+    {
+        return array_values(array_filter(
+            $this->unique($activeRegions),
+            fn (string $active): bool => ! collect($clearedRegions)->contains(
+                fn (string $cleared): bool => $this->clearsRegion($active, $cleared),
+            ),
+        ));
+    }
+
+    private function clearsRegion(string $active, string $cleared): bool
+    {
+        $active = mb_strtolower(trim($active));
+        $cleared = mb_strtolower(trim($cleared));
+
+        if ($active === $cleared) {
+            return true;
+        }
+
+        if (! str_contains($cleared, ' — ')) {
+            return str_starts_with($active, $cleared.' — ');
+        }
+
+        return str_starts_with($active, $cleared.' — ');
+    }
+
+    private function startedAt(string $time): CarbonImmutable
+    {
+        $now = CarbonImmutable::now('Europe/Kyiv');
+        [$hour, $minute] = array_map('intval', explode(':', $time));
+        $startedAt = $now->setTime($hour, $minute);
+
+        return $startedAt->greaterThan($now->addMinutes(5))
+            ? $startedAt->subDay()
+            : $startedAt;
+    }
+
+    private function durationMinutes(string $startedAt, string $endTime): int
+    {
+        $start = CarbonImmutable::parse($startedAt)->timezone('Europe/Kyiv');
+        [$hour, $minute] = array_map('intval', explode(':', $endTime));
+        $end = CarbonImmutable::now('Europe/Kyiv')->setTime($hour, $minute);
+
+        while ($end->lessThan($start)) {
+            $end = $end->addDay();
+        }
+
+        return max(0, (int) $start->diffInMinutes($end));
     }
 
     /**
