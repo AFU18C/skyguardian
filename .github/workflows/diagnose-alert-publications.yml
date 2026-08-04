@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   diagnose:
@@ -17,6 +18,7 @@ jobs:
         shell: bash
         run: |
           set -u
+          exec > >(tee /tmp/skyguardian-alert-diagnostics.txt) 2>&1
           cd /var/www/skyguardian
 
           echo '=== scheduler service ==='
@@ -74,3 +76,22 @@ jobs:
 
           rm -f /tmp/skyguardian-alert-diag.php
           exit "$cycle_status"
+
+      - name: Publish diagnostic report
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/skyguardian-alert-diagnostics.txt';
+            let report = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : 'Diagnostic output file was not created.';
+            report = report
+              .replace(/https:\/\/api\.telegram\.org\/bot[^/\s]+/gi, 'https://api.telegram.org/bot[REDACTED]')
+              .replace(/\b\d{6,15}:[A-Za-z0-9_-]{20,}\b/g, '[TELEGRAM_BOT_TOKEN_REDACTED]');
+            report = report.slice(-55000);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 60,
+              body: `<!-- alert-publication-diagnostics -->\n## Production diagnostics\n\n\`\`\`text\n${report}\n\`\`\``,
+            });
