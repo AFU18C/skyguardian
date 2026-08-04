@@ -20,7 +20,25 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             return parent::request($bot, $method, $payload);
         }
 
+        $results = [];
+
+        foreach ($this->splitByOblast($alert) as $oblastAlert) {
+            $results[] = $this->deliverAlert($bot, $payload, $oblastAlert);
+        }
+
+        return $results !== [] ? end($results) : null;
+    }
+
+    /**
+     * @param  array{kind: string, threat_type: string, time: string, oblast: string, regions: array<int, string>, details: array<int, string>}  $alert
+     */
+    private function deliverAlert(GroupChannelBot $bot, array $payload, array $alert): mixed
+    {
+        $cacheKey = $this->cacheKey($bot, $alert);
+
         if ($alert['kind'] === 'end') {
+            Cache::forget($cacheKey);
+
             return parent::request($bot, 'sendMessage', [
                 ...$payload,
                 'text' => GroupChannelAlertMessageFormatter::render(
@@ -34,7 +52,6 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             ]);
         }
 
-        $cacheKey = $this->cacheKey($bot, $alert);
         $cached = Cache::get($cacheKey, []);
         $regions = $this->unique([
             ...((array) ($cached['regions'] ?? [])),
@@ -44,10 +61,13 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             ...((array) ($cached['details'] ?? [])),
             ...$alert['details'],
         ]);
+        $time = is_string($cached['time'] ?? null)
+            ? $cached['time']
+            : $alert['time'];
         $text = GroupChannelAlertMessageFormatter::render(
             $alert['kind'],
             $alert['threat_type'],
-            $alert['time'],
+            $time,
             $regions,
             $details,
         );
@@ -69,11 +89,11 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
                     'text' => $text,
                     'parse_mode' => 'HTML',
                 ]);
-                $this->remember($cacheKey, $messageId, $regions, $details);
+                $this->remember($cacheKey, $messageId, $time, $regions, $details);
 
                 return $result;
             } catch (Throwable) {
-                // Telegram may refuse editing an old/deleted post. Send a new one instead.
+                // Telegram may refuse editing an old or deleted post. Send a new one instead.
             }
         }
 
@@ -87,7 +107,7 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             : null;
 
         if ($newMessageId !== null) {
-            $this->remember($cacheKey, $newMessageId, $regions, $details);
+            $this->remember($cacheKey, $newMessageId, $time, $regions, $details);
         }
 
         return $result;
@@ -139,18 +159,46 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
     }
 
     /**
-     * @param  array{kind: string, threat_type: string, time: string}  $alert
+     * @param  array{kind: string, threat_type: string, time: string, regions: array<int, string>, details: array<int, string>}  $alert
+     * @return array<int, array{kind: string, threat_type: string, time: string, oblast: string, regions: array<int, string>, details: array<int, string>}>
+     */
+    private function splitByOblast(array $alert): array
+    {
+        $groups = [];
+
+        foreach ($alert['regions'] as $region) {
+            $oblast = trim(explode(' — ', $region, 2)[0] ?? '');
+
+            if ($oblast === '') {
+                continue;
+            }
+
+            $key = mb_strtolower($oblast);
+            $groups[$key] ??= [
+                ...$alert,
+                'oblast' => $oblast,
+                'regions' => [],
+            ];
+            $groups[$key]['regions'][] = $region;
+        }
+
+        return array_values(array_map(function (array $group): array {
+            $group['regions'] = $this->unique($group['regions']);
+
+            return $group;
+        }, $groups));
+    }
+
+    /**
+     * @param  array{threat_type: string, oblast: string}  $alert
      */
     private function cacheKey(GroupChannelBot $bot, array $alert): string
     {
-        $date = now('Europe/Kyiv')->format('Y-m-d');
-
         return 'skyguardian:grouped-alert:'.hash('sha256', implode('|', [
             (string) $bot->id,
             (string) $bot->chat_id,
-            $alert['threat_type'],
-            $date,
-            $alert['time'],
+            mb_strtolower($alert['threat_type']),
+            mb_strtolower($alert['oblast']),
         ]));
     }
 
@@ -158,13 +206,19 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
      * @param  array<int, string>  $regions
      * @param  array<int, string>  $details
      */
-    private function remember(string $key, int $messageId, array $regions, array $details): void
-    {
+    private function remember(
+        string $key,
+        int $messageId,
+        string $time,
+        array $regions,
+        array $details,
+    ): void {
         Cache::put($key, [
             'message_id' => $messageId,
+            'time' => $time,
             'regions' => $regions,
             'details' => $details,
-        ], now()->addMinutes(2));
+        ], now()->addHours(12));
     }
 
     /**
