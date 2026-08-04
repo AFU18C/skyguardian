@@ -21,12 +21,16 @@ class GroupChannelAlertsApiCheckController extends Controller
             }
 
             $alerts = $client->activeAlerts((string) $groupChannelBot->alerts_api_token);
-            $wholeRegions = collect($alerts)->filter(function (array $alert): bool {
-                $uid = (string) ($alert['location_uid'] ?? '');
+            $supportedRegions = collect($alerts)->filter(function (array $alert): bool {
+                $locationType = (string) ($alert['location_type'] ?? '');
+                $locationUid = (string) ($alert['location_uid'] ?? '');
+                $oblastUid = (string) ($alert['location_oblast_uid'] ?? '');
+                $scopeRegionUid = $locationType === 'oblast'
+                    ? $locationUid
+                    : ($oblastUid !== '' ? $oblastUid : $locationUid);
 
-                return (($alert['location_type'] ?? null) === 'oblast'
-                        || in_array($uid, ['30', '31'], true))
-                    && array_key_exists($uid, GroupChannelBot::ALERT_REGIONS);
+                return in_array($locationType, ['oblast', 'city'], true)
+                    && array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS);
             })->count();
 
             $groupChannelBot->update([
@@ -39,7 +43,7 @@ class GroupChannelAlertsApiCheckController extends Controller
                 'toast' => [
                     'type' => 'success',
                     'title' => 'API работает',
-                    'message' => 'Токен принят. Активных событий уровня областей и специальных городов: '.$wholeRegions.'.',
+                    'message' => 'Токен принят. Активных событий по областям и городам: '.$supportedRegions.'.',
                 ],
                 'open_group_channel_manage' => $groupChannelBot->id,
                 'open_group_channel_module' => GroupChannelBot::MODULE_ALERT_PUBLICATIONS,

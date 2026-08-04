@@ -266,28 +266,39 @@ class GroupChannelAlertPublicationService
         $normalized = [];
 
         foreach ($alerts as $alert) {
-            $regionUid = trim((string) ($alert['location_uid'] ?? ''));
+            $locationUid = trim((string) ($alert['location_uid'] ?? ''));
             $locationType = (string) ($alert['location_type'] ?? '');
+            $oblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));
             $alertType = (string) ($alert['alert_type'] ?? '');
-            $isWholeRegion = $locationType === 'oblast'
-                || in_array($regionUid, ['30', '31'], true);
+            $isSupportedLocation = in_array($locationType, ['oblast', 'city'], true);
+            $scopeRegionUid = $locationType === 'oblast'
+                ? $locationUid
+                : ($oblastUid !== '' ? $oblastUid : $locationUid);
 
-            if (! $isWholeRegion
-                || ! array_key_exists($regionUid, GroupChannelBot::ALERT_REGIONS)
+            if (! $isSupportedLocation
+                || $locationUid === ''
+                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)
                 || ! in_array($alertType, $selectedTypes, true)
-                || (! $allUkraine && ! in_array($regionUid, $selectedRegions, true))) {
+                || (! $allUkraine && ! in_array($scopeRegionUid, $selectedRegions, true))) {
                 continue;
             }
 
             $startedAt = $this->date($alert['started_at'] ?? null) ?? $now;
+            $regionName = trim((string) ($alert['location_title'] ?? ''));
+
+            if ($regionName === '') {
+                $regionName = GroupChannelBot::ALERT_REGIONS[$locationUid]
+                    ?? GroupChannelBot::ALERT_REGIONS[$scopeRegionUid];
+            }
+
             $item = [
-                'region_uid' => $regionUid,
-                'region_name' => GroupChannelBot::ALERT_REGIONS[$regionUid],
+                'region_uid' => $locationUid,
+                'region_name' => $regionName,
                 'alert_type' => $alertType,
                 'source_alert_id' => is_numeric($alert['id'] ?? null) ? (int) $alert['id'] : null,
                 'started_at' => $startedAt,
             ];
-            $key = $this->stateKey($regionUid, $alertType);
+            $key = $this->stateKey($locationUid, $alertType);
 
             if (! isset($normalized[$key])
                 || $startedAt->greaterThan($normalized[$key]['started_at'])) {

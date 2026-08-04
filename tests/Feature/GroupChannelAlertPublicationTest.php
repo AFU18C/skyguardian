@@ -71,25 +71,41 @@ class GroupChannelAlertPublicationTest extends TestCase
         });
     }
 
-    public function test_raions_hromadas_and_small_cities_are_ignored(): void
+    public function test_cities_are_published_while_raions_and_hromadas_are_ignored(): void
     {
-        Http::fake();
-
-        $bot = $this->alertBot();
-        $result = app(GroupChannelAlertPublicationService::class)->processSnapshot($bot, [
-            $this->alert(14, 'Тестова громада', 'hromada', 2001),
-            $this->alert(14, 'Тестовий район', 'raion', 2002),
-            $this->alert(14, 'Тестове місто', 'city', 2003),
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response([
+                'ok' => true,
+                'result' => ['message_id' => 202],
+            ]),
         ]);
 
-        $this->assertTrue($result['baseline']);
-        $this->assertSame(0, $result['active']);
-        $this->assertDatabaseCount('group_channel_alert_states', 0);
-        $this->assertDatabaseCount('group_channel_alert_events', 0);
-        Http::assertNothingSent();
+        $bot = $this->alertBot();
+        $service = app(GroupChannelAlertPublicationService::class);
+        $service->processSnapshot($bot, []);
+
+        $result = $service->processSnapshot($bot->fresh(), [
+            $this->alert(5001, 'Тестова громада', 'hromada', 2001, 'air_raid', 25),
+            $this->alert(5002, 'Тестовий район', 'raion', 2002, 'air_raid', 25),
+            $this->alert(5003, 'Чернігів', 'city', 2003, 'air_raid', 25),
+        ]);
+
+        $this->assertFalse($result['baseline']);
+        $this->assertSame(1, $result['active']);
+        $this->assertSame(1, $result['queued']);
+        $this->assertSame(1, $result['sent']);
+        $this->assertDatabaseHas('group_channel_alert_states', [
+            'group_channel_bot_id' => $bot->id,
+            'region_uid' => '5003',
+            'region_name' => 'Чернігів',
+        ]);
+        $this->assertDatabaseCount('group_channel_alert_states', 1);
+        Http::assertSent(function (Request $request): bool {
+            return str_contains((string) $request['text'], 'Чернігів');
+        });
     }
 
-    public function test_selected_oblasts_and_threat_types_are_respected(): void
+    public function test_selected_oblasts_include_their_cities_and_respect_threat_types(): void
     {
         Http::fake();
 
@@ -107,17 +123,28 @@ class GroupChannelAlertPublicationTest extends TestCase
 
         $result = app(GroupChannelAlertPublicationService::class)->processSnapshot($bot, [
             $this->alert(12, 'Запорізька область', 'oblast', 3001, 'air_raid'),
-            $this->alert(14, 'Київська область', 'oblast', 3002, 'air_raid'),
-            $this->alert(12, 'Запорізька область', 'oblast', 3003, 'artillery_shelling'),
+            $this->alert(1201, 'Запоріжжя', 'city', 3002, 'air_raid', 12),
+            $this->alert(1401, 'Бровари', 'city', 3003, 'air_raid', 14),
+            $this->alert(12, 'Запорізька область', 'oblast', 3004, 'artillery_shelling'),
         ]);
 
-        $this->assertSame(1, $result['active']);
+        $this->assertSame(2, $result['active']);
         $this->assertDatabaseHas('group_channel_alert_states', [
             'group_channel_bot_id' => $bot->id,
             'region_uid' => '12',
             'alert_type' => 'air_raid',
         ]);
-        $this->assertDatabaseCount('group_channel_alert_states', 1);
+        $this->assertDatabaseHas('group_channel_alert_states', [
+            'group_channel_bot_id' => $bot->id,
+            'region_uid' => '1201',
+            'region_name' => 'Запоріжжя',
+            'alert_type' => 'air_raid',
+        ]);
+        $this->assertDatabaseMissing('group_channel_alert_states', [
+            'group_channel_bot_id' => $bot->id,
+            'region_uid' => '1401',
+        ]);
+        $this->assertDatabaseCount('group_channel_alert_states', 2);
     }
 
     /**
@@ -154,7 +181,11 @@ class GroupChannelAlertPublicationTest extends TestCase
         string $locationType,
         int $id,
         string $alertType = 'air_raid',
+        ?int $oblastUid = null,
     ): array {
+        $oblastUid ??= $regionUid;
+        $oblastName = GroupChannelBot::ALERT_REGIONS[(string) $oblastUid] ?? $title;
+
         return [
             'id' => $id,
             'location_title' => $title,
@@ -164,7 +195,8 @@ class GroupChannelAlertPublicationTest extends TestCase
             'updated_at' => '2026-08-04T10:00:01+03:00',
             'alert_type' => $alertType,
             'location_uid' => (string) $regionUid,
-            'location_oblast' => $title,
+            'location_oblast' => $oblastName,
+            'location_oblast_uid' => (string) $oblastUid,
             'location_raion' => '',
             'notes' => null,
             'calculated' => null,
