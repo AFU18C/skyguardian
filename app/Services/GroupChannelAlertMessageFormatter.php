@@ -43,6 +43,13 @@ final class GroupChannelAlertMessageFormatter
                     self::formatDuration($durationMinutes),
                 ).'</b>';
             }
+
+            $message .= "\n\n📂 <b>Деталі завершеної тривоги</b>";
+            $message .= "\n".self::formatCompletedAlertDetails(
+                $threatType,
+                $regions,
+                $startTime,
+            );
         }
 
         if (mb_strlen($message) <= 4096) {
@@ -74,7 +81,65 @@ final class GroupChannelAlertMessageFormatter
      */
     private static function formatRegions(string $kind, array $regions): string
     {
-        /** @var array<string, array{oblast: string, children: array<string, string>}> $groups */
+        $groups = self::groupRegions($regions);
+        $blocks = [];
+
+        foreach ($groups as $group) {
+            $children = self::sortedChildren($group['children']);
+            $isEnd = $kind === 'end';
+            $block = '📍 <b>'.self::escape($group['oblast'])."</b>\n\n";
+            $block .= $isEnd
+                ? '✅ <b>СТАТУС: БЕЗПЕЧНО</b>'
+                : '🔴 <b>СТАТУС: АКТИВНА</b>';
+
+            if (! $isEnd) {
+                $block .= "\n\n<b>Активні території:</b>";
+                $block .= self::formatLocationList($children);
+            }
+
+            $blocks[] = $block;
+        }
+
+        return $blocks !== []
+            ? implode("\n\n", $blocks)
+            : "📍 <b>Невідома локація</b>\n\n🔴 <b>СТАТУС: АКТИВНА</b>";
+    }
+
+    /**
+     * @param  array<int, string>  $regions
+     */
+    private static function formatCompletedAlertDetails(
+        string $threatType,
+        array $regions,
+        ?string $startTime,
+    ): string {
+        $groups = self::groupRegions($regions);
+        $locations = [];
+
+        foreach ($groups as $group) {
+            foreach (self::sortedChildren($group['children']) as $child) {
+                $locations[mb_strtolower($child)] = $child;
+            }
+        }
+
+        $details = '<b>'.self::escape(self::headline('start', $threatType))."</b>\n";
+        $details .= '🔴 <b>СТАТУС БУВ: АКТИВНА</b>';
+        $details .= "\n\n<b>Території:</b>";
+        $details .= self::formatLocationList(array_values($locations));
+
+        if ($startTime !== null && trim($startTime) !== '') {
+            $details .= "\n\n🕒 Початок: <b>".self::escape($startTime).'</b>';
+        }
+
+        return '<blockquote expandable>'.$details.'</blockquote>';
+    }
+
+    /**
+     * @param  array<int, string>  $regions
+     * @return array<string, array{oblast: string, children: array<string, string>}>
+     */
+    private static function groupRegions(array $regions): array
+    {
         $groups = [];
 
         foreach (self::unique($regions) as $region) {
@@ -97,39 +162,41 @@ final class GroupChannelAlertMessageFormatter
             }
         }
 
-        $blocks = [];
+        return $groups;
+    }
 
-        foreach ($groups as $group) {
-            $children = array_values($group['children']);
-            usort($children, function (string $left, string $right): int {
-                $rank = self::locationRank($left) <=> self::locationRank($right);
+    /**
+     * @param  array<string, string>  $children
+     * @return array<int, string>
+     */
+    private static function sortedChildren(array $children): array
+    {
+        $values = array_values($children);
+        usort($values, function (string $left, string $right): int {
+            $rank = self::locationRank($left) <=> self::locationRank($right);
 
-                return $rank !== 0 ? $rank : strnatcasecmp($left, $right);
-            });
+            return $rank !== 0 ? $rank : strnatcasecmp($left, $right);
+        });
 
-            $isEnd = $kind === 'end';
-            $block = '📍 <b>'.self::escape($group['oblast'])."</b>\n\n";
-            $block .= $isEnd
-                ? '✅ <b>СТАТУС: БЕЗПЕЧНО</b>'
-                : '🔴 <b>СТАТУС: АКТИВНА</b>';
-            $block .= $isEnd
-                ? "\n\n<b>Тривога діяла:</b>"
-                : "\n\n<b>Активні території:</b>";
+        return $values;
+    }
 
-            if ($children === []) {
-                $block .= "\n› Уся територія";
-            } else {
-                foreach ($children as $child) {
-                    $block .= "\n› ".self::escape($child);
-                }
-            }
-
-            $blocks[] = $block;
+    /**
+     * @param  array<int, string>  $locations
+     */
+    private static function formatLocationList(array $locations): string
+    {
+        if ($locations === []) {
+            return "\n› Уся територія";
         }
 
-        return $blocks !== []
-            ? implode("\n\n", $blocks)
-            : "📍 <b>Невідома локація</b>\n\n🔴 <b>СТАТУС: АКТИВНА</b>";
+        $list = '';
+
+        foreach ($locations as $location) {
+            $list .= "\n› ".self::escape($location);
+        }
+
+        return $list;
     }
 
     private static function formatDuration(int $minutes): string

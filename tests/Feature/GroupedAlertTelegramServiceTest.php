@@ -75,7 +75,7 @@ class GroupedAlertTelegramServiceTest extends TestCase
         $this->assertStringContainsString('🔄 Оновлено: <b>', $kharkivUpdated);
     }
 
-    public function test_partial_and_full_all_clear_edit_the_original_post_and_show_duration(): void
+    public function test_partial_and_full_all_clear_edit_the_original_post_and_collapse_previous_alert(): void
     {
         CarbonImmutable::setTestNow('2026-08-05T00:47:00+03:00');
         config(['cache.default' => 'array']);
@@ -121,11 +121,17 @@ class GroupedAlertTelegramServiceTest extends TestCase
             $allClear = (string) $requests[2][0]['text'];
             $this->assertStringContainsString('<b>🟢 ТРИВОГУ ЗАВЕРШЕНО</b>', $allClear);
             $this->assertStringContainsString('✅ <b>СТАТУС: БЕЗПЕЧНО</b>', $allClear);
-            $this->assertStringContainsString('<b>Тривога діяла:</b>', $allClear);
-            $this->assertStringContainsString('› Харківський район', $allClear);
-            $this->assertStringContainsString('› м. Харків', $allClear);
             $this->assertStringContainsString('🕒 <b>00:14 → 00:47</b>', $allClear);
             $this->assertStringContainsString('⏱ Тривалість: <b>33 хв</b>', $allClear);
+            $this->assertStringContainsString('📂 <b>Деталі завершеної тривоги</b>', $allClear);
+            $this->assertStringContainsString('<blockquote expandable>', $allClear);
+            $this->assertStringContainsString('<b>🚨 ПОВІТРЯНА ТРИВОГА</b>', $allClear);
+            $this->assertStringContainsString('🔴 <b>СТАТУС БУВ: АКТИВНА</b>', $allClear);
+            $this->assertStringContainsString('<b>Території:</b>', $allClear);
+            $this->assertStringContainsString('› Харківський район', $allClear);
+            $this->assertStringContainsString('› м. Харків', $allClear);
+            $this->assertStringContainsString('🕒 Початок: <b>00:14</b>', $allClear);
+            $this->assertStringContainsString('</blockquote>', $allClear);
         } finally {
             CarbonImmutable::setTestNow();
         }
