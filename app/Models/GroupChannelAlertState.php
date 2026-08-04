@@ -13,6 +13,7 @@ class GroupChannelAlertState extends Model
         'region_uid',
         'region_name',
         'alert_type',
+        'details',
         'source_alert_id',
         'started_at',
         'last_seen_at',
