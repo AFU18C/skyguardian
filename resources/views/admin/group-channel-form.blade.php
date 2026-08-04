@@ -45,3 +45,34 @@
         <button class="sg-button sg-button-primary" type="submit" data-submit-button>Сохранить</button>
     </div>
 </form>
+
+@if($bot)
+    <hr>
+    <form class="sg-form" method="POST" action="{{ route('admin.group-channel.alerts-api-token.update', $bot) }}">
+        @csrf @method('PUT')
+        <div class="sg-field">
+            <label for="alerts-api-token-{{ $bot->id }}">Токен API alerts.in.ua</label>
+            <input
+                id="alerts-api-token-{{ $bot->id }}"
+                type="password"
+                name="alerts_api_token"
+                value=""
+                maxlength="512"
+                autocomplete="new-password"
+                placeholder="{{ $bot->alerts_api_token ? 'Токен уже добавлен. Введите новый только для замены' : 'Вставьте полученный API-токен' }}"
+            >
+            <small>Токен хранится зашифрованным и не выводится обратно в форму.</small>
+            @error('alerts_api_token')<small class="sg-field-error">{{ $message }}</small>@enderror
+        </div>
+        @if($bot->alerts_api_token)
+            <label class="sg-switch-row">
+                <span><strong>Удалить текущий API-токен</strong><small>Модуль перестанет получать данные до добавления нового токена.</small></span>
+                <input type="hidden" name="remove_alerts_api_token" value="0">
+                <input type="checkbox" name="remove_alerts_api_token" value="1">
+            </label>
+        @endif
+        <div class="sg-form-actions">
+            <button class="sg-button sg-button-primary" type="submit" data-submit-button>Сохранить API-токен</button>
+        </div>
+    </form>
+@endif
