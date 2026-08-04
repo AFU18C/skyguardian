@@ -92,6 +92,42 @@ jobs:
           sudo journalctl -u skyguardian-scheduler.service --since '20 minutes ago' \
             -p warning --no-pager -n 100 2>/dev/null || true
 
+          echo '=== scheduler command timings: last 180 seconds ==='
+          sudo journalctl -u skyguardian-scheduler.service --since '180 seconds ago' \
+            --no-pager -o cat > /tmp/skyguardian-scheduler-journal.txt 2>/dev/null || true
+          python3 - <<'PY'
+          import re
+          from collections import defaultdict
+          from pathlib import Path
+
+          path = Path('/tmp/skyguardian-scheduler-journal.txt')
+          stats = defaultdict(list)
+          pattern = re.compile(r"Running \['artisan'\s+([^\]]+?)\]\s+([0-9.]+)(ms|s)\s+DONE")
+
+          if path.exists():
+              for line in path.read_text(errors='replace').splitlines():
+                  match = pattern.search(line)
+                  if not match:
+                      continue
+                  command = match.group(1).strip()
+                  value = float(match.group(2))
+                  milliseconds = value * 1000 if match.group(3) == 's' else value
+                  stats[command].append(milliseconds)
+
+          if not stats:
+              print('no_completed_command_timings_found')
+          else:
+              print(f"{'command':70} {'count':>6} {'avg_ms':>10} {'max_ms':>10} {'total_ms':>12} {'wall_share':>11}")
+              rows = []
+              for command, values in stats.items():
+                  total = sum(values)
+                  rows.append((total, command, len(values), total / len(values), max(values)))
+              for total, command, count, average, maximum in sorted(rows, reverse=True):
+                  wall_share = total / 180000 * 100
+                  print(f"{command[:70]:70} {count:6d} {average:10.2f} {maximum:10.2f} {total:12.2f} {wall_share:10.2f}%")
+          PY
+          rm -f /tmp/skyguardian-scheduler-journal.txt
+
       - name: Publish diagnostic report
         if: always()
         uses: actions/github-script@v8
