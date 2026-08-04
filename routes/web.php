@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\GroupChannelAlertSettingsController;
+use App\Http\Controllers\Admin\GroupChannelAlertsApiCheckController;
+use App\Http\Controllers\Admin\GroupChannelAlertsApiTokenController;
 use App\Http\Controllers\Admin\GroupChannelBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelCheckController;
 use App\Http\Controllers\Admin\GroupChannelController;
@@ -94,6 +97,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::delete('/group-channel/{groupChannelBot}', [GroupChannelController::class, 'destroy'])->name('group-channel.destroy');
     Route::post('/group-channel/{groupChannelBot}/check', GroupChannelCheckController::class)->name('group-channel.check');
     Route::post('/group-channel/{groupChannelBot}/test-message', [GroupChannelController::class, 'sendTestMessage'])->name('group-channel.test-message');
+    Route::put('/group-channel/{groupChannelBot}/alerts-api-token', GroupChannelAlertsApiTokenController::class)->name('group-channel.alerts-api-token.update');
+    Route::post('/group-channel/{groupChannelBot}/alerts-api-check', GroupChannelAlertsApiCheckController::class)->name('group-channel.alerts-api-check');
+    Route::put('/group-channel/{groupChannelBot}/alert-settings', GroupChannelAlertSettingsController::class)->name('group-channel.alert-settings.update');
     Route::post('/group-channel/{groupChannelBot}/webhook', GroupChannelWebhookRegistrationController::class)->name('group-channel.webhook.register');
     Route::put('/group-channel/{groupChannelBot}/modules', [GroupChannelController::class, 'updateModules'])->name('group-channel.modules.update');
     Route::patch('/group-channel/{groupChannelBot}/modules/{module}', GroupChannelModuleToggleController::class)->name('group-channel.modules.toggle');
