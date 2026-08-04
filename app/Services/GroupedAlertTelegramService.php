@@ -278,12 +278,6 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             }
         }
 
-        if ($kind === 'end'
-            && $threatType === ''
-            && preg_match('/ВІДБІЙ(?:\s+ПОВІТРЯНОЇ)?\s+ТРИВОГИ/ui', $text)) {
-            $threatType = GroupChannelBot::ALERT_TYPES['air_raid'];
-        }
-
         if ($regions === [] || $time === '') {
             return null;
         }
@@ -336,14 +330,15 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
     {
         $types = $alert['threat_type'] !== ''
             ? [$alert['threat_type']]
-            : array_values(GroupChannelBot::ALERT_TYPES);
+            : ['', ...array_values(GroupChannelBot::ALERT_TYPES)];
+        $types = array_values(array_unique($types));
         $bestKey = null;
         $bestCached = [];
         $bestType = $alert['threat_type'];
         $bestScore = -1;
         $bestUpdatedAt = '';
 
-        foreach ($this->unique(['', ...$types]) as $threatType) {
+        foreach ($types as $threatType) {
             $candidate = [...$alert, 'threat_type' => $threatType];
             $key = $this->cacheKey($bot, $candidate);
             $cached = Cache::get($key, []);
