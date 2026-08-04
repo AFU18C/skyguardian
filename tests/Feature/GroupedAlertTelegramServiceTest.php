@@ -77,7 +77,7 @@ class GroupedAlertTelegramServiceTest extends TestCase
         CarbonImmutable::setTestNow('2026-08-05T00:47:00+03:00');
         config(['cache.default' => 'array']);
         Cache::flush();
-        Http::fake(Http::response([
+        Http::fake(fn () => Http::response([
             'ok' => true,
             'result' => ['message_id' => 777],
         ]));
