@@ -1,0 +1,76 @@
+name: Diagnose Alert Publications
+
+on:
+  push:
+    branches:
+      - ops/diagnose-alert-publications
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: Inspect production alert publisher
+        shell: bash
+        run: |
+          set -u
+          cd /var/www/skyguardian
+
+          echo '=== scheduler service ==='
+          sudo systemctl is-active skyguardian-scheduler.service || true
+          sudo systemctl show skyguardian-scheduler.service \
+            --property=ActiveState,SubState,MainPID,ExecMainStartTimestamp,ExecMainStatus \
+            --no-pager || true
+
+          echo '=== state before forced cycle ==='
+          cat > /tmp/skyguardian-alert-diag.php <<'PHP'
+          <?php
+          require '/var/www/skyguardian/vendor/autoload.php';
+          $app = require '/var/www/skyguardian/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          foreach (App\Models\GroupChannelBot::query()->orderBy('id')->get() as $bot) {
+              if (! $bot->moduleEnabled(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS)) {
+                  continue;
+              }
+              $statuses = $bot->alertEvents()
+                  ->selectRaw('status, COUNT(*) aggregate')
+                  ->groupBy('status')
+                  ->pluck('aggregate', 'status')
+                  ->map(fn ($v) => (int) $v)
+                  ->all();
+              echo json_encode([
+                  'id' => $bot->id,
+                  'group' => $bot->group_name,
+                  'active' => (bool) $bot->is_active,
+                  'chat_id_present' => (bool) $bot->chat_id,
+                  'initialized_at' => optional($bot->alerts_api_initialized_at)?->toIso8601String(),
+                  'last_checked_at' => optional($bot->alerts_api_last_checked_at)?->toIso8601String(),
+                  'last_success_at' => optional($bot->alerts_api_last_success_at)?->toIso8601String(),
+                  'last_error' => $bot->alerts_api_last_error,
+                  'states' => $bot->alertStates()->count(),
+                  'events' => $statuses,
+              ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL;
+          }
+          PHP
+          sudo -u www-data php /tmp/skyguardian-alert-diag.php || true
+
+          echo '=== forced processing cycle ==='
+          set +e
+          sudo -u www-data php artisan skyguardian:group-channel-alerts:process --limit=50
+          cycle_status=$?
+          set -e
+          echo "cycle_exit_code=$cycle_status"
+
+          echo '=== state after forced cycle ==='
+          sudo -u www-data php /tmp/skyguardian-alert-diag.php || true
+
+          echo '=== recent scheduler journal ==='
+          sudo journalctl -u skyguardian-scheduler.service --since '20 minutes ago' --no-pager -n 120 \
+            | sed -E 's#https://api\.telegram\.org/bot[^/[:space:]]+#https://api.telegram.org/bot[REDACTED]#g' \
+            | tail -n 120 || true
+
+          rm -f /tmp/skyguardian-alert-diag.php
+          exit "$cycle_status"
