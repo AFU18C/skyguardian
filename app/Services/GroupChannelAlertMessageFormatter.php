@@ -15,22 +15,15 @@ final class GroupChannelAlertMessageFormatter
         array $regions,
         array $details = [],
     ): string {
-        $headline = $kind === 'end'
-            ? '🟢 ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ'
-            : '🚨 ПОВІТРЯНА ТРИВОГА';
         $timeLabel = $kind === 'end' ? 'Відбій' : 'Початок';
-        $message = '<b>'.self::escape($headline)."</b>\n\n";
-        $message .= '📍 '.self::formatRegions($regions);
-
-        if ($kind !== 'end' && trim($threatType) !== '') {
-            $message .= "\n\n⚠️ ".self::escape($threatType);
-        }
+        $message = '<b>'.self::escape(self::headline($kind, $threatType))."</b>\n\n";
+        $message .= self::formatRegions($kind, $regions);
 
         foreach (self::unique($details) as $detail) {
-            $message .= "\n🎯 ".self::escape(mb_substr($detail, 0, 500));
+            $message .= "\n\n🎯 ".self::escape(mb_substr($detail, 0, 500));
         }
 
-        $message .= "\n🕒 {$timeLabel}: <b>".self::escape($time).'</b>';
+        $message .= "\n\n🕒 <b>{$timeLabel}: ".self::escape($time).'</b>';
 
         if (mb_strlen($message) <= 4096) {
             return $message;
@@ -39,10 +32,27 @@ final class GroupChannelAlertMessageFormatter
         return self::escape(mb_substr(html_entity_decode(strip_tags($message)), 0, 3800));
     }
 
+    private static function headline(string $kind, string $threatType): string
+    {
+        $threatType = trim($threatType);
+        $normalized = mb_strtolower($threatType);
+        $isAirRaid = $normalized === '' || str_contains($normalized, 'повітряна тривога');
+
+        if ($kind === 'end') {
+            return $isAirRaid
+                ? '🟢 ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ'
+                : '🟢 ВІДБІЙ: '.mb_strtoupper($threatType);
+        }
+
+        return $isAirRaid
+            ? '🚨 ПОВІТРЯНА ТРИВОГА'
+            : '🚨 '.mb_strtoupper($threatType);
+    }
+
     /**
      * @param  array<int, string>  $regions
      */
-    private static function formatRegions(array $regions): string
+    private static function formatRegions(string $kind, array $regions): string
     {
         /** @var array<string, array{oblast: string, children: array<string, string>}> $groups */
         $groups = [];
@@ -77,18 +87,24 @@ final class GroupChannelAlertMessageFormatter
                 return $rank !== 0 ? $rank : strnatcasecmp($left, $right);
             });
 
-            $block = '<b>'.self::escape($group['oblast']).'</b>';
+            $block = '📍 <b>'.self::escape($group['oblast']).'</b>';
 
-            foreach ($children as $child) {
-                $block .= "\n• ".self::escape($child);
+            if ($children !== []) {
+                $block .= $kind === 'end'
+                    ? "\n\nВідбій оголошено:"
+                    : "\n\nТривога оголошена:";
+
+                foreach ($children as $child) {
+                    $block .= "\n• ".self::escape($child);
+                }
             }
 
             $blocks[] = $block;
         }
 
         return $blocks !== []
-            ? implode("\n\n📍 ", $blocks)
-            : '<b>Невідома локація</b>';
+            ? implode("\n\n", $blocks)
+            : '📍 <b>Невідома локація</b>';
     }
 
     private static function locationRank(string $location): int
