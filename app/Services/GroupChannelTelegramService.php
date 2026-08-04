@@ -10,6 +10,10 @@ use RuntimeException;
 
 class GroupChannelTelegramService
 {
+    private const ALERT_MAP_BUTTON_TEXT = '🗺 Мапа тривог України';
+
+    private const ALERT_MAP_URL = 'https://skyguardian.pp.ua/';
+
     public function request(GroupChannelBot $bot, string $method, array $payload = []): mixed
     {
         $response = $this->client($bot)
@@ -90,6 +94,8 @@ class GroupChannelTelegramService
 
     private function normalizePayload(string $method, array $payload): array
     {
+        $payload = $this->withAlertMapButton($method, $payload);
+
         if ($method !== 'sendPoll' || ! isset($payload['options'])) {
             return $payload;
         }
@@ -112,6 +118,36 @@ class GroupChannelTelegramService
         );
 
         return $payload;
+    }
+
+    private function withAlertMapButton(string $method, array $payload): array
+    {
+        if (! in_array($method, ['sendMessage', 'editMessageText'], true)) {
+            return $payload;
+        }
+
+        $text = $payload['text'] ?? null;
+
+        if (! is_string($text) || ! $this->isAlertStatusCard($text)) {
+            return $payload;
+        }
+
+        $payload['reply_markup'] = [
+            'inline_keyboard' => [[
+                [
+                    'text' => self::ALERT_MAP_BUTTON_TEXT,
+                    'url' => self::ALERT_MAP_URL,
+                ],
+            ]],
+        ];
+
+        return $payload;
+    }
+
+    private function isAlertStatusCard(string $text): bool
+    {
+        return str_contains($text, '<b>🚨 ')
+            || str_contains($text, '<b>🟢 ');
     }
 
     private function client(GroupChannelBot $bot): PendingRequest
