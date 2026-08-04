@@ -2,9 +2,9 @@
 
 use App\Http\Controllers\Admin\BackupController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\GroupChannelAlertSettingsController;
 use App\Http\Controllers\Admin\GroupChannelAlertsApiCheckController;
 use App\Http\Controllers\Admin\GroupChannelAlertsApiTokenController;
+use App\Http\Controllers\Admin\GroupChannelAlertSettingsController;
 use App\Http\Controllers\Admin\GroupChannelBulkDeleteController;
 use App\Http\Controllers\Admin\GroupChannelCheckController;
 use App\Http\Controllers\Admin\GroupChannelController;
