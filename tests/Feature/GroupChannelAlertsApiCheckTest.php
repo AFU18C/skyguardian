@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\GroupChannelBot;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -19,7 +20,7 @@ class GroupChannelAlertsApiCheckTest extends TestCase
             ]),
         ]);
 
-        $user = \App\Models\User::factory()->create();
+        $user = User::factory()->create();
         $settings = GroupChannelBot::defaultModuleSettings();
         $settings[GroupChannelBot::MODULE_ALERT_PUBLICATIONS]['enabled'] = true;
 
