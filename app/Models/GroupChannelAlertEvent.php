@@ -41,6 +41,23 @@ class GroupChannelAlertEvent extends Model
         'attempts' => 0,
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $event): bool {
+            if ($event->kind !== self::KIND_START || ! $event->event_at) {
+                return true;
+            }
+
+            $bot = $event->bot()->first();
+
+            if (! $bot?->alerts_api_initialized_at) {
+                return true;
+            }
+
+            return $event->event_at->greaterThan($bot->alerts_api_initialized_at);
+        });
+    }
+
     protected function casts(): array
     {
         return [
