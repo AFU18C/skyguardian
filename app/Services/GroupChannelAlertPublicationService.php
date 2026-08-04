@@ -99,6 +99,7 @@ class GroupChannelAlertPublicationService
                             'region_uid' => $state->region_uid,
                             'region_name' => $state->region_name,
                             'alert_type' => $state->alert_type,
+                            'details' => $state->details,
                             'source_alert_id' => $state->source_alert_id,
                             'started_at' => $state->started_at?->toImmutable(),
                         ],
@@ -186,6 +187,7 @@ class GroupChannelAlertPublicationService
             $event->kind,
             $event->alert_type,
             $event->event_at->timezone('Europe/Kyiv')->format('Y-m-d H:i'),
+            hash('sha256', trim((string) $event->details)),
         ])) as $batch) {
             $ids = $batch->pluck('id')->all();
             $claimed = GroupChannelAlertEvent::query()
@@ -267,10 +269,14 @@ class GroupChannelAlertPublicationService
 
         foreach ($alerts as $alert) {
             $locationUid = trim((string) ($alert['location_uid'] ?? ''));
-            $locationType = (string) ($alert['location_type'] ?? '');
+            $locationType = trim((string) ($alert['location_type'] ?? ''));
             $oblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));
-            $alertType = (string) ($alert['alert_type'] ?? '');
-            $isSupportedLocation = in_array($locationType, ['oblast', 'city'], true);
+            $alertType = trim((string) ($alert['alert_type'] ?? ''));
+            $isSupportedLocation = in_array(
+                $locationType,
+                ['oblast', 'raion', 'city', 'hromada'],
+                true,
+            );
             $scopeRegionUid = $locationType === 'oblast'
                 ? $locationUid
                 : ($oblastUid !== '' ? $oblastUid : $locationUid);
@@ -284,17 +290,11 @@ class GroupChannelAlertPublicationService
             }
 
             $startedAt = $this->date($alert['started_at'] ?? null) ?? $now;
-            $regionName = trim((string) ($alert['location_title'] ?? ''));
-
-            if ($regionName === '') {
-                $regionName = GroupChannelBot::ALERT_REGIONS[$locationUid]
-                    ?? GroupChannelBot::ALERT_REGIONS[$scopeRegionUid];
-            }
-
             $item = [
                 'region_uid' => $locationUid,
-                'region_name' => $regionName,
+                'region_name' => $this->locationName($alert, $locationType, $scopeRegionUid),
                 'alert_type' => $alertType,
+                'details' => $this->details($alert['notes'] ?? null),
                 'source_alert_id' => is_numeric($alert['id'] ?? null) ? (int) $alert['id'] : null,
                 'started_at' => $startedAt,
             ];
@@ -312,6 +312,56 @@ class GroupChannelAlertPublicationService
     }
 
     /**
+     * @param  array<string, mixed>  $alert
+     */
+    private function locationName(array $alert, string $locationType, string $scopeRegionUid): string
+    {
+        $title = trim((string) ($alert['location_title'] ?? ''));
+        $oblast = trim((string) ($alert['location_oblast'] ?? ''));
+        $raion = trim((string) ($alert['location_raion'] ?? ''));
+        $oblast = $oblast !== ''
+            ? $oblast
+            : (GroupChannelBot::ALERT_REGIONS[$scopeRegionUid] ?? '');
+
+        if ($locationType === 'oblast') {
+            return $title !== '' ? $title : $oblast;
+        }
+
+        $parts = [$oblast];
+
+        if ($locationType === 'hromada'
+            && $raion !== ''
+            && mb_strtolower($raion) !== mb_strtolower($title)) {
+            $parts[] = $raion;
+        }
+
+        if ($title !== '') {
+            $parts[] = $title;
+        } elseif ($raion !== '') {
+            $parts[] = $raion;
+        }
+
+        $parts = collect($parts)
+            ->filter()
+            ->unique(fn (string $part): string => mb_strtolower($part))
+            ->values()
+            ->all();
+
+        return $parts !== [] ? implode(' — ', $parts) : 'Невідома локація';
+    }
+
+    private function details(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $value = trim(preg_replace('/\s+/u', ' ', $value) ?? '');
+
+        return $value !== '' ? mb_substr($value, 0, 1500) : null;
+    }
+
+    /**
      * @param  array<string, mixed>  $item
      * @return array<string, mixed>
      */
@@ -321,6 +371,7 @@ class GroupChannelAlertPublicationService
             'region_uid' => $item['region_uid'],
             'region_name' => $item['region_name'],
             'alert_type' => $item['alert_type'],
+            'details' => $item['details'],
             'source_alert_id' => $item['source_alert_id'],
             'started_at' => $item['started_at'],
             'last_seen_at' => $now,
@@ -354,6 +405,7 @@ class GroupChannelAlertPublicationService
                 'region_uid' => $item['region_uid'],
                 'region_name' => $item['region_name'],
                 'alert_type' => $item['alert_type'],
+                'details' => $item['details'] ?? null,
                 'event_at' => $eventAt,
                 'status' => GroupChannelAlertEvent::STATUS_PENDING,
             ],
@@ -392,12 +444,30 @@ class GroupChannelAlertPublicationService
             ->sort()
             ->values()
             ->implode("\n📍 ");
+        $details = $events
+            ->pluck('details')
+            ->filter()
+            ->unique()
+            ->values()
+            ->implode("\n🎯 ");
+        $hasDetailsVariable = str_contains($template, '{details}');
         $message = strtr($template, [
             '{region}' => $regions,
             '{time}' => $first->event_at->timezone('Europe/Kyiv')->format('H:i'),
             '{threat_type}' => GroupChannelBot::ALERT_TYPES[$first->alert_type] ?? $first->alert_type,
+            '{details}' => $details,
         ]);
-        $message = trim($message);
+
+        if ($first->kind === GroupChannelAlertEvent::KIND_START
+            && $details !== ''
+            && ! $hasDetailsVariable) {
+            $detailsLine = "🎯 {$details}";
+            $message = str_contains($message, "\n🕒")
+                ? str_replace("\n🕒", "\n{$detailsLine}\n🕒", $message)
+                : $message."\n{$detailsLine}";
+        }
+
+        $message = trim(preg_replace('/\n{3,}/', "\n\n", $message) ?? $message);
 
         if ($message === '') {
             throw new RuntimeException('Шаблон сообщения тревог сформировал пустой текст.');
