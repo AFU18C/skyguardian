@@ -61,15 +61,18 @@ class GroupedAlertTelegramServiceTest extends TestCase
         $this->assertSame('HTML', $requests[2][0]['parse_mode']);
         $this->assertSame(701, $requests[2][0]['message_id']);
         $this->assertStringContainsString('<b>🚨 ПОВІТРЯНА ТРИВОГА</b>', $kharkivUpdated);
+        $this->assertStringContainsString('━━━━━━━━━━━━━━', $kharkivUpdated);
         $this->assertStringContainsString('📍 <b>Харківська область</b>', $kharkivUpdated);
-        $this->assertStringContainsString('Тривога оголошена:', $kharkivUpdated);
-        $this->assertStringContainsString('• Харківський район', $kharkivUpdated);
-        $this->assertStringContainsString('• м. Харків', $kharkivUpdated);
-        $this->assertStringContainsString('• Харківська територіальна громада', $kharkivUpdated);
+        $this->assertStringContainsString('🔴 <b>СТАТУС: АКТИВНА</b>', $kharkivUpdated);
+        $this->assertStringContainsString('<b>Активні території:</b>', $kharkivUpdated);
+        $this->assertStringContainsString('› Харківський район', $kharkivUpdated);
+        $this->assertStringContainsString('› м. Харків', $kharkivUpdated);
+        $this->assertStringContainsString('› Харківська територіальна громада', $kharkivUpdated);
         $this->assertStringNotContainsString('⚠️ Повітряна тривога', $kharkivUpdated);
         $this->assertStringNotContainsString('Полтавська область', $kharkivUpdated);
         $this->assertStringContainsString('🎯 КАБи у напрямку півночі Харківщини', $kharkivUpdated);
-        $this->assertStringContainsString('🕒 <b>Початок: 22:14</b>', $kharkivUpdated);
+        $this->assertStringContainsString('🕒 Початок: <b>22:14</b>', $kharkivUpdated);
+        $this->assertStringContainsString('🔄 Оновлено: <b>', $kharkivUpdated);
     }
 
     public function test_partial_and_full_all_clear_edit_the_original_post_and_show_duration(): void
@@ -109,17 +112,20 @@ class GroupedAlertTelegramServiceTest extends TestCase
 
             $partial = (string) $requests[1][0]['text'];
             $this->assertStringContainsString('<b>🚨 ПОВІТРЯНА ТРИВОГА</b>', $partial);
-            $this->assertStringContainsString('• м. Харків', $partial);
-            $this->assertStringNotContainsString('• Харківський район', $partial);
-            $this->assertStringContainsString('🕒 <b>Початок: 00:14</b>', $partial);
+            $this->assertStringContainsString('🔴 <b>СТАТУС: АКТИВНА</b>', $partial);
+            $this->assertStringContainsString('› м. Харків', $partial);
+            $this->assertStringNotContainsString('› Харківський район', $partial);
+            $this->assertStringContainsString('🕒 Початок: <b>00:14</b>', $partial);
+            $this->assertStringContainsString('🔄 Оновлено: <b>00:47</b>', $partial);
 
             $allClear = (string) $requests[2][0]['text'];
-            $this->assertStringContainsString('<b>🟢 ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ</b>', $allClear);
-            $this->assertStringContainsString('• Харківський район', $allClear);
-            $this->assertStringContainsString('• м. Харків', $allClear);
-            $this->assertStringContainsString('🕒 <b>Початок: 00:14</b>', $allClear);
-            $this->assertStringContainsString('🕒 <b>Відбій: 00:47</b>', $allClear);
-            $this->assertStringContainsString('⏱ <b>Тривалість: 33 хв</b>', $allClear);
+            $this->assertStringContainsString('<b>🟢 ТРИВОГУ ЗАВЕРШЕНО</b>', $allClear);
+            $this->assertStringContainsString('✅ <b>СТАТУС: БЕЗПЕЧНО</b>', $allClear);
+            $this->assertStringContainsString('<b>Тривога діяла:</b>', $allClear);
+            $this->assertStringContainsString('› Харківський район', $allClear);
+            $this->assertStringContainsString('› м. Харків', $allClear);
+            $this->assertStringContainsString('🕒 <b>00:14 → 00:47</b>', $allClear);
+            $this->assertStringContainsString('⏱ Тривалість: <b>33 хв</b>', $allClear);
         } finally {
             CarbonImmutable::setTestNow();
         }

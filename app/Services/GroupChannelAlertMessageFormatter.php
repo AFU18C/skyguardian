@@ -17,7 +17,8 @@ final class GroupChannelAlertMessageFormatter
         ?string $startTime = null,
         ?int $durationMinutes = null,
     ): string {
-        $message = '<b>'.self::escape(self::headline($kind, $threatType))."</b>\n\n";
+        $message = '<b>'.self::escape(self::headline($kind, $threatType))."</b>\n";
+        $message .= "━━━━━━━━━━━━━━\n\n";
         $message .= self::formatRegions($kind, $regions);
 
         if ($kind !== 'end') {
@@ -25,16 +26,20 @@ final class GroupChannelAlertMessageFormatter
                 $message .= "\n\n🎯 ".self::escape(mb_substr($detail, 0, 500));
             }
 
-            $message .= "\n\n🕒 <b>Початок: ".self::escape($time).'</b>';
+            $message .= "\n\n🕒 Початок: <b>".self::escape($time).'</b>';
+            $message .= "\n🔄 Оновлено: <b>".self::escape(
+                now('Europe/Kyiv')->format('H:i'),
+            ).'</b>';
         } else {
             if ($startTime !== null && trim($startTime) !== '') {
-                $message .= "\n\n🕒 <b>Початок: ".self::escape($startTime).'</b>';
+                $message .= "\n\n🕒 <b>".self::escape($startTime)
+                    .' → '.self::escape($time).'</b>';
+            } else {
+                $message .= "\n\n🕒 Відбій: <b>".self::escape($time).'</b>';
             }
 
-            $message .= "\n🕒 <b>Відбій: ".self::escape($time).'</b>';
-
             if ($durationMinutes !== null) {
-                $message .= "\n⏱ <b>Тривалість: ".self::escape(
+                $message .= "\n⏱ Тривалість: <b>".self::escape(
                     self::formatDuration($durationMinutes),
                 ).'</b>';
             }
@@ -55,8 +60,8 @@ final class GroupChannelAlertMessageFormatter
 
         if ($kind === 'end') {
             return $isAirRaid
-                ? '🟢 ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ'
-                : '🟢 ВІДБІЙ: '.mb_strtoupper($threatType);
+                ? '🟢 ТРИВОГУ ЗАВЕРШЕНО'
+                : '🟢 ЗАГРОЗУ ЗАВЕРШЕНО';
         }
 
         return $isAirRaid
@@ -102,15 +107,20 @@ final class GroupChannelAlertMessageFormatter
                 return $rank !== 0 ? $rank : strnatcasecmp($left, $right);
             });
 
-            $block = '📍 <b>'.self::escape($group['oblast']).'</b>';
+            $isEnd = $kind === 'end';
+            $block = '📍 <b>'.self::escape($group['oblast'])."</b>\n\n";
+            $block .= $isEnd
+                ? '✅ <b>СТАТУС: БЕЗПЕЧНО</b>'
+                : '🔴 <b>СТАТУС: АКТИВНА</b>';
+            $block .= $isEnd
+                ? "\n\n<b>Тривога діяла:</b>"
+                : "\n\n<b>Активні території:</b>";
 
-            if ($children !== []) {
-                $block .= $kind === 'end'
-                    ? "\n\nВідбій оголошено:"
-                    : "\n\nТривога оголошена:";
-
+            if ($children === []) {
+                $block .= "\n› Уся територія";
+            } else {
                 foreach ($children as $child) {
-                    $block .= "\n• ".self::escape($child);
+                    $block .= "\n› ".self::escape($child);
                 }
             }
 
@@ -119,7 +129,7 @@ final class GroupChannelAlertMessageFormatter
 
         return $blocks !== []
             ? implode("\n\n", $blocks)
-            : '📍 <b>Невідома локація</b>';
+            : "📍 <b>Невідома локація</b>\n\n🔴 <b>СТАТУС: АКТИВНА</b>";
     }
 
     private static function formatDuration(int $minutes): string
