@@ -24,7 +24,8 @@ class GroupChannelAlertsApiCheckController extends Controller
             $wholeRegions = collect($alerts)->filter(function (array $alert): bool {
                 $uid = (string) ($alert['location_uid'] ?? '');
 
-                return (($alert['location_type'] ?? null) === 'oblast' || $uid === '31')
+                return (($alert['location_type'] ?? null) === 'oblast'
+                        || in_array($uid, ['30', '31'], true))
                     && array_key_exists($uid, GroupChannelBot::ALERT_REGIONS);
             })->count();
 
@@ -38,7 +39,7 @@ class GroupChannelAlertsApiCheckController extends Controller
                 'toast' => [
                     'type' => 'success',
                     'title' => 'API работает',
-                    'message' => 'Токен принят. Активных событий уровня областей и Киева: '.$wholeRegions.'.',
+                    'message' => 'Токен принят. Активных событий уровня областей и специальных городов: '.$wholeRegions.'.',
                 ],
                 'open_group_channel_manage' => $groupChannelBot->id,
                 'open_group_channel_module' => GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
