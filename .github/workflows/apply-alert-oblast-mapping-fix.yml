@@ -7,11 +7,13 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   apply:
     if: ${{ !contains(github.event.head_commit.message, 'Apply alert oblast mapping fix') }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -19,38 +21,41 @@ jobs:
           fetch-depth: 0
 
       - name: Patch service
+        id: patch
         shell: bash
         run: |
+          set -Eeuo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
           path = Path('app/Services/GroupChannelAlertPublicationService.php')
           text = path.read_text()
 
-          text = text.replace(
-              "            $oblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));\n",
-              '',
-              1,
-          )
+          line = "            $oblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));\n"
+          if line not in text:
+              raise SystemExit('oblastUid line not found')
+          text = text.replace(line, '', 1)
 
           old_scope = """            $scopeRegionUid = $locationType === 'oblast'
                 ? $locationUid
                 : ($oblastUid !== '' ? $oblastUid : $locationUid);
 """
-          new_scope = """            $scopeRegionUid = $this->scopeRegionUid($alert, $locationType, $locationUid);
-"""
           if old_scope not in text:
               raise SystemExit('scope block not found')
-          text = text.replace(old_scope, new_scope, 1)
+          text = text.replace(
+              old_scope,
+              "            $scopeRegionUid = $this->scopeRegionUid($alert, $locationType, $locationUid);\n",
+              1,
+          )
 
-          old_condition = """                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)
-"""
-          new_condition = """                || $scopeRegionUid === null
-                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)
-"""
+          old_condition = "                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)\n"
           if old_condition not in text:
               raise SystemExit('scope condition not found')
-          text = text.replace(old_condition, new_condition, 1)
+          text = text.replace(
+              old_condition,
+              "                || $scopeRegionUid === null\n                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)\n",
+              1,
+          )
 
           old_start = """                if ($lockedBot->moduleSetting(
                     GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
@@ -75,8 +80,8 @@ jobs:
     private function locationName(array $alert, string $locationType, string $scopeRegionUid): string
 """
           helper = """    /**
-     * Resolve the selected top-level region by its API name. For child
-     * locations alerts.in.ua may return the child UID in location_oblast_uid.
+     * Resolve the selected top-level region by its API name. Child locations
+     * may contain their own UID in location_oblast_uid.
      *
      * @param  array<string, mixed>  $alert
      */
@@ -129,6 +134,7 @@ jobs:
           path.write_text(text)
           PY
 
+          rm -f .github/alert-region-fix-trigger
           rm .github/workflows/apply-alert-oblast-mapping-fix.yml
 
       - name: Commit fix
@@ -136,6 +142,18 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add app/Services/GroupChannelAlertPublicationService.php .github/workflows/apply-alert-oblast-mapping-fix.yml
+          git add -A
           git commit -m 'Apply alert oblast mapping fix'
           git push origin HEAD:fix/alert-oblast-name-mapping
+
+      - name: Report workflow failure
+        if: failure()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 60,
+              body: `Alert oblast mapping workflow failed at ${context.sha}.`,
+            });
