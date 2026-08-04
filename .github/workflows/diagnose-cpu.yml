@@ -1,0 +1,117 @@
+name: Diagnose Production CPU
+
+on:
+  push:
+    branches:
+      - ops/diagnose-cpu-20260804
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  diagnose:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: Collect production CPU diagnostics
+        shell: bash
+        run: |
+          set -u
+          report=/tmp/skyguardian-cpu-diagnostics.txt
+          exec > >(tee "$report") 2>&1
+
+          echo '=== timestamp ==='
+          date --iso-8601=seconds
+
+          echo '=== host summary ==='
+          hostname
+          printf 'logical_cpus='; nproc
+          uptime
+          printf 'loadavg='; cat /proc/loadavg
+
+          echo '=== memory ==='
+          free -h
+
+          echo '=== cpu sample: vmstat 1s x 8 ==='
+          vmstat 1 8 || true
+
+          if command -v mpstat >/dev/null 2>&1; then
+            echo '=== cpu sample: mpstat ==='
+            mpstat -P ALL 1 5 || true
+          fi
+
+          if command -v pidstat >/dev/null 2>&1; then
+            echo '=== per-process cpu sample: pidstat ==='
+            pidstat -u -r 1 5 || true
+          fi
+
+          echo '=== top snapshot ==='
+          COLUMNS=220 top -b -n 3 -d 1 | tail -n 45 || true
+
+          echo '=== processes sorted by cpu ==='
+          ps -eo pid,ppid,user,stat,pcpu,pmem,etime,comm,args --sort=-pcpu \
+            | head -n 35 \
+            | sed -E 's#(bot|token|password|secret|key)=([^ ]+)#\1=[REDACTED]#gi' || true
+
+          echo '=== cpu grouped by executable ==='
+          ps -eo comm=,pcpu= \
+            | awk '{cpu[$1]+=$2; count[$1]++} END {for (c in cpu) printf "%-28s %8.2f%%  processes=%d\n", c, cpu[c], count[c]}' \
+            | sort -k2 -nr \
+            | head -n 25 || true
+
+          echo '=== selected systemd services ==='
+          for service in \
+            skyguardian-scheduler.service \
+            skyguardian-telethon.service \
+            php8.3-fpm.service \
+            nginx.service \
+            mysql.service \
+            mariadb.service \
+            docker.service; do
+            if systemctl list-unit-files "$service" --no-legend 2>/dev/null | grep -q .; then
+              echo "--- $service ---"
+              sudo systemctl show "$service" \
+                --property=ActiveState,SubState,MainPID,TasksCurrent,MemoryCurrent,CPUUsageNSec,ExecMainStartTimestamp \
+                --no-pager || true
+            fi
+          done
+
+          echo '=== skyguardian process counts ==='
+          pgrep -af 'artisan|schedule:work|queue:work|telethon|php-fpm' \
+            | sed -E 's#(bot|token|password|secret|key)=([^ ]+)#\1=[REDACTED]#gi' || true
+
+          echo '=== docker stats ==='
+          if command -v docker >/dev/null 2>&1; then
+            sudo docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.PIDs}}' 2>/dev/null || true
+          else
+            echo 'docker_not_installed'
+          fi
+
+          echo '=== recent scheduler warnings/errors ==='
+          sudo journalctl -u skyguardian-scheduler.service --since '20 minutes ago' \
+            -p warning --no-pager -n 100 2>/dev/null || true
+
+      - name: Publish diagnostic report
+        if: always()
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '/tmp/skyguardian-cpu-diagnostics.txt';
+            let report = fs.existsSync(path)
+              ? fs.readFileSync(path, 'utf8')
+              : 'CPU diagnostic output was not created.';
+
+            report = report
+              .replace(/https:\/\/api\.telegram\.org\/bot[^/\s]+/gi, 'https://api.telegram.org/bot[REDACTED]')
+              .replace(/\b\d{6,15}:[A-Za-z0-9_-]{20,}\b/g, '[TELEGRAM_BOT_TOKEN_REDACTED]')
+              .replace(/(token|password|secret|key)=([^\s]+)/gi, '$1=[REDACTED]')
+              .slice(-60000);
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 62,
+              body: `Автоматическая диагностика production.\n\n\`\`\`text\n${report}\n\`\`\``,
+            });
