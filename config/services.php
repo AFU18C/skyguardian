@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'alerts_in_ua' => [
+        'active_alerts_url' => env(
+            'ALERTS_IN_UA_ACTIVE_ALERTS_URL',
+            'https://api.alerts.in.ua/v1/alerts/active.json',
+        ),
+        'timeout' => (int) env('ALERTS_IN_UA_TIMEOUT', 10),
+    ],
+
 ];

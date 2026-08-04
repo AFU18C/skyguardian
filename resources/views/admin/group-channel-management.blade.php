@@ -27,6 +27,7 @@
     @php
         $configurableModules = [
             'publications',
+            \App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
             'bulk_delete',
             'technical_account_bulk_delete',
             'system_messages',
@@ -83,7 +84,10 @@
                         @if($module === 'bulk_delete')
                             @include('admin.group-channel-bulk-delete-note', ['bot' => $bot])
                         @endif
-                        @if($module === 'technical_account_bulk_delete')
+
+                        @if($module === \App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS)
+                            @include('admin.group-channel-alert-publications', ['bot' => $bot])
+                        @elseif($module === 'technical_account_bulk_delete')
                             @include('admin.group-channel-technical-delete', ['bot' => $bot])
                         @else
                             @include('admin.group-channel-module-content', ['bot' => $bot, 'module' => $module])

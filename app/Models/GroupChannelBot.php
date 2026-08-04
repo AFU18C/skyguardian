@@ -10,8 +10,11 @@ class GroupChannelBot extends Model
 {
     use HasFactory;
 
+    public const MODULE_ALERT_PUBLICATIONS = 'alert_publications';
+
     public const MODULES = [
         'publications' => 'Публикации',
+        self::MODULE_ALERT_PUBLICATIONS => 'Публикация тревог',
         'drafts' => 'Черновики',
         'scheduled_publications' => 'Отложенные публикации',
         'auto_delete_publications' => 'Автоудаление публикаций',
@@ -29,16 +32,65 @@ class GroupChannelBot extends Model
         'slow_mode' => 'Медленный режим',
     ];
 
+    public const ALERT_REGIONS = [
+        '29' => 'Автономна Республіка Крим',
+        '8' => 'Волинська область',
+        '4' => 'Вінницька область',
+        '9' => 'Дніпропетровська область',
+        '28' => 'Донецька область',
+        '10' => 'Житомирська область',
+        '11' => 'Закарпатська область',
+        '12' => 'Запорізька область',
+        '13' => 'Івано-Франківська область',
+        '31' => 'м. Київ',
+        '14' => 'Київська область',
+        '15' => 'Кіровоградська область',
+        '16' => 'Луганська область',
+        '27' => 'Львівська область',
+        '17' => 'Миколаївська область',
+        '18' => 'Одеська область',
+        '19' => 'Полтавська область',
+        '5' => 'Рівненська область',
+        '30' => 'м. Севастополь',
+        '20' => 'Сумська область',
+        '21' => 'Тернопільська область',
+        '22' => 'Харківська область',
+        '23' => 'Херсонська область',
+        '3' => 'Хмельницька область',
+        '24' => 'Черкаська область',
+        '26' => 'Чернівецька область',
+        '25' => 'Чернігівська область',
+    ];
+
+    public const ALERT_TYPES = [
+        'air_raid' => 'Повітряна тривога',
+        'artillery_shelling' => 'Загроза артилерійського обстрілу',
+        'urban_fights' => 'Вуличні бої',
+        'chemical' => 'Хімічна загроза',
+        'nuclear' => 'Радіаційна загроза',
+    ];
+
+    public const DEFAULT_ALERT_START_TEMPLATE = "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 {region}\n⚠️ {threat_type}\n🕒 Початок: {time}";
+
+    public const DEFAULT_ALERT_END_TEMPLATE = "✅ ВІДБІЙ ТРИВОГИ\n\n📍 {region}\n🕒 Відбій: {time}";
+
     protected $fillable = [
-        'bot_name', 'bot_token', 'token_fingerprint', 'webhook_secret',
+        'bot_name', 'bot_token', 'alerts_api_token', 'alerts_api_token_fingerprint',
+        'token_fingerprint', 'webhook_secret',
         'webhook_registered_at', 'webhook_last_error', 'last_update_at',
         'admin_id', 'group_name', 'group_link', 'chat_type', 'chat_id',
         'bot_username', 'status', 'permissions', 'last_error',
         'last_manual_check_at', 'is_active', 'module_settings',
         'last_test_message_at', 'last_test_message_error',
+        'alerts_api_initialized_at', 'alerts_api_last_checked_at',
+        'alerts_api_last_success_at', 'alerts_api_last_error',
     ];
 
-    protected $hidden = ['bot_token', 'webhook_secret'];
+    protected $hidden = [
+        'bot_token',
+        'alerts_api_token',
+        'webhook_secret',
+    ];
 
     protected $attributes = [
         'chat_type' => 'group',
@@ -51,12 +103,16 @@ class GroupChannelBot extends Model
     {
         return [
             'bot_token' => 'encrypted',
+            'alerts_api_token' => 'encrypted',
             'permissions' => 'array',
             'module_settings' => 'array',
             'last_manual_check_at' => 'datetime',
             'last_test_message_at' => 'datetime',
             'webhook_registered_at' => 'datetime',
             'last_update_at' => 'datetime',
+            'alerts_api_initialized_at' => 'datetime',
+            'alerts_api_last_checked_at' => 'datetime',
+            'alerts_api_last_success_at' => 'datetime',
             'is_active' => 'boolean',
         ];
     }
@@ -86,6 +142,16 @@ class GroupChannelBot extends Model
         return $this->hasMany(GroupChannelTechnicalDeleteTask::class);
     }
 
+    public function alertStates(): HasMany
+    {
+        return $this->hasMany(GroupChannelAlertState::class);
+    }
+
+    public function alertEvents(): HasMany
+    {
+        return $this->hasMany(GroupChannelAlertEvent::class);
+    }
+
     public function moduleEnabled(string $module): bool
     {
         return (bool) $this->moduleSetting($module, 'enabled', false);
@@ -93,10 +159,20 @@ class GroupChannelBot extends Model
 
     public function moduleSetting(string $module, ?string $key = null, mixed $default = null): mixed
     {
+        $stored = data_get($this->module_settings, $module, []);
+        $stored = is_array($stored) ? $stored : [];
         $settings = array_replace_recursive(
             self::defaultModuleSettings()[$module] ?? [],
-            data_get($this->module_settings, $module, []),
+            $stored,
         );
+
+        if ($module === self::MODULE_ALERT_PUBLICATIONS) {
+            foreach (['region_uids', 'alert_types'] as $listKey) {
+                if (array_key_exists($listKey, $stored) && is_array($stored[$listKey])) {
+                    $settings[$listKey] = array_values($stored[$listKey]);
+                }
+            }
+        }
 
         return $key === null ? $settings : data_get($settings, $key, $default);
     }
@@ -107,6 +183,16 @@ class GroupChannelBot extends Model
             ->mapWithKeys(fn (string $module): array => [$module => ['enabled' => false]])
             ->all();
 
+        $defaults[self::MODULE_ALERT_PUBLICATIONS] += [
+            'all_ukraine' => true,
+            'region_uids' => array_keys(self::ALERT_REGIONS),
+            'alert_types' => array_keys(self::ALERT_TYPES),
+            'publish_start' => true,
+            'publish_end' => true,
+            'disable_notification' => false,
+            'start_template' => self::DEFAULT_ALERT_START_TEMPLATE,
+            'end_template' => self::DEFAULT_ALERT_END_TEMPLATE,
+        ];
         $defaults['antispam'] += [
             'delete_links' => false,
             'delete_new_member_messages' => false,

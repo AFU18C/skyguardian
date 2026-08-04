@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\GroupChannelBot;
+use App\Services\GroupChannelAlertPublicationService;
 use App\Services\GroupChannelWebhookRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -30,6 +31,7 @@ class GroupChannelModuleToggleController extends Controller
         GroupChannelBot $groupChannelBot,
         string $module,
         GroupChannelWebhookRegistrationService $webhook,
+        GroupChannelAlertPublicationService $alertPublications,
     ): JsonResponse|RedirectResponse {
         abort_unless(array_key_exists($module, GroupChannelBot::MODULES), 404);
 
@@ -50,6 +52,24 @@ class GroupChannelModuleToggleController extends Controller
             'title' => $enabled ? 'Функция включена' : 'Функция выключена',
             'message' => GroupChannelBot::MODULES[$module].($enabled ? ' включена.' : ' выключена.'),
         ];
+
+        if ($module === GroupChannelBot::MODULE_ALERT_PUBLICATIONS) {
+            $alertPublications->resetBaseline($groupChannelBot->fresh());
+
+            if ($enabled && ! $groupChannelBot->alerts_api_token) {
+                $toast = [
+                    'type' => 'warning',
+                    'title' => 'Функция включена',
+                    'message' => 'Добавьте токен alerts.in.ua через кнопку «Редактировать».',
+                ];
+            } elseif ($enabled && ! $groupChannelBot->chat_id) {
+                $toast = [
+                    'type' => 'warning',
+                    'title' => 'Функция включена',
+                    'message' => 'Выполните проверку подключения, чтобы определить Chat ID.',
+                ];
+            }
+        }
 
         if ($enabled && in_array($module, self::WEBHOOK_MODULES, true)) {
             try {
