@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\GroupChannelBot;
 use App\Services\AlertsInUaClient;
+use App\Services\GroupChannelAlertPublicationService;
 use Illuminate\Http\RedirectResponse;
 use RuntimeException;
 use Throwable;
@@ -14,6 +15,7 @@ class GroupChannelAlertsApiCheckController extends Controller
     public function __invoke(
         GroupChannelBot $groupChannelBot,
         AlertsInUaClient $client,
+        GroupChannelAlertPublicationService $publication,
     ): RedirectResponse {
         try {
             if (! $groupChannelBot->alerts_api_token) {
@@ -21,47 +23,34 @@ class GroupChannelAlertsApiCheckController extends Controller
             }
 
             $alerts = $client->activeAlerts((string) $groupChannelBot->alerts_api_token);
-            $supportedRegions = collect($alerts)->filter(function (array $alert): bool {
-                $locationType = trim((string) ($alert['location_type'] ?? ''));
-                $locationUid = trim((string) ($alert['location_uid'] ?? ''));
-                $oblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));
-                $scopeRegionUid = $locationType === 'oblast'
-                    ? $locationUid
-                    : ($oblastUid !== '' ? $oblastUid : $locationUid);
+            $result = $publication->processSnapshot($groupChannelBot->fresh(), $alerts);
 
-                return in_array(
-                    $locationType,
-                    ['oblast', 'raion', 'city', 'hromada'],
-                    true,
-                ) && array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS);
-            })->count();
-
-            $groupChannelBot->update([
-                'alerts_api_last_checked_at' => now(),
-                'alerts_api_last_success_at' => now(),
-                'alerts_api_last_error' => null,
+            $message = implode(' ', [
+                'Активных событий: '.$result['active'].'.',
+                'Добавлено в очередь: '.$result['queued'].'.',
+                'Отправлено: '.$result['sent'].'.',
+                $result['baseline']
+                    ? 'Выполнена первичная синхронизация: уже активные тревоги не отправляются.'
+                    : '',
             ]);
 
             return back()->with([
                 'toast' => [
                     'type' => 'success',
-                    'title' => 'API работает',
-                    'message' => 'Токен принят. Активных событий по областям, районам, городам и громадам: '.$supportedRegions.'.',
+                    'title' => 'API и публикация работают',
+                    'message' => trim($message),
                 ],
                 'open_group_channel_manage' => $groupChannelBot->id,
                 'open_group_channel_module' => GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
             ]);
         } catch (Throwable $e) {
             report($e);
-            $groupChannelBot->update([
-                'alerts_api_last_checked_at' => now(),
-                'alerts_api_last_error' => $e->getMessage(),
-            ]);
+            $publication->markFailure($groupChannelBot, $e);
 
             return back()->with([
                 'toast' => [
                     'type' => 'error',
-                    'title' => 'API недоступен',
+                    'title' => 'Ошибка обработки тревог',
                     'message' => $e->getMessage(),
                 ],
                 'open_group_channel_manage' => $groupChannelBot->id,
