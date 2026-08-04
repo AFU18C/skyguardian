@@ -112,6 +112,19 @@ onReady(() => {
         syncAvailability();
     });
 
+    document.querySelectorAll('[data-alert-region-settings]').forEach((settings) => {
+        const allUkraine = settings.querySelector('[data-alert-all-ukraine]');
+        const regions = settings.querySelector('[data-alert-regions]');
+
+        const syncRegions = () => {
+            if (!allUkraine || !regions) return;
+            regions.hidden = allUkraine.checked;
+        };
+
+        allUkraine?.addEventListener('change', syncRegions);
+        syncRegions();
+    });
+
     document.querySelectorAll('[data-modal] form').forEach((form) => {
         form.addEventListener('submit', () => {
             const modal = form.closest('[data-modal]');
