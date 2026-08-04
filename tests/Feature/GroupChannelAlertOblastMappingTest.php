@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\GroupChannelAlertEvent;
 use App\Models\GroupChannelBot;
+use App\Services\AlertsInUaClient;
 use App\Services\GroupChannelAlertPublicationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,35 @@ class GroupChannelAlertOblastMappingTest extends TestCase
         CarbonImmutable::setTestNow('2026-08-04T10:00:00Z');
 
         try {
+            $baselineAlert = $this->alert(
+                id: 8757,
+                uid: '16',
+                title: 'Луганська область',
+                type: 'oblast',
+                oblast: 'Луганська область',
+                startedAt: '2022-04-04T16:45:39.000Z',
+            );
+            $oldChildAlert = $this->alert(
+                id: 241597,
+                uid: '5349',
+                title: 'м. Марганець',
+                type: 'city',
+                oblast: 'Дніпропетровська область',
+                startedAt: '2026-08-04T09:00:00.000Z',
+            );
+            $newChildAlert = $this->alert(
+                id: 241705,
+                uid: '125',
+                title: 'Ізюмський район',
+                type: 'raion',
+                oblast: 'Харківська область',
+                startedAt: '2026-08-04T10:01:00.000Z',
+            );
+
             Http::fake([
+                'https://api.alerts.in.ua/*' => Http::response([
+                    'alerts' => [$baselineAlert, $oldChildAlert, $newChildAlert],
+                ]),
                 'https://api.telegram.org/*' => Http::response([
                     'ok' => true,
                     'result' => ['message_id' => 301],
@@ -47,40 +76,18 @@ class GroupChannelAlertOblastMappingTest extends TestCase
             ]);
 
             $service = app(GroupChannelAlertPublicationService::class);
-            $baselineAlert = $this->alert(
-                id: 8757,
-                uid: '16',
-                title: 'Луганська область',
-                type: 'oblast',
-                oblast: 'Луганська область',
-                startedAt: '2022-04-04T16:45:39.000Z',
-            );
-
             $baseline = $service->processSnapshot($bot, [$baselineAlert]);
+
             $this->assertTrue($baseline['baseline']);
-            Http::assertNothingSent();
+            Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'api.telegram.org'));
 
             CarbonImmutable::setTestNow('2026-08-04T10:02:00Z');
 
-            $result = $service->processSnapshot($bot->fresh(), [
-                $baselineAlert,
-                $this->alert(
-                    id: 241597,
-                    uid: '5349',
-                    title: 'м. Марганець',
-                    type: 'city',
-                    oblast: 'Дніпропетровська область',
-                    startedAt: '2026-08-04T09:00:00.000Z',
-                ),
-                $this->alert(
-                    id: 241705,
-                    uid: '125',
-                    title: 'Ізюмський район',
-                    type: 'raion',
-                    oblast: 'Харківська область',
-                    startedAt: '2026-08-04T10:01:00.000Z',
-                ),
-            ]);
+            $alerts = app(AlertsInUaClient::class)->activeAlerts('alerts-test-token');
+            $this->assertSame('9', $alerts[1]['location_oblast_uid']);
+            $this->assertSame('22', $alerts[2]['location_oblast_uid']);
+
+            $result = $service->processSnapshot($bot->fresh(), $alerts);
 
             $this->assertFalse($result['baseline']);
             $this->assertSame(3, $result['active']);
@@ -104,7 +111,8 @@ class GroupChannelAlertOblastMappingTest extends TestCase
             ]);
 
             Http::assertSent(function (Request $request): bool {
-                return str_contains((string) $request['text'], 'Харківська область — Ізюмський район');
+                return str_contains($request->url(), 'api.telegram.org')
+                    && str_contains((string) $request['text'], 'Харківська область — Ізюмський район');
             });
         } finally {
             CarbonImmutable::setTestNow();
