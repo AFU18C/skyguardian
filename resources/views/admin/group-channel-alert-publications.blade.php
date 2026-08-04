@@ -42,11 +42,11 @@
     <fieldset data-alert-region-settings>
         <legend>Территория публикаций</legend>
         <label class="sg-switch-row">
-            <span><strong>Вся Украина</strong><small>Публиковать события по всем областям и городам, где тревога объявляется отдельно.</small></span>
+            <span><strong>Вся Украина</strong><small>Публиковать события по всем областям, районам, городам и громадам.</small></span>
             <input type="hidden" name="all_ukraine" value="0">
             <input type="checkbox" name="all_ukraine" value="1" data-alert-all-ukraine @checked($allUkraine)>
         </label>
-        <p>Публикуются события уровня областей и городов. Районы, громады и сёла игнорируются.</p>
+        <p>Локация выводится иерархически: область — район/город/громада. При выборе отдельной области учитываются все её локации.</p>
         <div class="sg-form-grid" data-alert-regions @if($allUkraine) hidden @endif>
             @foreach(\App\Models\GroupChannelBot::ALERT_REGIONS as $uid => $region)
                 <label class="sg-switch-row">
@@ -102,7 +102,7 @@
 
     <fieldset>
         <legend>Шаблоны сообщений</legend>
-        <p>Доступные переменные: <code>{region}</code>, <code>{time}</code>, <code>{threat_type}</code>. Одновременные события одного типа объединяются в одно сообщение.</p>
+        <p>Переменные: <code>{region}</code>, <code>{time}</code>, <code>{threat_type}</code>, <code>{details}</code>. Цель или направление из поля API <code>notes</code> добавляется автоматически, когда оно заполнено.</p>
         <div class="sg-field">
             <label for="alert-start-template-{{ $bot->id }}">Сообщение о тревоге</label>
             <textarea id="alert-start-template-{{ $bot->id }}" name="start_template" rows="7" maxlength="3500" required>{{ $bot->moduleSetting($module, 'start_template', \App\Models\GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE) }}</textarea>
