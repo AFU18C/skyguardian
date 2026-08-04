@@ -156,10 +156,6 @@ class GroupChannelAlertPublicationService
 
     private function deliverPending(GroupChannelBot $bot): int
     {
-        if (! $bot->chat_id) {
-            throw new RuntimeException('Сначала проверьте подключение бота, чтобы определить Chat ID.');
-        }
-
         $events = $bot->alertEvents()
             ->where(function ($query): void {
                 $query->whereIn('status', [
@@ -175,6 +171,14 @@ class GroupChannelAlertPublicationService
             ->orderBy('id')
             ->limit(100)
             ->get();
+
+        if ($events->isEmpty()) {
+            return 0;
+        }
+
+        if (! $bot->chat_id) {
+            throw new RuntimeException('Сначала проверьте подключение бота, чтобы определить Chat ID.');
+        }
 
         $sent = 0;
 
@@ -265,7 +269,8 @@ class GroupChannelAlertPublicationService
             $regionUid = trim((string) ($alert['location_uid'] ?? ''));
             $locationType = (string) ($alert['location_type'] ?? '');
             $alertType = (string) ($alert['alert_type'] ?? '');
-            $isWholeRegion = $locationType === 'oblast' || $regionUid === '31';
+            $isWholeRegion = $locationType === 'oblast'
+                || in_array($regionUid, ['30', '31'], true);
 
             if (! $isWholeRegion
                 || ! array_key_exists($regionUid, GroupChannelBot::ALERT_REGIONS)
