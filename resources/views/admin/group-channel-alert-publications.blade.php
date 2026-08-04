@@ -3,6 +3,17 @@
     $allUkraine = (bool) $bot->moduleSetting($module, 'all_ukraine', true);
     $selectedRegions = array_map('strval', (array) $bot->moduleSetting($module, 'region_uids', array_keys(\App\Models\GroupChannelBot::ALERT_REGIONS)));
     $selectedTypes = array_map('strval', (array) $bot->moduleSetting($module, 'alert_types', array_keys(\App\Models\GroupChannelBot::ALERT_TYPES)));
+    $formatAlertsTimestamp = static function (string $attribute) use ($bot): ?string {
+        $value = $bot->getRawOriginal($attribute);
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        return \Carbon\CarbonImmutable::parse($value, 'UTC')
+            ->timezone('Europe/Kyiv')
+            ->format('d.m.Y H:i:s');
+    };
 @endphp
 
 @if(!$bot->alerts_api_token)
@@ -14,8 +25,8 @@
 
 <dl class="sg-record-data">
     <div><dt>API-токен</dt><dd>{{ $bot->alerts_api_token ? 'Добавлен' : 'Не добавлен' }}</dd></div>
-    <div><dt>Последняя проверка</dt><dd>{{ $bot->alerts_api_last_checked_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i:s') ?? 'Не выполнялась' }}</dd></div>
-    <div><dt>Последний успешный ответ</dt><dd>{{ $bot->alerts_api_last_success_at?->timezone('Europe/Kyiv')->format('d.m.Y H:i:s') ?? 'Не получен' }}</dd></div>
+    <div><dt>Последняя проверка</dt><dd>{{ $formatAlertsTimestamp('alerts_api_last_checked_at') ?? 'Не выполнялась' }}</dd></div>
+    <div><dt>Последний успешный ответ</dt><dd>{{ $formatAlertsTimestamp('alerts_api_last_success_at') ?? 'Не получен' }}</dd></div>
     <div><dt>Синхронизация</dt><dd>{{ $bot->alerts_api_initialized_at ? 'Выполнена' : 'Ожидает первого запуска' }}</dd></div>
 </dl>
 
