@@ -23,6 +23,7 @@ class ProcessGroupChannelAlertPublications extends Command
         $bots = GroupChannelBot::query()
             ->where('is_active', true)
             ->whereNotNull('alerts_api_token')
+            ->whereNotNull('chat_id')
             ->orderBy('id')
             ->limit(max(1, (int) $this->option('limit')))
             ->get()
