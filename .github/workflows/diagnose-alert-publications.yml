@@ -27,36 +27,78 @@ jobs:
             --property=ActiveState,SubState,MainPID,ExecMainStartTimestamp,ExecMainStatus \
             --no-pager || true
 
-          echo '=== state before forced cycle ==='
           cat > /tmp/skyguardian-alert-diag.php <<'PHP'
           <?php
           require '/var/www/skyguardian/vendor/autoload.php';
           $app = require '/var/www/skyguardian/bootstrap/app.php';
           $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $client = app(App\Services\AlertsInUaClient::class);
+
           foreach (App\Models\GroupChannelBot::query()->orderBy('id')->get() as $bot) {
               if (! $bot->moduleEnabled(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS)) {
                   continue;
               }
+
               $statuses = $bot->alertEvents()
                   ->selectRaw('status, COUNT(*) aggregate')
                   ->groupBy('status')
                   ->pluck('aggregate', 'status')
                   ->map(fn ($v) => (int) $v)
                   ->all();
+
               echo json_encode([
-                  'id' => $bot->id,
-                  'group' => $bot->group_name,
-                  'active' => (bool) $bot->is_active,
-                  'chat_id_present' => (bool) $bot->chat_id,
-                  'initialized_at' => optional($bot->alerts_api_initialized_at)?->toIso8601String(),
-                  'last_checked_at' => optional($bot->alerts_api_last_checked_at)?->toIso8601String(),
-                  'last_success_at' => optional($bot->alerts_api_last_success_at)?->toIso8601String(),
-                  'last_error' => $bot->alerts_api_last_error,
-                  'states' => $bot->alertStates()->count(),
-                  'events' => $statuses,
+                  'bot' => [
+                      'id' => $bot->id,
+                      'group' => $bot->group_name,
+                      'active' => (bool) $bot->is_active,
+                      'chat_id_present' => (bool) $bot->chat_id,
+                      'initialized_at' => optional($bot->alerts_api_initialized_at)?->toIso8601String(),
+                      'last_checked_at' => optional($bot->alerts_api_last_checked_at)?->toIso8601String(),
+                      'last_success_at' => optional($bot->alerts_api_last_success_at)?->toIso8601String(),
+                      'last_error' => $bot->alerts_api_last_error,
+                      'states' => $bot->alertStates()->count(),
+                      'events' => $statuses,
+                  ],
               ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL;
+
+              echo "stored_states:\n";
+              foreach ($bot->alertStates()->orderBy('region_name')->get() as $state) {
+                  echo json_encode([
+                      'region_uid' => $state->region_uid,
+                      'region_name' => $state->region_name,
+                      'alert_type' => $state->alert_type,
+                      'source_alert_id' => $state->source_alert_id,
+                      'started_at' => optional($state->started_at)?->toIso8601String(),
+                      'last_seen_at' => optional($state->last_seen_at)?->toIso8601String(),
+                  ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL;
+              }
+
+              echo "raw_api_alerts:\n";
+              try {
+                  $alerts = $client->activeAlerts((string) $bot->alerts_api_token);
+                  foreach ($alerts as $alert) {
+                      echo json_encode([
+                          'id' => $alert['id'] ?? null,
+                          'location_uid' => $alert['location_uid'] ?? null,
+                          'location_title' => $alert['location_title'] ?? null,
+                          'location_type' => $alert['location_type'] ?? null,
+                          'location_oblast' => $alert['location_oblast'] ?? null,
+                          'location_oblast_uid' => $alert['location_oblast_uid'] ?? null,
+                          'location_raion' => $alert['location_raion'] ?? null,
+                          'alert_type' => $alert['alert_type'] ?? null,
+                          'started_at' => $alert['started_at'] ?? null,
+                          'updated_at' => $alert['updated_at'] ?? null,
+                          'calculated' => $alert['calculated'] ?? null,
+                          'notes' => $alert['notes'] ?? null,
+                      ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL;
+                  }
+              } catch (Throwable $e) {
+                  echo 'api_error='.get_class($e).': '.$e->getMessage().PHP_EOL;
+              }
           }
           PHP
+
+          echo '=== state and raw API before forced cycle ==='
           sudo -u www-data php /tmp/skyguardian-alert-diag.php || true
 
           echo '=== forced processing cycle ==='
@@ -66,13 +108,13 @@ jobs:
           set -e
           echo "cycle_exit_code=$cycle_status"
 
-          echo '=== state after forced cycle ==='
+          echo '=== state and raw API after forced cycle ==='
           sudo -u www-data php /tmp/skyguardian-alert-diag.php || true
 
           echo '=== recent scheduler journal ==='
-          sudo journalctl -u skyguardian-scheduler.service --since '20 minutes ago' --no-pager -n 120 \
+          sudo journalctl -u skyguardian-scheduler.service --since '5 minutes ago' --no-pager -n 80 \
             | sed -E 's#https://api\.telegram\.org/bot[^/[:space:]]+#https://api.telegram.org/bot[REDACTED]#g' \
-            | tail -n 120 || true
+            | tail -n 80 || true
 
           rm -f /tmp/skyguardian-alert-diag.php
           exit "$cycle_status"
@@ -93,5 +135,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: 60,
-              body: `<!-- alert-publication-diagnostics -->\n## Production diagnostics\n\n\`\`\`text\n${report}\n\`\`\``,
+              body: `<!-- alert-publication-diagnostics -->\n## Production API comparison\n\n\`\`\`text\n${report}\n\`\`\``,
             });
