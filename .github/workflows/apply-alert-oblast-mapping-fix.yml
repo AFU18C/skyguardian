@@ -1,0 +1,141 @@
+name: Apply Alert Oblast Mapping Fix
+
+on:
+  push:
+    branches:
+      - fix/alert-oblast-name-mapping
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, 'Apply alert oblast mapping fix') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/alert-oblast-name-mapping
+          fetch-depth: 0
+
+      - name: Patch service
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/Services/GroupChannelAlertPublicationService.php')
+          text = path.read_text()
+
+          text = text.replace(
+              "            $oblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));\n",
+              '',
+              1,
+          )
+
+          old_scope = """            $scopeRegionUid = $locationType === 'oblast'
+                ? $locationUid
+                : ($oblastUid !== '' ? $oblastUid : $locationUid);
+"""
+          new_scope = """            $scopeRegionUid = $this->scopeRegionUid($alert, $locationType, $locationUid);
+"""
+          if old_scope not in text:
+              raise SystemExit('scope block not found')
+          text = text.replace(old_scope, new_scope, 1)
+
+          old_condition = """                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)
+"""
+          new_condition = """                || $scopeRegionUid === null
+                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)
+"""
+          if old_condition not in text:
+              raise SystemExit('scope condition not found')
+          text = text.replace(old_condition, new_condition, 1)
+
+          old_start = """                if ($lockedBot->moduleSetting(
+                    GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+                    'publish_start',
+                    true,
+                )) {
+"""
+          new_start = """                if ($item['started_at']->greaterThan($lockedBot->alerts_api_initialized_at)
+                    && $lockedBot->moduleSetting(
+                        GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+                        'publish_start',
+                        true,
+                    )) {
+"""
+          if old_start not in text:
+              raise SystemExit('publish start block not found')
+          text = text.replace(old_start, new_start, 1)
+
+          marker = """    /**
+     * @param  array<string, mixed>  $alert
+     */
+    private function locationName(array $alert, string $locationType, string $scopeRegionUid): string
+"""
+          helper = """    /**
+     * Resolve the selected top-level region by its API name. For child
+     * locations alerts.in.ua may return the child UID in location_oblast_uid.
+     *
+     * @param  array<string, mixed>  $alert
+     */
+    private function scopeRegionUid(array $alert, string $locationType, string $locationUid): ?string
+    {
+        if ($locationType === 'oblast'
+            && array_key_exists($locationUid, GroupChannelBot::ALERT_REGIONS)) {
+            return $locationUid;
+        }
+
+        $oblastName = $this->normalizedRegionName((string) ($alert['location_oblast'] ?? ''));
+
+        if ($oblastName !== '') {
+            foreach (GroupChannelBot::ALERT_REGIONS as $uid => $name) {
+                if ($this->normalizedRegionName($name) === $oblastName) {
+                    return (string) $uid;
+                }
+            }
+        }
+
+        $reportedOblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));
+
+        if (array_key_exists($reportedOblastUid, GroupChannelBot::ALERT_REGIONS)) {
+            return $reportedOblastUid;
+        }
+
+        $title = $this->normalizedRegionName((string) ($alert['location_title'] ?? ''));
+
+        foreach (GroupChannelBot::ALERT_REGIONS as $uid => $name) {
+            if ($this->normalizedRegionName($name) === $title) {
+                return (string) $uid;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizedRegionName(string $name): string
+    {
+        $name = mb_strtolower(trim(preg_replace('/\\s+/u', ' ', $name) ?? ''));
+
+        return preg_replace('/^м\\.\\s*/u', '', $name) ?? $name;
+    }
+
+"""
+          if marker not in text:
+              raise SystemExit('locationName marker not found')
+          text = text.replace(marker, helper + marker, 1)
+
+          path.write_text(text)
+          PY
+
+          rm .github/workflows/apply-alert-oblast-mapping-fix.yml
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/Services/GroupChannelAlertPublicationService.php .github/workflows/apply-alert-oblast-mapping-fix.yml
+          git commit -m 'Apply alert oblast mapping fix'
+          git push origin HEAD:fix/alert-oblast-name-mapping
