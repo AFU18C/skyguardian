@@ -1,4 +1,4 @@
-name: Apply Verified Alert Mapping Fix
+name: Verify Alert Publishing Fix
 
 on:
   push:
@@ -6,162 +6,109 @@ on:
       - ops/diagnose-alert-publications
 
 permissions:
-  contents: write
+  contents: read
   issues: write
 
 jobs:
-  apply:
+  verify:
     runs-on: self-hosted
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: fix/alert-oblast-name-mapping
-          fetch-depth: 0
-
-      - name: Apply mapping patch
+      - name: Wait for production and verify publishing
         shell: bash
         run: |
-          set -Eeuo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
+          set -u
+          exec > >(tee /tmp/skyguardian-alert-verification.txt) 2>&1
+          cd /var/www/skyguardian
 
-          path = Path('app/Services/GroupChannelAlertPublicationService.php')
-          text = path.read_text()
+          echo '=== wait for deployed fix ==='
+          deployed=0
+          for attempt in $(seq 1 90); do
+            if grep -q 'normalizeOblastUid' app/Services/AlertsInUaClient.php 2>/dev/null; then
+              deployed=1
+              echo "deployed_fix_detected_attempt=$attempt"
+              break
+            fi
+            sleep 5
+          done
 
-          line = "            $oblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));\n"
-          if line not in text:
-              raise SystemExit('oblastUid line not found')
-          text = text.replace(line, '', 1)
+          if [ "$deployed" -ne 1 ]; then
+            echo 'deployed_fix_not_detected'
+            exit 1
+          fi
 
-          old_scope = """            $scopeRegionUid = $locationType === 'oblast'
-                ? $locationUid
-                : ($oblastUid !== '' ? $oblastUid : $locationUid);
-"""
-          if old_scope not in text:
-              raise SystemExit('scope block not found')
-          text = text.replace(
-              old_scope,
-              "            $scopeRegionUid = $this->scopeRegionUid($alert, $locationType, $locationUid);\n",
-              1,
-          )
+          cat > /tmp/skyguardian-alert-verify.php <<'PHP'
+          <?php
+          require '/var/www/skyguardian/vendor/autoload.php';
+          $app = require '/var/www/skyguardian/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-          old_condition = "                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)\n"
-          if old_condition not in text:
-              raise SystemExit('scope condition not found')
-          text = text.replace(
-              old_condition,
-              "                || $scopeRegionUid === null\n                || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)\n",
-              1,
-          )
+          foreach (App\Models\GroupChannelBot::query()->orderBy('id')->get() as $bot) {
+              if (! $bot->moduleEnabled(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS)) {
+                  continue;
+              }
 
-          old_start = """                if ($lockedBot->moduleSetting(
-                    GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
-                    'publish_start',
-                    true,
-                )) {
-"""
-          new_start = """                if ($item['started_at']->greaterThan($lockedBot->alerts_api_initialized_at)
-                    && $lockedBot->moduleSetting(
-                        GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
-                        'publish_start',
-                        true,
-                    )) {
-"""
-          if old_start not in text:
-              raise SystemExit('publish start block not found')
-          text = text.replace(old_start, new_start, 1)
+              echo json_encode([
+                  'bot_id' => $bot->id,
+                  'group' => $bot->group_name,
+                  'last_checked_at' => optional($bot->alerts_api_last_checked_at)?->toIso8601String(),
+                  'last_success_at' => optional($bot->alerts_api_last_success_at)?->toIso8601String(),
+                  'last_error' => $bot->alerts_api_last_error,
+                  'states' => $bot->alertStates()->count(),
+                  'pending' => $bot->alertEvents()->where('status', 'pending')->count(),
+                  'sent' => $bot->alertEvents()->where('status', 'sent')->count(),
+                  'errors' => $bot->alertEvents()->where('status', 'error')->count(),
+              ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL;
 
-          marker = """    /**
-     * @param  array<string, mixed>  $alert
-     */
-    private function locationName(array $alert, string $locationType, string $scopeRegionUid): string
-"""
-          helper = """    /**
-     * Resolve the selected top-level region by its API name. Child locations
-     * may contain their own UID in location_oblast_uid.
-     *
-     * @param  array<string, mixed>  $alert
-     */
-    private function scopeRegionUid(array $alert, string $locationType, string $locationUid): ?string
-    {
-        if ($locationType === 'oblast'
-            && array_key_exists($locationUid, GroupChannelBot::ALERT_REGIONS)) {
-            return $locationUid;
-        }
+              echo "latest_events:\n";
+              foreach ($bot->alertEvents()->latest('id')->limit(20)->get()->reverse() as $event) {
+                  echo json_encode([
+                      'kind' => $event->kind,
+                      'region' => $event->region_name,
+                      'type' => $event->alert_type,
+                      'status' => $event->status,
+                      'event_at' => optional($event->event_at)?->toIso8601String(),
+                      'sent_at' => optional($event->sent_at)?->toIso8601String(),
+                      'last_error' => $event->last_error,
+                  ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES).PHP_EOL;
+              }
+          }
+          PHP
 
-        $oblastName = $this->normalizedRegionName((string) ($alert['location_oblast'] ?? ''));
+          echo '=== before forced cycle ==='
+          sudo -u www-data php /tmp/skyguardian-alert-verify.php || true
 
-        if ($oblastName !== '') {
-            foreach (GroupChannelBot::ALERT_REGIONS as $uid => $name) {
-                if ($this->normalizedRegionName($name) === $oblastName) {
-                    return (string) $uid;
-                }
-            }
-        }
+          echo '=== forced cycle ==='
+          set +e
+          sudo -u www-data php artisan skyguardian:group-channel-alerts:process --limit=50
+          cycle_status=$?
+          set -e
+          echo "cycle_exit_code=$cycle_status"
 
-        $reportedOblastUid = trim((string) ($alert['location_oblast_uid'] ?? ''));
+          sleep 3
 
-        if (array_key_exists($reportedOblastUid, GroupChannelBot::ALERT_REGIONS)) {
-            return $reportedOblastUid;
-        }
+          echo '=== after forced cycle ==='
+          sudo -u www-data php /tmp/skyguardian-alert-verify.php || true
 
-        $title = $this->normalizedRegionName((string) ($alert['location_title'] ?? ''));
+          rm -f /tmp/skyguardian-alert-verify.php
+          exit "$cycle_status"
 
-        foreach (GroupChannelBot::ALERT_REGIONS as $uid => $name) {
-            if ($this->normalizedRegionName($name) === $title) {
-                return (string) $uid;
-            }
-        }
-
-        return null;
-    }
-
-    private function normalizedRegionName(string $name): string
-    {
-        $name = mb_strtolower(trim(preg_replace('/\\s+/u', ' ', $name) ?? ''));
-
-        return preg_replace('/^м\\.\\s*/u', '', $name) ?? $name;
-    }
-
-"""
-          if marker not in text:
-              raise SystemExit('locationName marker not found')
-          text = text.replace(marker, helper + marker, 1)
-          path.write_text(text)
-          PY
-
-          rm -f .github/alert-region-fix-trigger
-          rm -f .github/workflows/apply-alert-oblast-mapping-fix.yml
-
-      - name: Commit to fix branch
-        shell: bash
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add -A
-          git commit -m 'Apply alert oblast mapping fix'
-          git push origin HEAD:fix/alert-oblast-name-mapping
-
-      - name: Report success
+      - name: Publish verification report
+        if: always()
         uses: actions/github-script@v8
         with:
           script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: 60,
-              body: 'Verified oblast-name mapping patch was applied to `fix/alert-oblast-name-mapping`.',
-            });
+            const fs = require('fs');
+            const path = '/tmp/skyguardian-alert-verification.txt';
+            let report = fs.existsSync(path) ? fs.readFileSync(path, 'utf8') : 'Verification output was not created.';
+            report = report
+              .replace(/https:\/\/api\.telegram\.org\/bot[^/\s]+/gi, 'https://api.telegram.org/bot[REDACTED]')
+              .replace(/\b\d{6,15}:[A-Za-z0-9_-]{20,}\b/g, '[TELEGRAM_BOT_TOKEN_REDACTED]')
+              .slice(-55000);
 
-      - name: Report failure
-        if: failure()
-        uses: actions/github-script@v8
-        with:
-          script: |
-            await github.rest.issues.createComment({
+            await github.rest.issues.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: 60,
-              body: `Verified mapping patch failed at ${context.sha}.`,
+              body: `Автоматическая проверка production после исправления.\n\n\`\`\`text\n${report}\n\`\`\``,
             });
