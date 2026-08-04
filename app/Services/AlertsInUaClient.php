@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\GroupChannelBot;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -47,6 +48,47 @@ class AlertsInUaClient
             throw new RuntimeException('alerts.in.ua вернул ответ в неизвестном формате.');
         }
 
-        return array_values(array_filter($alerts, 'is_array'));
+        return array_values(array_map(
+            fn (array $alert): array => $this->normalizeOblastUid($alert),
+            array_filter($alerts, 'is_array'),
+        ));
+    }
+
+    /**
+     * Child locations may contain their own UID in location_oblast_uid.
+     * Resolve the real top-level region from the oblast name used by the API.
+     *
+     * @param  array<string, mixed>  $alert
+     * @return array<string, mixed>
+     */
+    private function normalizeOblastUid(array $alert): array
+    {
+        $oblastName = $this->normalizedRegionName((string) ($alert['location_oblast'] ?? ''));
+
+        if ($oblastName !== '') {
+            foreach (GroupChannelBot::ALERT_REGIONS as $uid => $name) {
+                if ($this->normalizedRegionName($name) === $oblastName) {
+                    $alert['location_oblast_uid'] = (string) $uid;
+
+                    return $alert;
+                }
+            }
+        }
+
+        $locationUid = trim((string) ($alert['location_uid'] ?? ''));
+
+        if (($alert['location_type'] ?? null) === 'oblast'
+            && array_key_exists($locationUid, GroupChannelBot::ALERT_REGIONS)) {
+            $alert['location_oblast_uid'] = $locationUid;
+        }
+
+        return $alert;
+    }
+
+    private function normalizedRegionName(string $name): string
+    {
+        $name = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name) ?? ''));
+
+        return preg_replace('/^м\.\s*/u', '', $name) ?? $name;
     }
 }
