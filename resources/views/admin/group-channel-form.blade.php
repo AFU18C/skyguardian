@@ -1,4 +1,4 @@
-<form class="sg-form" method="POST" action="{{ $action }}">
+<form class="sg-form {{ $bot ? 'sg-group-channel-edit-form' : '' }}" method="POST" action="{{ $action }}">
     @csrf
     @if($bot) @method('PUT') @endif
     <div class="sg-form-grid">
