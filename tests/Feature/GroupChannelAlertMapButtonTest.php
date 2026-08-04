@@ -63,7 +63,7 @@ class GroupChannelAlertMapButtonTest extends TestCase
 
         $request = Http::recorded()[0][0];
 
-        $this->assertNull($request['reply_markup']);
+        $this->assertFalse(isset($request['reply_markup']));
     }
 
     private function bot(): GroupChannelBot
