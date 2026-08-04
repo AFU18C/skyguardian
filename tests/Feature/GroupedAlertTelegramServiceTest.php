@@ -14,14 +14,21 @@ class GroupedAlertTelegramServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_alerts_with_same_type_and_time_are_combined_by_editing_one_post(): void
+    public function test_each_oblast_has_its_own_post_and_new_locations_edit_that_post(): void
     {
         config(['cache.default' => 'array']);
         Cache::flush();
-        Http::fake(fn (Request $request) => Http::response([
-            'ok' => true,
-            'result' => ['message_id' => 777],
-        ]));
+        $nextMessageId = 700;
+        Http::fake(function (Request $request) use (&$nextMessageId) {
+            if (str_ends_with($request->url(), '/sendMessage')) {
+                $nextMessageId++;
+            }
+
+            return Http::response([
+                'ok' => true,
+                'result' => ['message_id' => $nextMessageId],
+            ]);
+        });
 
         $bot = GroupChannelBot::query()->create([
             'bot_name' => 'Alert Bot',
@@ -39,30 +46,39 @@ class GroupedAlertTelegramServiceTest extends TestCase
 
         $service->request($bot, 'sendMessage', [
             'chat_id' => $bot->chat_id,
-            'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Харківська область — Харківський район\n⚠️ Повітряна тривога\n🕒 Початок: 22:14",
+            'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Харківська область — Харківський район\n📍 Полтавська область — Кременчуцький район\n⚠️ Повітряна тривога\n🕒 Початок: 22:14",
         ]);
         $service->request($bot, 'sendMessage', [
             'chat_id' => $bot->chat_id,
-            'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Харківська область — Харківський район — Харківська територіальна громада\n📍 Харківська область — м. Харків\n⚠️ Повітряна тривога\n🎯 КАБи у напрямку півночі Харківщини\n🕒 Початок: 22:14",
+            'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Харківська область — Харківський район — Харківська територіальна громада\n📍 Харківська область — м. Харків\n⚠️ Повітряна тривога\n🎯 КАБи у напрямку півночі Харківщини\n🕒 Початок: 22:19",
         ]);
 
-        Http::assertSentCount(2);
+        Http::assertSentCount(3);
         $requests = Http::recorded();
         $this->assertStringEndsWith('/sendMessage', $requests[0][0]->url());
-        $this->assertStringEndsWith('/editMessageText', $requests[1][0]->url());
+        $this->assertStringEndsWith('/sendMessage', $requests[1][0]->url());
+        $this->assertStringEndsWith('/editMessageText', $requests[2][0]->url());
 
-        $payload = $requests[1][0]->data();
-        $text = (string) $payload['text'];
+        $kharkivInitial = (string) $requests[0][0]['text'];
+        $poltavaInitial = (string) $requests[1][0]['text'];
+        $kharkivUpdated = (string) $requests[2][0]['text'];
 
-        $this->assertSame('HTML', $payload['parse_mode']);
-        $this->assertSame(777, $payload['message_id']);
-        $this->assertStringContainsString('<b>🚨 ПОВІТРЯНА ТРИВОГА</b>', $text);
-        $this->assertStringContainsString('📍 <b>Харківська область</b>', $text);
-        $this->assertStringContainsString('• Харківський район', $text);
-        $this->assertStringContainsString('• м. Харків', $text);
-        $this->assertStringContainsString('• Харківська територіальна громада', $text);
-        $this->assertSame(1, substr_count($text, 'Харківська область'));
-        $this->assertStringContainsString('🎯 КАБи у напрямку півночі Харківщини', $text);
-        $this->assertStringContainsString('🕒 Початок: <b>22:14</b>', $text);
+        $this->assertStringContainsString('📍 <b>Харківська область</b>', $kharkivInitial);
+        $this->assertStringNotContainsString('Полтавська область', $kharkivInitial);
+        $this->assertStringContainsString('📍 <b>Полтавська область</b>', $poltavaInitial);
+        $this->assertStringNotContainsString('Харківська область', $poltavaInitial);
+
+        $this->assertSame('HTML', $requests[2][0]['parse_mode']);
+        $this->assertSame(701, $requests[2][0]['message_id']);
+        $this->assertStringContainsString('<b>🚨 ПОВІТРЯНА ТРИВОГА</b>', $kharkivUpdated);
+        $this->assertStringContainsString('📍 <b>Харківська область</b>', $kharkivUpdated);
+        $this->assertStringContainsString('Тривога оголошена:', $kharkivUpdated);
+        $this->assertStringContainsString('• Харківський район', $kharkivUpdated);
+        $this->assertStringContainsString('• м. Харків', $kharkivUpdated);
+        $this->assertStringContainsString('• Харківська територіальна громада', $kharkivUpdated);
+        $this->assertStringNotContainsString('⚠️ Повітряна тривога', $kharkivUpdated);
+        $this->assertStringNotContainsString('Полтавська область', $kharkivUpdated);
+        $this->assertStringContainsString('🎯 КАБи у напрямку півночі Харківщини', $kharkivUpdated);
+        $this->assertStringContainsString('🕒 <b>Початок: 22:14</b>', $kharkivUpdated);
     }
 }
