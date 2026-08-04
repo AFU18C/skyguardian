@@ -29,16 +29,16 @@ jobs:
 
           echo '=== cpu average over 10 seconds ==='
           if command -v mpstat >/dev/null 2>&1; then
-            mpstat 1 10 | awk '/Average:/ && $2 == "all" {print}'
+            mpstat 1 10 | awk '/Average:/ && $2 == "all" {print}' || true
           else
-            vmstat 1 11 | tail -n 10
+            vmstat 1 11 | tail -n 10 || true
           fi
 
           echo '=== current top production processes ==='
           ps -eo pid,user,pcpu,pmem,etime,comm,args --sort=-pcpu \
             | grep -v -E 'Runner.Worker|diagnose-cpu|mpstat|vmstat|awk|grep' \
             | head -n 12 \
-            | sed -E 's#(bot|token|password|secret|key)=([^ ]+)#\1=[REDACTED]#gi'
+            | sed -E 's#(bot|token|password|secret|key)=([^ ]+)#\1=[REDACTED]#gi' || true
 
           echo '=== scheduler command timings over last 180 seconds ==='
           sudo journalctl -u skyguardian-scheduler.service --since '180 seconds ago' \
@@ -72,7 +72,7 @@ jobs:
           for service in skyguardian-scheduler.service skyguardian-telethon.service php8.3-fpm.service nginx.service mysql.service; do
             if systemctl list-unit-files "$service" --no-legend 2>/dev/null | grep -q .; then
               echo "--- $service ---"
-              sudo systemctl show "$service" --property=ActiveState,MainPID,MemoryCurrent,CPUUsageNSec,ExecMainStartTimestamp --no-pager
+              sudo systemctl show "$service" --property=ActiveState,MainPID,MemoryCurrent,CPUUsageNSec,ExecMainStartTimestamp --no-pager || true
             fi
           done
 
