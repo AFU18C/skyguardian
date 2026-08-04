@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDateTime;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -21,8 +22,8 @@ class GroupChannelAlertState extends Model
     {
         return [
             'source_alert_id' => 'integer',
-            'started_at' => 'datetime',
-            'last_seen_at' => 'datetime',
+            'started_at' => UtcDateTime::class,
+            'last_seen_at' => UtcDateTime::class,
         ];
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UtcDateTime;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -42,10 +43,10 @@ class GroupChannelAlertEvent extends Model
     protected function casts(): array
     {
         return [
-            'event_at' => 'datetime',
+            'event_at' => UtcDateTime::class,
             'attempts' => 'integer',
-            'sending_started_at' => 'datetime',
-            'sent_at' => 'datetime',
+            'sending_started_at' => UtcDateTime::class,
+            'sent_at' => UtcDateTime::class,
         ];
     }
 
