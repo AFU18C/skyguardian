@@ -111,11 +111,6 @@ jobs:
           echo '=== state and raw API after forced cycle ==='
           sudo -u www-data php /tmp/skyguardian-alert-diag.php || true
 
-          echo '=== recent scheduler journal ==='
-          sudo journalctl -u skyguardian-scheduler.service --since '5 minutes ago' --no-pager -n 80 \
-            | sed -E 's#https://api\.telegram\.org/bot[^/[:space:]]+#https://api.telegram.org/bot[REDACTED]#g' \
-            | tail -n 80 || true
-
           rm -f /tmp/skyguardian-alert-diag.php
           exit "$cycle_status"
 
@@ -131,9 +126,9 @@ jobs:
               .replace(/https:\/\/api\.telegram\.org\/bot[^/\s]+/gi, 'https://api.telegram.org/bot[REDACTED]')
               .replace(/\b\d{6,15}:[A-Za-z0-9_-]{20,}\b/g, '[TELEGRAM_BOT_TOKEN_REDACTED]');
             report = report.slice(-55000);
-            await github.rest.issues.createComment({
+            await github.rest.issues.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: 60,
-              body: `<!-- alert-publication-diagnostics -->\n## Production API comparison\n\n\`\`\`text\n${report}\n\`\`\``,
+              body: `Автоматический production-отчёт.\n\n## Production API comparison\n\n\`\`\`text\n${report}\n\`\`\``,
             });
