@@ -28,15 +28,15 @@
 <form method="POST" action="{{ route('admin.group-channel.alert-settings.update', $bot) }}">
     @csrf @method('PUT')
 
-    <fieldset>
+    <fieldset data-alert-region-settings>
         <legend>Территория публикаций</legend>
         <label class="sg-switch-row">
             <span><strong>Вся Украина</strong><small>Публиковать события по всем областям, АР Крым, Севастополю и Киеву.</small></span>
             <input type="hidden" name="all_ukraine" value="0">
-            <input type="checkbox" name="all_ukraine" value="1" @checked($allUkraine)>
+            <input type="checkbox" name="all_ukraine" value="1" data-alert-all-ukraine @checked($allUkraine)>
         </label>
-        <p>Используются только события уровня областей и Киева. Районы, громады, сёла и другие города игнорируются.</p>
-        <div class="sg-form-grid">
+        <p>Используются только события уровня областей, Киева и Севастополя. Районы, громады, сёла и другие города игнорируются.</p>
+        <div class="sg-form-grid" data-alert-regions @if($allUkraine) hidden @endif>
             @foreach(\App\Models\GroupChannelBot::ALERT_REGIONS as $uid => $region)
                 <label class="sg-switch-row">
                     <span><strong>{{ $region }}</strong></span>
