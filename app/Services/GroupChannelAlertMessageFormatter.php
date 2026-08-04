@@ -2,88 +2,54 @@
 
 namespace App\Services;
 
-use App\Models\GroupChannelAlertEvent;
-use App\Models\GroupChannelBot;
-use Illuminate\Support\Collection;
-use RuntimeException;
-
 final class GroupChannelAlertMessageFormatter
 {
     /**
-     * @param  Collection<int, GroupChannelAlertEvent>  $events
+     * @param  array<int, string>  $regions
+     * @param  array<int, string>  $details
      */
-    public static function render(GroupChannelBot $bot, Collection $events): string
-    {
-        /** @var GroupChannelAlertEvent|null $first */
-        $first = $events->first();
+    public static function render(
+        string $kind,
+        string $threatType,
+        string $time,
+        array $regions,
+        array $details = [],
+    ): string {
+        $headline = $kind === 'end'
+            ? '🟢 ВІДБІЙ ПОВІТРЯНОЇ ТРИВОГИ'
+            : '🚨 ПОВІТРЯНА ТРИВОГА';
+        $timeLabel = $kind === 'end' ? 'Відбій' : 'Початок';
+        $message = '<b>'.self::escape($headline)."</b>\n\n";
+        $message .= '📍 '.self::formatRegions($regions);
 
-        if (! $first) {
-            throw new RuntimeException('Невозможно сформировать сообщение без событий тревоги.');
+        if ($kind !== 'end' && trim($threatType) !== '') {
+            $message .= "\n\n⚠️ ".self::escape($threatType);
         }
 
-        $templateKey = $first->kind === GroupChannelAlertEvent::KIND_START
-            ? 'start_template'
-            : 'end_template';
-        $default = $first->kind === GroupChannelAlertEvent::KIND_START
-            ? GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE
-            : GroupChannelBot::DEFAULT_ALERT_END_TEMPLATE;
-        $template = trim((string) $bot->moduleSetting(
-            GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
-            $templateKey,
-            $default,
-        ));
-
-        if ($template === '') {
-            $template = $default;
+        foreach (self::unique($details) as $detail) {
+            $message .= "\n🎯 ".self::escape(mb_substr($detail, 0, 500));
         }
 
-        $details = self::formatDetails($events);
-        $hasDetailsVariable = str_contains($template, '{details}');
-        $message = strtr(self::escape($template), [
-            '{region}' => self::formatRegions($events),
-            '{time}' => '<b>'.self::escape($first->event_at->timezone('Europe/Kyiv')->format('H:i')).'</b>',
-            '{threat_type}' => self::escape(
-                GroupChannelBot::ALERT_TYPES[$first->alert_type] ?? $first->alert_type,
-            ),
-            '{details}' => $details,
-        ]);
+        $message .= "\n🕒 {$timeLabel}: <b>".self::escape($time).'</b>';
 
-        if ($first->kind === GroupChannelAlertEvent::KIND_START
-            && $details !== ''
-            && ! $hasDetailsVariable) {
-            $detailsBlock = "🎯 {$details}";
-            $message = str_contains($message, "\n🕒")
-                ? str_replace("\n🕒", "\n{$detailsBlock}\n🕒", $message)
-                : $message."\n{$detailsBlock}";
+        if (mb_strlen($message) <= 4096) {
+            return $message;
         }
 
-        $message = self::boldFirstLine($message);
-        $message = trim(preg_replace('/\n{3,}/', "\n\n", $message) ?? $message);
-
-        if ($message === '') {
-            throw new RuntimeException('Шаблон сообщения тревог сформировал пустой текст.');
-        }
-
-        if (mb_strlen($message) > 4096) {
-            $plain = html_entity_decode(strip_tags($message), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-            return self::escape(mb_substr($plain, 0, 3800));
-        }
-
-        return $message;
+        return self::escape(mb_substr(html_entity_decode(strip_tags($message)), 0, 3800));
     }
 
     /**
-     * @param  Collection<int, GroupChannelAlertEvent>  $events
+     * @param  array<int, string>  $regions
      */
-    private static function formatRegions(Collection $events): string
+    private static function formatRegions(array $regions): string
     {
-        /** @var array<string, array<string, string>> $groups */
+        /** @var array<string, array{oblast: string, children: array<string, string>}> $groups */
         $groups = [];
 
-        foreach ($events as $event) {
+        foreach (self::unique($regions) as $region) {
             $parts = array_values(array_filter(
-                array_map('trim', explode(' — ', trim((string) $event->region_name))),
+                array_map('trim', explode(' — ', $region)),
                 fn (string $part): bool => $part !== '',
             ));
 
@@ -92,26 +58,13 @@ final class GroupChannelAlertMessageFormatter
             }
 
             $oblast = $parts[0];
-            $groupKey = mb_strtolower($oblast);
-            $groups[$groupKey] ??= [
-                'oblast' => $oblast,
-                'children' => [],
-            ];
+            $key = mb_strtolower($oblast);
+            $groups[$key] ??= ['oblast' => $oblast, 'children' => []];
 
-            if (count($parts) < 2) {
-                continue;
+            if (count($parts) > 1) {
+                $child = (string) end($parts);
+                $groups[$key]['children'][mb_strtolower($child)] = $child;
             }
-
-            $child = (string) end($parts);
-            $childKey = mb_strtolower($child);
-
-            if ($childKey !== $groupKey) {
-                $groups[$groupKey]['children'][$childKey] = $child;
-            }
-        }
-
-        if ($groups === []) {
-            return self::escape('Невідома локація');
         }
 
         $blocks = [];
@@ -133,7 +86,9 @@ final class GroupChannelAlertMessageFormatter
             $blocks[] = $block;
         }
 
-        return implode("\n\n📍 ", $blocks);
+        return $blocks !== []
+            ? implode("\n\n📍 ", $blocks)
+            : '<b>Невідома локація</b>';
     }
 
     private static function locationRank(string $location): int
@@ -142,7 +97,7 @@ final class GroupChannelAlertMessageFormatter
             return 10;
         }
 
-        if (preg_match('/^м\.\s/ui', $location) || str_contains(mb_strtolower($location), 'місто')) {
+        if (preg_match('/^м\.\s/ui', $location)) {
             return 20;
         }
 
@@ -154,46 +109,22 @@ final class GroupChannelAlertMessageFormatter
     }
 
     /**
-     * @param  Collection<int, GroupChannelAlertEvent>  $events
+     * @param  array<int, string>  $values
+     * @return array<int, string>
      */
-    private static function formatDetails(Collection $events): string
+    private static function unique(array $values): array
     {
-        $details = $events
-            ->pluck('details')
-            ->filter(fn (mixed $detail): bool => is_string($detail) && trim($detail) !== '')
-            ->map(fn (string $detail): string => trim($detail))
-            ->unique(fn (string $detail): string => mb_strtolower($detail))
-            ->values();
-        $hidden = max(0, $details->count() - 5);
-        $visible = $details
-            ->take(5)
-            ->map(fn (string $detail): string => self::escape(mb_substr($detail, 0, 500)))
-            ->implode("\n🎯 ");
+        $unique = [];
 
-        if ($hidden > 0) {
-            $visible .= "\n🎯 Ще {$hidden} уточнень";
+        foreach ($values as $value) {
+            $value = trim($value);
+
+            if ($value !== '') {
+                $unique[mb_strtolower($value)] = $value;
+            }
         }
 
-        return $visible;
-    }
-
-    private static function boldFirstLine(string $message): string
-    {
-        $lines = explode("\n", $message);
-
-        foreach ($lines as $index => $line) {
-            if (trim($line) === '') {
-                continue;
-            }
-
-            if (! str_contains($line, '<b>')) {
-                $lines[$index] = '<b>'.$line.'</b>';
-            }
-
-            break;
-        }
-
-        return implode("\n", $lines);
+        return array_values($unique);
     }
 
     private static function escape(string $value): string
