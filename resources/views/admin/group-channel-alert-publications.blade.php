@@ -31,11 +31,11 @@
     <fieldset data-alert-region-settings>
         <legend>Территория публикаций</legend>
         <label class="sg-switch-row">
-            <span><strong>Вся Украина</strong><small>Публиковать события по всем областям, АР Крым, Севастополю и Киеву.</small></span>
+            <span><strong>Вся Украина</strong><small>Публиковать события по всем областям и городам, где тревога объявляется отдельно.</small></span>
             <input type="hidden" name="all_ukraine" value="0">
             <input type="checkbox" name="all_ukraine" value="1" data-alert-all-ukraine @checked($allUkraine)>
         </label>
-        <p>Используются только события уровня областей, Киева и Севастополя. Районы, громады, сёла и другие города игнорируются.</p>
+        <p>Публикуются события уровня областей и городов. Районы, громады и сёла игнорируются.</p>
         <div class="sg-form-grid" data-alert-regions @if($allUkraine) hidden @endif>
             @foreach(\App\Models\GroupChannelBot::ALERT_REGIONS as $uid => $region)
                 <label class="sg-switch-row">
