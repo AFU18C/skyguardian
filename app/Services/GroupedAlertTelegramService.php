@@ -20,6 +20,20 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             return parent::request($bot, $method, $payload);
         }
 
+        if ($alert['kind'] === 'end') {
+            return parent::request($bot, 'sendMessage', [
+                ...$payload,
+                'text' => GroupChannelAlertMessageFormatter::render(
+                    $alert['kind'],
+                    $alert['threat_type'],
+                    $alert['time'],
+                    $alert['regions'],
+                    $alert['details'],
+                ),
+                'parse_mode' => 'HTML',
+            ]);
+        }
+
         $cacheKey = $this->cacheKey($bot, $alert);
         $cached = Cache::get($cacheKey, []);
         $regions = $this->unique([
@@ -134,7 +148,6 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
         return 'skyguardian:grouped-alert:'.hash('sha256', implode('|', [
             (string) $bot->id,
             (string) $bot->chat_id,
-            $alert['kind'],
             $alert['threat_type'],
             $date,
             $alert['time'],
