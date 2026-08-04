@@ -159,10 +159,20 @@ class GroupChannelBot extends Model
 
     public function moduleSetting(string $module, ?string $key = null, mixed $default = null): mixed
     {
+        $stored = data_get($this->module_settings, $module, []);
+        $stored = is_array($stored) ? $stored : [];
         $settings = array_replace_recursive(
             self::defaultModuleSettings()[$module] ?? [],
-            data_get($this->module_settings, $module, []),
+            $stored,
         );
+
+        if ($module === self::MODULE_ALERT_PUBLICATIONS) {
+            foreach (['region_uids', 'alert_types'] as $listKey) {
+                if (array_key_exists($listKey, $stored) && is_array($stored[$listKey])) {
+                    $settings[$listKey] = array_values($stored[$listKey]);
+                }
+            }
+        }
 
         return $key === null ? $settings : data_get($settings, $key, $default);
     }
