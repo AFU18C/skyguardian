@@ -253,4 +253,11 @@
     .sg-bot-rights-heading { display: block; }
     .sg-bot-rights-heading small { display: block; margin-top: 4px; }
     .sg-module-panel { padding: 12px; }
+    .sg-group-channel-edit-form .sg-form-actions {
+        position: static;
+        z-index: auto;
+        margin: 0;
+        padding: 16px 0 0;
+        background: transparent;
+    }
 }
