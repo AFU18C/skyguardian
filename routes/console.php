@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('skyguardian:sources:process --limit=40')
-    ->everySecond()
+    ->everyFiveSeconds()
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:group-channel-publications:process --limit=20')
