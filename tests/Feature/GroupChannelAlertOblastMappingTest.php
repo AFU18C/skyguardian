@@ -16,7 +16,7 @@ class GroupChannelAlertOblastMappingTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_child_locations_are_mapped_by_oblast_name_and_only_new_alerts_are_published(): void
+    public function test_child_locations_are_mapped_by_oblast_name_and_published(): void
     {
         CarbonImmutable::setTestNow('2026-08-04T10:00:00Z');
 
@@ -29,7 +29,7 @@ class GroupChannelAlertOblastMappingTest extends TestCase
                 oblast: 'Луганська область',
                 startedAt: '2022-04-04T16:45:39.000Z',
             );
-            $oldChildAlert = $this->alert(
+            $cityAlert = $this->alert(
                 id: 241597,
                 uid: '5349',
                 title: 'м. Марганець',
@@ -37,7 +37,7 @@ class GroupChannelAlertOblastMappingTest extends TestCase
                 oblast: 'Дніпропетровська область',
                 startedAt: '2026-08-04T09:00:00.000Z',
             );
-            $newChildAlert = $this->alert(
+            $raionAlert = $this->alert(
                 id: 241705,
                 uid: '125',
                 title: 'Ізюмський район',
@@ -48,7 +48,7 @@ class GroupChannelAlertOblastMappingTest extends TestCase
 
             Http::fake([
                 'https://api.alerts.in.ua/*' => Http::response([
-                    'alerts' => [$baselineAlert, $oldChildAlert, $newChildAlert],
+                    'alerts' => [$baselineAlert, $cityAlert, $raionAlert],
                 ]),
                 'https://api.telegram.org/*' => Http::response([
                     'ok' => true,
@@ -91,8 +91,8 @@ class GroupChannelAlertOblastMappingTest extends TestCase
 
             $this->assertFalse($result['baseline']);
             $this->assertSame(3, $result['active']);
-            $this->assertSame(1, $result['queued']);
-            $this->assertSame(1, $result['sent']);
+            $this->assertSame(2, $result['queued']);
+            $this->assertSame(2, $result['sent']);
 
             $this->assertDatabaseHas('group_channel_alert_states', [
                 'group_channel_bot_id' => $bot->id,
@@ -102,14 +102,20 @@ class GroupChannelAlertOblastMappingTest extends TestCase
             $this->assertDatabaseHas('group_channel_alert_events', [
                 'group_channel_bot_id' => $bot->id,
                 'kind' => GroupChannelAlertEvent::KIND_START,
+                'region_uid' => '5349',
+                'status' => GroupChannelAlertEvent::STATUS_SENT,
+            ]);
+            $this->assertDatabaseHas('group_channel_alert_events', [
+                'group_channel_bot_id' => $bot->id,
+                'kind' => GroupChannelAlertEvent::KIND_START,
                 'region_uid' => '125',
                 'status' => GroupChannelAlertEvent::STATUS_SENT,
             ]);
-            $this->assertDatabaseMissing('group_channel_alert_events', [
-                'group_channel_bot_id' => $bot->id,
-                'region_uid' => '5349',
-            ]);
 
+            Http::assertSent(function (Request $request): bool {
+                return str_contains($request->url(), 'api.telegram.org')
+                    && str_contains((string) $request['text'], 'Дніпропетровська область — м. Марганець');
+            });
             Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'api.telegram.org')
                     && str_contains((string) $request['text'], 'Харківська область — Ізюмський район');
