@@ -22,7 +22,7 @@ class GroupChannelAlertSettingsController extends Controller
         $data = $request->validate([
             'all_ukraine' => ['nullable', 'boolean'],
             'region_uids' => ['nullable', 'array'],
-            'region_uids.*' => ['string', Rule::in(array_keys(GroupChannelBot::ALERT_REGIONS))],
+            'region_uids.*' => ['string', Rule::in(array_map('strval', array_keys(GroupChannelBot::ALERT_REGIONS)))],
             'alert_types' => ['required', 'array', 'min:1'],
             'alert_types.*' => ['string', Rule::in(array_keys(GroupChannelBot::ALERT_TYPES))],
             'publish_start' => ['nullable', 'boolean'],
@@ -54,16 +54,16 @@ class GroupChannelAlertSettingsController extends Controller
                 GroupChannelBot::MODULE_ALERT_PUBLICATIONS.'.all_ukraine',
                 true,
             ),
-            'region_uids' => array_values((array) data_get(
+            'region_uids' => array_values(array_map('strval', (array) data_get(
                 $settings,
                 GroupChannelBot::MODULE_ALERT_PUBLICATIONS.'.region_uids',
                 [],
-            )),
-            'alert_types' => array_values((array) data_get(
+            ))),
+            'alert_types' => array_values(array_map('strval', (array) data_get(
                 $settings,
                 GroupChannelBot::MODULE_ALERT_PUBLICATIONS.'.alert_types',
                 [],
-            )),
+            ))),
         ];
         $incoming = [
             'enabled' => true,
