@@ -10,9 +10,7 @@
             return null;
         }
 
-        return \Carbon\CarbonImmutable::parse($value, 'UTC')
-            ->timezone('Europe/Kyiv')
-            ->format('d.m.Y H:i:s');
+        return \Carbon\CarbonImmutable::parse($value)->format('d.m.Y H:i:s');
     };
 @endphp
 
@@ -32,7 +30,7 @@
 
 <form method="POST" action="{{ route('admin.group-channel.alerts-api-check', $bot) }}">
     @csrf
-    <button class="sg-button sg-button-secondary" type="submit" data-submit-button>Проверить API-токен</button>
+    <button class="sg-button sg-button-secondary" type="submit" data-submit-button>Проверить API и публикацию</button>
 </form>
 
 <hr>
