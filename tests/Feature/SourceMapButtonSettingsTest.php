@@ -21,44 +21,35 @@ class SourceMapButtonSettingsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_map_button_setting_is_available_and_saved_for_news_and_air_alert_sources(): void
+    public function test_map_button_setting_is_available_and_saved_for_both_source_editors(): void
     {
         $user = User::factory()->create();
         $account = $this->createAccount();
+        $cases = [
+            [Source::TYPE_NEWS, 'admin.news.index', 'admin.news.store', '@news_source'],
+            [Source::TYPE_AIR_ALERT, 'admin.air-alert.index', 'admin.air-alert.store', '@alert_source'],
+        ];
 
-        foreach ([
-            [Source::TYPE_NEWS, 'admin.news.index', 'admin.news.store', 'Новости с кнопкой', '@news_source'],
-            [Source::TYPE_AIR_ALERT, 'admin.air-alert.index', 'admin.air-alert.store', 'Тревоги с кнопкой', '@alert_source'],
-        ] as [$type, $indexRoute, $storeRoute, $name, $peer]) {
+        foreach ($cases as [$type, $indexRoute, $storeRoute, $peer]) {
             $this->actingAs($user)->get(route($indexRoute))
                 ->assertOk()
                 ->assertSee('Кнопка карты тревог')
                 ->assertSee('Показывать кнопку «Мапа тривог України»')
                 ->assertSee('Ссылка кнопки');
 
-            $this->actingAs($user)->post(route($storeRoute), [
-                'form_context' => 'source-create',
-                'name' => $name,
-                'technical_account_id' => $account->id,
+            $this->actingAs($user)->post(route($storeRoute), $this->sourcePayload($account, [
+                'name' => 'Источник '.$type,
                 'source_peer' => $peer,
-                'destination_peer' => '@SkyGuardianUa',
-                'check_interval' => 60,
-                'check_interval_unit' => 'seconds',
-                'is_active' => '1',
-                'copy_mode' => 'original',
-                'strip_links' => '0',
-                'strip_hashtags' => '0',
-                'strip_mentions' => '0',
-                'remove_phrases' => '',
-                'footer_html' => '',
-                'blocked_keywords_enabled' => '0',
-                'blocked_keywords' => '',
                 'map_button_enabled' => '1',
                 'map_button_url' => 'https://example.com/maps/'.$type,
-            ])->assertSessionHasNoErrors();
+            ]))->assertSessionHasNoErrors();
 
-            $source = Source::query()->where('type', $type)->firstOrFail();
-            $rule = $source->rules()->where('key', 'map_button_url')->firstOrFail();
+            $rule = Source::query()
+                ->where('type', $type)
+                ->firstOrFail()
+                ->rules()
+                ->where('key', 'map_button_url')
+                ->firstOrFail();
 
             $this->assertTrue($rule->is_active);
             $this->assertSame('https://example.com/maps/'.$type, data_get($rule->value, 'value'));
@@ -83,27 +74,16 @@ class SourceMapButtonSettingsTest extends TestCase
             'priority' => 80,
         ]);
 
-        $this->actingAs($user)->put(route('admin.news.update', $source), [
-            'form_context' => 'source-'.$source->id,
-            'name' => $source->name,
-            'technical_account_id' => $account->id,
-            'source_peer' => $source->source_peer,
-            'destination_peer' => $source->destination_peer,
-            'check_interval' => 60,
-            'check_interval_unit' => 'seconds',
-            'is_active' => '1',
-            'copy_mode' => 'original',
-            'strip_links' => '0',
-            'strip_hashtags' => '0',
-            'strip_mentions' => '0',
-            'remove_phrases' => '',
-            'footer_html' => '',
-            'blocked_keywords_enabled' => '0',
-            'blocked_keywords' => '',
-            'map_button_enabled' => '0',
-            'map_button_url' => 'https://skyguardian.pp.ua/',
-            'reset_cursor' => '0',
-        ])->assertSessionHasNoErrors();
+        $this->actingAs($user)->put(
+            route('admin.news.update', $source),
+            $this->sourcePayload($account, [
+                'form_context' => 'source-'.$source->id,
+                'name' => $source->name,
+                'source_peer' => $source->source_peer,
+                'map_button_enabled' => '0',
+                'reset_cursor' => '0',
+            ]),
+        )->assertSessionHasNoErrors();
 
         $this->assertFalse($source->rules()->where('key', 'map_button_url')->firstOrFail()->is_active);
     }
@@ -121,18 +101,8 @@ class SourceMapButtonSettingsTest extends TestCase
             'last_message_id' => 10,
         ]);
         $source->rules()->createMany([
-            [
-                'key' => 'copy_mode',
-                'value' => ['value' => 'original'],
-                'is_active' => true,
-                'priority' => 10,
-            ],
-            [
-                'key' => 'map_button_url',
-                'value' => ['value' => 'https://example.com/custom-map'],
-                'is_active' => true,
-                'priority' => 80,
-            ],
+            ['key' => 'copy_mode', 'value' => ['value' => 'original'], 'is_active' => true, 'priority' => 10],
+            ['key' => 'map_button_url', 'value' => ['value' => 'https://example.com/custom-map'], 'is_active' => true, 'priority' => 80],
         ]);
         $this->createDestinationBot();
 
@@ -156,40 +126,27 @@ class SourceMapButtonSettingsTest extends TestCase
             'peer' => '@source',
             'min_id' => 10,
             'limit' => 100,
-        ])->andReturn([
-            'messages' => [
-                ['id' => 11, 'text' => 'one', 'grouped_id' => null],
-                ['id' => 12, 'text' => 'two', 'grouped_id' => null],
-            ],
-        ]);
-        $telethon->shouldReceive('call')->once()->ordered()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
-            'source_peer' => '@source',
-            'destination_peer' => '@SkyGuardianUa',
-            'message_ids' => [11],
-            'settings' => $settings,
-        ])->andReturn([
-            'copied_count' => 1,
-            'failed_count' => 0,
-            'last_processed_id' => 11,
-            'partial_delivery' => null,
-        ]);
-        $telethon->shouldReceive('call')->once()->ordered()->with('latest_message_id', Mockery::type(TechnicalAccount::class), [
-            'peer' => '@SkyGuardianUa',
-        ])->andReturn(['latest_message_id' => 901]);
-        $telethon->shouldReceive('call')->once()->ordered()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
-            'source_peer' => '@source',
-            'destination_peer' => '@SkyGuardianUa',
-            'message_ids' => [12],
-            'settings' => $settings,
-        ])->andReturn([
-            'copied_count' => 1,
-            'failed_count' => 0,
-            'last_processed_id' => 12,
-            'partial_delivery' => null,
-        ]);
-        $telethon->shouldReceive('call')->once()->ordered()->with('latest_message_id', Mockery::type(TechnicalAccount::class), [
-            'peer' => '@SkyGuardianUa',
-        ])->andReturn(['latest_message_id' => 902]);
+        ])->andReturn(['messages' => [
+            ['id' => 11, 'text' => 'one', 'grouped_id' => null],
+            ['id' => 12, 'text' => 'two', 'grouped_id' => null],
+        ]]);
+
+        foreach ([[11, 901], [12, 902]] as [$sourceMessageId, $destinationMessageId]) {
+            $telethon->shouldReceive('call')->once()->ordered()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
+                'source_peer' => '@source',
+                'destination_peer' => '@SkyGuardianUa',
+                'message_ids' => [$sourceMessageId],
+                'settings' => $settings,
+            ])->andReturn([
+                'copied_count' => 1,
+                'failed_count' => 0,
+                'last_processed_id' => $sourceMessageId,
+                'partial_delivery' => null,
+            ]);
+            $telethon->shouldReceive('call')->once()->ordered()->with('latest_message_id', Mockery::type(TechnicalAccount::class), [
+                'peer' => '@SkyGuardianUa',
+            ])->andReturn(['latest_message_id' => $destinationMessageId]);
+        }
 
         $result = (new SourceProcessor($telethon, new OperationGate, new SourceScheduler))->process($source);
 
@@ -199,10 +156,9 @@ class SourceMapButtonSettingsTest extends TestCase
 
         $requests = Http::recorded();
         $this->assertCount(2, $requests);
-        $this->assertSame([901, 902], array_map(
-            static fn (array $record): int => (int) $record[0]['message_id'],
-            $requests,
-        ));
+        $this->assertSame([901, 902], $requests
+            ->map(static fn (array $record): int => (int) $record[0]['message_id'])
+            ->all());
 
         foreach ($requests as [$request]) {
             $this->assertStringEndsWith('/editMessageReplyMarkup', $request->url());
@@ -210,6 +166,30 @@ class SourceMapButtonSettingsTest extends TestCase
             $this->assertSame('🗺 Мапа тривог України', $button['text'] ?? null);
             $this->assertSame('https://example.com/custom-map', $button['url'] ?? null);
         }
+    }
+
+    private function sourcePayload(TechnicalAccount $account, array $overrides = []): array
+    {
+        return array_merge([
+            'form_context' => 'source-create',
+            'name' => 'Источник',
+            'technical_account_id' => $account->id,
+            'source_peer' => '@source',
+            'destination_peer' => '@SkyGuardianUa',
+            'check_interval' => 60,
+            'check_interval_unit' => 'seconds',
+            'is_active' => '1',
+            'copy_mode' => 'original',
+            'strip_links' => '0',
+            'strip_hashtags' => '0',
+            'strip_mentions' => '0',
+            'remove_phrases' => '',
+            'footer_html' => '',
+            'blocked_keywords_enabled' => '0',
+            'blocked_keywords' => '',
+            'map_button_enabled' => '0',
+            'map_button_url' => 'https://skyguardian.pp.ua/',
+        ], $overrides);
     }
 
     private function createAccount(): TechnicalAccount
