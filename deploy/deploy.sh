@@ -155,8 +155,7 @@ if ! sudo test -f /etc/skyguardian/backup.env; then
         '# Example: RCLONE_REMOTE=remote:skyguardian-backups' \
         'RCLONE_REMOTE=' \
         'BACKUP_ENCRYPTION_PASSWORD_FILE=/etc/skyguardian/backup.key' \
-        | sudo tee "$SHARED_DIR/.backup-env-tmp" >/dev/null
-    sudo mv "$SHARED_DIR/.backup-env-tmp" /etc/skyguardian/backup.env
+        | sudo tee /etc/skyguardian/backup.env >/dev/null
     sudo chmod 600 /etc/skyguardian/backup.env
 fi
 
