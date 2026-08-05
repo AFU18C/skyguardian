@@ -182,6 +182,7 @@ class SourceProcessor
 
                 if ($destinationMessageId < 1) {
                     $buttonErrors[] = 'Не удалось определить опубликованное сообщение.';
+
                     continue;
                 }
 
