@@ -124,7 +124,12 @@ sudo chmod 640 "$SHARED_DIR/.env"
 sudo -u www-data test -r "$SHARED_DIR/.env"
 
 sudo install -d -o www-data -g www-data -m 775 bootstrap/cache
-sudo -u www-data php artisan optimize:clear
+# Do not run optimize:clear here: it also executes cache:clear and deletes
+# active grouped-alert message IDs, start times and region state.
+sudo -u www-data php artisan config:clear
+sudo -u www-data php artisan route:clear
+sudo -u www-data php artisan view:clear
+sudo -u www-data php artisan clear-compiled
 sudo -u www-data php artisan migrate --force
 sudo -u www-data php artisan config:cache
 sudo -u www-data php artisan view:cache
