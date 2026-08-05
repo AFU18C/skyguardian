@@ -10,14 +10,10 @@ use RuntimeException;
 
 class GroupChannelTelegramService
 {
-    private const ALERT_MAP_BUTTON_TEXT = '🗺 Мапа тривог України';
-
-    private const ALERT_MAP_URL = 'https://skyguardian.pp.ua/';
-
     public function request(GroupChannelBot $bot, string $method, array $payload = []): mixed
     {
         $response = $this->client($bot)
-            ->post($method, $this->normalizePayload($method, $payload));
+            ->post($method, $this->normalizePayload($bot, $method, $payload));
         $body = $response->json();
 
         if (! $response->successful() || ! ($body['ok'] ?? false)) {
@@ -92,9 +88,9 @@ class GroupChannelTelegramService
         return is_array($body['result'] ?? null) ? $body['result'] : [];
     }
 
-    private function normalizePayload(string $method, array $payload): array
+    private function normalizePayload(GroupChannelBot $bot, string $method, array $payload): array
     {
-        $payload = $this->withAlertMapButton($method, $payload);
+        $payload = $this->withAlertMapButton($bot, $method, $payload);
 
         if ($method !== 'sendPoll' || ! isset($payload['options'])) {
             return $payload;
@@ -120,7 +116,7 @@ class GroupChannelTelegramService
         return $payload;
     }
 
-    private function withAlertMapButton(string $method, array $payload): array
+    private function withAlertMapButton(GroupChannelBot $bot, string $method, array $payload): array
     {
         if (! in_array($method, ['sendMessage', 'editMessageText'], true)) {
             return $payload;
@@ -132,11 +128,48 @@ class GroupChannelTelegramService
             return $payload;
         }
 
+        $enabled = (bool) $bot->moduleSetting(
+            GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+            'map_button_enabled',
+            true,
+        );
+
+        if (! $enabled) {
+            if ($method === 'editMessageText') {
+                $payload['reply_markup'] = ['inline_keyboard' => []];
+            } else {
+                unset($payload['reply_markup']);
+            }
+
+            return $payload;
+        }
+
+        $buttonText = trim((string) $bot->moduleSetting(
+            GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+            'map_button_text',
+            GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_TEXT,
+        ));
+        $buttonUrl = trim((string) $bot->moduleSetting(
+            GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+            'map_button_url',
+            GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_URL,
+        ));
+
+        if ($buttonText === '' || filter_var($buttonUrl, FILTER_VALIDATE_URL) === false) {
+            if ($method === 'editMessageText') {
+                $payload['reply_markup'] = ['inline_keyboard' => []];
+            } else {
+                unset($payload['reply_markup']);
+            }
+
+            return $payload;
+        }
+
         $payload['reply_markup'] = [
             'inline_keyboard' => [[
                 [
-                    'text' => self::ALERT_MAP_BUTTON_TEXT,
-                    'url' => self::ALERT_MAP_URL,
+                    'text' => $buttonText,
+                    'url' => $buttonUrl,
                 ],
             ]],
         ];
