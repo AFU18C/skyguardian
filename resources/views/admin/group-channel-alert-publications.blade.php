@@ -3,6 +3,9 @@
     $allUkraine = (bool) $bot->moduleSetting($module, 'all_ukraine', true);
     $selectedRegions = array_map('strval', (array) $bot->moduleSetting($module, 'region_uids', array_keys(\App\Models\GroupChannelBot::ALERT_REGIONS)));
     $selectedTypes = array_map('strval', (array) $bot->moduleSetting($module, 'alert_types', array_keys(\App\Models\GroupChannelBot::ALERT_TYPES)));
+    $mapButtonEnabled = (bool) $bot->moduleSetting($module, 'map_button_enabled', true);
+    $mapButtonText = (string) $bot->moduleSetting($module, 'map_button_text', \App\Models\GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_TEXT);
+    $mapButtonUrl = (string) $bot->moduleSetting($module, 'map_button_url', \App\Models\GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_URL);
     $formatAlertsTimestamp = static function (string $attribute) use ($bot): ?string {
         $value = $bot->getRawOriginal($attribute);
 
@@ -96,6 +99,40 @@
             <input type="hidden" name="disable_notification" value="0">
             <input type="checkbox" name="disable_notification" value="1" @checked($bot->moduleSetting($module, 'disable_notification', false))>
         </label>
+    </fieldset>
+
+    <fieldset>
+        <legend>Кнопка карты тревог</legend>
+        <label class="sg-switch-row">
+            <span><strong>Показывать кнопку под тревогой и отбоем</strong><small>Кнопка отображается в самом низу тревожной карточки.</small></span>
+            <input type="hidden" name="map_button_enabled" value="0">
+            <input type="checkbox" name="map_button_enabled" value="1" @checked((bool) old('map_button_enabled', $mapButtonEnabled))>
+        </label>
+        <div class="sg-field">
+            <label for="alert-map-button-text-{{ $bot->id }}">Надпись на кнопке</label>
+            <input
+                id="alert-map-button-text-{{ $bot->id }}"
+                type="text"
+                name="map_button_text"
+                value="{{ old('map_button_text', $mapButtonText) }}"
+                maxlength="64"
+                required
+            >
+            @error('map_button_text')<small class="sg-field-error">{{ $message }}</small>@enderror
+        </div>
+        <div class="sg-field">
+            <label for="alert-map-button-url-{{ $bot->id }}">Ссылка кнопки</label>
+            <input
+                id="alert-map-button-url-{{ $bot->id }}"
+                type="url"
+                name="map_button_url"
+                value="{{ old('map_button_url', $mapButtonUrl) }}"
+                maxlength="2048"
+                placeholder="https://skyguardian.pp.ua/"
+                required
+            >
+            @error('map_button_url')<small class="sg-field-error">{{ $message }}</small>@enderror
+        </div>
     </fieldset>
 
     <fieldset>

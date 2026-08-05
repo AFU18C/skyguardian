@@ -28,6 +28,9 @@ class GroupChannelAlertSettingsController extends Controller
             'publish_start' => ['nullable', 'boolean'],
             'publish_end' => ['nullable', 'boolean'],
             'disable_notification' => ['nullable', 'boolean'],
+            'map_button_enabled' => ['nullable', 'boolean'],
+            'map_button_text' => ['required', 'string', 'max:64'],
+            'map_button_url' => ['required', 'string', 'url', 'max:2048'],
             'start_template' => ['required', 'string', 'max:3500'],
             'end_template' => ['required', 'string', 'max:3500'],
         ]);
@@ -73,6 +76,9 @@ class GroupChannelAlertSettingsController extends Controller
             'publish_start' => $request->boolean('publish_start'),
             'publish_end' => $request->boolean('publish_end'),
             'disable_notification' => $request->boolean('disable_notification'),
+            'map_button_enabled' => $request->boolean('map_button_enabled'),
+            'map_button_text' => trim($data['map_button_text']),
+            'map_button_url' => trim($data['map_button_url']),
             'start_template' => trim($data['start_template']),
             'end_template' => trim($data['end_template']),
         ];
