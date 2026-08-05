@@ -74,6 +74,10 @@ class GroupChannelBot extends Model
 
     public const DEFAULT_ALERT_END_TEMPLATE = "✅ ВІДБІЙ ТРИВОГИ\n\n📍 {region}\n🕒 Відбій: {time}";
 
+    public const DEFAULT_ALERT_MAP_BUTTON_TEXT = '🗺 Мапа тривог України';
+
+    public const DEFAULT_ALERT_MAP_BUTTON_URL = 'https://skyguardian.pp.ua/';
+
     protected $fillable = [
         'bot_name', 'bot_token', 'alerts_api_token', 'alerts_api_token_fingerprint',
         'token_fingerprint', 'webhook_secret',
@@ -190,6 +194,9 @@ class GroupChannelBot extends Model
             'publish_start' => true,
             'publish_end' => true,
             'disable_notification' => false,
+            'map_button_enabled' => true,
+            'map_button_text' => self::DEFAULT_ALERT_MAP_BUTTON_TEXT,
+            'map_button_url' => self::DEFAULT_ALERT_MAP_BUTTON_URL,
             'start_template' => self::DEFAULT_ALERT_START_TEMPLATE,
             'end_template' => self::DEFAULT_ALERT_END_TEMPLATE,
         ];
