@@ -173,6 +173,8 @@
         @endif
     </section>
 
+    @include('admin.sources._map_button_settings')
+
     <section class="sg-rules">
         <div class="sg-section-heading">
             <div>

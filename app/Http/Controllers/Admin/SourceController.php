@@ -145,6 +145,15 @@ class SourceController extends Controller
             'footer_html' => ['nullable', 'string', 'max:10000'],
             'blocked_keywords_enabled' => ['nullable', 'boolean'],
             'blocked_keywords' => ['nullable', 'string', 'max:10000'],
+            'map_button_enabled' => ['nullable', 'boolean'],
+            'map_button_url' => [
+                'nullable',
+                'string',
+                'max:2048',
+                'url',
+                'starts_with:http://,https://',
+                'required_if:map_button_enabled,1',
+            ],
             'reset_cursor' => ['nullable', 'boolean'],
         ]);
     }
@@ -175,6 +184,12 @@ class SourceController extends Controller
                 'value' => trim((string) ($validated['blocked_keywords'] ?? '')),
                 'is_active' => (bool) ($validated['blocked_keywords_enabled'] ?? false),
                 'priority' => 70,
+            ],
+            [
+                'key' => 'map_button_url',
+                'value' => trim((string) ($validated['map_button_url'] ?? 'https://skyguardian.pp.ua/')),
+                'is_active' => (bool) ($validated['map_button_enabled'] ?? false),
+                'priority' => 80,
             ],
         ];
 

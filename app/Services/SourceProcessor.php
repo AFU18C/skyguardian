@@ -66,19 +66,31 @@ class SourceProcessor
             $pendingCopy = $source->pending_copy;
 
             if ($messageIds && $source->destination_peer) {
-                $copyResult = $this->telethon->call('copy_messages', $account, [
-                    'source_peer' => $source->source_peer,
-                    'destination_peer' => $source->destination_peer,
-                    'message_ids' => $messageIds,
-                    'settings' => $this->copySettings($source),
-                ]);
+                $mapButtonUrl = $this->mapButtonUrl($source);
+                $copyResult = $mapButtonUrl !== null
+                    ? $this->copyMessagesWithMapButtons($source, $messages, $mapButtonUrl)
+                    : $this->telethon->call('copy_messages', $account, [
+                        'source_peer' => $source->source_peer,
+                        'destination_peer' => $source->destination_peer,
+                        'message_ids' => $messageIds,
+                        'settings' => $this->copySettings($source),
+                    ]);
                 $copiedCount = (int) ($copyResult['copied_count'] ?? count($messageIds));
                 $failedCount = (int) ($copyResult['failed_count'] ?? 0);
                 $pendingCopy = data_get($copyResult, 'partial_delivery');
+
                 if ($failedCount > 0) {
                     $lastProcessedId = data_get($copyResult, 'last_processed_id');
                     $firstError = (string) data_get($copyResult, 'failed.0.error', 'Неизвестная ошибка Telegram.');
                     $copyError = "Не скопировано сообщений: {$failedCount}. {$firstError}";
+                } elseif (is_numeric($copyResult['last_processed_id'] ?? null)) {
+                    $lastProcessedId = (int) $copyResult['last_processed_id'];
+                }
+
+                $buttonError = trim((string) ($copyResult['button_error'] ?? ''));
+
+                if ($buttonError !== '') {
+                    $copyError = trim(($copyError !== null ? $copyError.' ' : '').'Кнопка карты: '.$buttonError);
                 }
             }
 
@@ -110,6 +122,123 @@ class SourceProcessor
         } finally {
             $this->gate->release($token);
         }
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $messages
+     * @return array<string, mixed>
+     */
+    private function copyMessagesWithMapButtons(Source $source, array $messages, string $url): array
+    {
+        $account = $source->technicalAccount;
+        $copiedCount = 0;
+        $failedCount = 0;
+        $failed = [];
+        $lastProcessedId = null;
+        $partialDelivery = null;
+        $resumePartial = $source->pending_copy;
+        $buttonErrors = [];
+        $buttonService = app(SourceMapButtonService::class);
+
+        foreach ($this->groupedMessageIds($messages) as $messageIds) {
+            $settings = $this->copySettings($source);
+            $settings['resume_partial'] = $resumePartial;
+            $copyResult = $this->telethon->call('copy_messages', $account, [
+                'source_peer' => $source->source_peer,
+                'destination_peer' => $source->destination_peer,
+                'message_ids' => $messageIds,
+                'settings' => $settings,
+            ]);
+            $groupCopied = (int) ($copyResult['copied_count'] ?? count($messageIds));
+            $groupFailed = (int) ($copyResult['failed_count'] ?? 0);
+            $copiedCount += $groupCopied;
+            $failedCount += $groupFailed;
+
+            if ($groupFailed > 0) {
+                $failed = array_merge($failed, (array) ($copyResult['failed'] ?? []));
+                $partialDelivery = data_get($copyResult, 'partial_delivery');
+                $groupLastProcessedId = data_get($copyResult, 'last_processed_id');
+
+                if (is_numeric($groupLastProcessedId)) {
+                    $lastProcessedId = max((int) ($lastProcessedId ?? 0), (int) $groupLastProcessedId);
+                }
+
+                break;
+            }
+
+            $resumePartial = null;
+            $partialDelivery = null;
+            $lastProcessedId = max((int) ($lastProcessedId ?? 0), max($messageIds));
+
+            if ($groupCopied < 1) {
+                continue;
+            }
+
+            try {
+                $latest = $this->telethon->call('latest_message_id', $account, [
+                    'peer' => $source->destination_peer,
+                ]);
+                $destinationMessageId = (int) ($latest['latest_message_id'] ?? 0);
+
+                if ($destinationMessageId < 1) {
+                    $buttonErrors[] = 'Не удалось определить опубликованное сообщение.';
+
+                    continue;
+                }
+
+                $buttonError = $buttonService->attach($source, $destinationMessageId, $url);
+
+                if ($buttonError !== null) {
+                    $buttonErrors[] = $buttonError;
+                }
+            } catch (Throwable $exception) {
+                report($exception);
+                $buttonErrors[] = 'Не удалось определить сообщение или добавить кнопку.';
+            }
+        }
+
+        return [
+            'copied_count' => $copiedCount,
+            'failed_count' => $failedCount,
+            'failed' => $failed,
+            'last_processed_id' => $lastProcessedId,
+            'partial_delivery' => $partialDelivery,
+            'button_error' => implode(' ', array_values(array_unique($buttonErrors))),
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $messages
+     * @return array<int, array<int, int>>
+     */
+    private function groupedMessageIds(array $messages): array
+    {
+        usort($messages, static fn (array $left, array $right): int => (int) ($left['id'] ?? 0) <=> (int) ($right['id'] ?? 0));
+        $groups = [];
+
+        foreach ($messages as $message) {
+            $messageId = (int) ($message['id'] ?? 0);
+
+            if ($messageId < 1) {
+                continue;
+            }
+
+            $groupedId = $message['grouped_id'] ?? null;
+            $key = $groupedId !== null && $groupedId !== ''
+                ? 'group:'.(string) $groupedId
+                : 'message:'.$messageId;
+            $groups[$key] ??= [];
+            $groups[$key][] = $messageId;
+        }
+
+        return array_values($groups);
+    }
+
+    private function mapButtonUrl(Source $source): ?string
+    {
+        $url = trim((string) $this->ruleValue($source, 'map_button_url', ''));
+
+        return $url !== '' ? $url : null;
     }
 
     private function copySettings(Source $source): array
