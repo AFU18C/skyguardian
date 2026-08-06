@@ -19,7 +19,8 @@ class ProcessSources extends Command
         SourceScheduler $scheduler,
         SourceProcessor $processor,
         SourcePollingSettings $polling,
-    ): int {
+    ): int
+    {
         $limit = max(1, min((int) $this->option('limit'), 40));
         $failed = 0;
 
