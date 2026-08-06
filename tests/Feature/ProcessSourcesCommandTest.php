@@ -19,8 +19,12 @@ class ProcessSourcesCommandTest extends TestCase
         $scheduler = Mockery::mock(SourceScheduler::class);
         $scheduler->shouldReceive('due')
             ->once()
-            ->with(40)
+            ->with(40, Source::TYPE_NEWS)
             ->andReturn(new Collection([$source]));
+        $scheduler->shouldReceive('due')
+            ->once()
+            ->with(40, Source::TYPE_AIR_ALERT)
+            ->andReturn(collect());
 
         $processor = Mockery::mock(SourceProcessor::class);
         $processor->shouldReceive('process')
@@ -45,7 +49,14 @@ class ProcessSourcesCommandTest extends TestCase
         $source->id = 7;
 
         $scheduler = Mockery::mock(SourceScheduler::class);
-        $scheduler->shouldReceive('due')->once()->andReturn(new Collection([$source]));
+        $scheduler->shouldReceive('due')
+            ->once()
+            ->with(40, Source::TYPE_NEWS)
+            ->andReturn(new Collection([$source]));
+        $scheduler->shouldReceive('due')
+            ->once()
+            ->with(40, Source::TYPE_AIR_ALERT)
+            ->andReturn(collect());
 
         $processor = Mockery::mock(SourceProcessor::class);
         $processor->shouldReceive('process')->once()->andReturn([]);
