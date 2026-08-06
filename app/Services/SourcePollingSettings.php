@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
+use Throwable;
 
 class SourcePollingSettings
 {
@@ -75,7 +76,7 @@ class SourcePollingSettings
 
         try {
             $lastRunAt = CarbonImmutable::parse($lastRun);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return true;
         }
 
