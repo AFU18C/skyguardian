@@ -8,6 +8,7 @@
     @vite([
         'resources/css/app.css',
         'resources/css/source-copying.css',
+        'resources/css/source-polling-settings.css',
         'resources/css/collapsible-cards.css',
         'resources/css/topbar-metrics.css',
         'resources/css/source-health.css',
