@@ -40,8 +40,9 @@
         </header>
         <main class="sg-main">
             <div class="sg-page-header">
-                <div>
+                <div class="sg-page-title-row">
                     <h1>{{ $title ?? 'Админка' }}</h1>
+                    @isset($titleActions)<div class="sg-page-title-actions">{{ $titleActions }}</div>@endisset
                 </div>
                 @isset($actions)<div class="sg-page-actions">{{ $actions }}</div>@endisset
             </div>
