@@ -3,6 +3,8 @@
     $emptyText = $type === \App\Models\Source::TYPE_NEWS
         ? 'Источники новостей ещё не добавлены.'
         : 'Источники воздушной тревоги ещё не добавлены.';
+    $pollingModalId = 'source-polling-settings-'.$type;
+    $pollingSectionName = $type === \App\Models\Source::TYPE_NEWS ? 'новостей' : 'воздушных тревог';
 @endphp
 
 <x-layouts.admin :title="$title">
@@ -11,6 +13,16 @@
             ? 'Управление Telegram-источниками новостей.'
             : 'Управление Telegram-источниками воздушной тревоги.' }}
     </x-slot:description>
+
+    <x-slot:titleActions>
+        <button
+            class="sg-icon-button sg-page-settings-button"
+            type="button"
+            data-modal-open="{{ $pollingModalId }}"
+            aria-label="Настройки автоматической проверки {{ $pollingSectionName }}"
+            title="Настройки автоматической проверки"
+        >⚙</button>
+    </x-slot:titleActions>
 
     <x-slot:actions>
         <button class="sg-button sg-button-primary" type="button" data-modal-open="source-create" @disabled($sourceLimitReached)>
@@ -91,6 +103,51 @@
     @endif
 
     @push('modals')
+        <x-modal id="{{ $pollingModalId }}" title="Настройки проверки {{ $pollingSectionName }}">
+            <form method="POST" action="{{ route($routePrefix.'.polling-settings.update') }}">
+                @csrf
+                @method('PUT')
+                <input type="hidden" name="form_context" value="source-polling-settings">
+                <input type="hidden" name="source_type" value="{{ $type }}">
+
+                <label class="sg-switch-row">
+                    <span>
+                        <strong>Автоматическая проверка источников</strong>
+                        <small>Проверять, наступило ли время <code>next_check_at</code>, только для раздела {{ $pollingSectionName }}.</small>
+                    </span>
+                    <input type="hidden" name="polling_enabled" value="0">
+                    <input
+                        type="checkbox"
+                        name="polling_enabled"
+                        value="1"
+                        @checked((bool) old('polling_enabled', $pollingSettings['enabled']))
+                    >
+                </label>
+
+                <div class="sg-field">
+                    <label for="source-polling-interval-{{ $type }}">Проверять наступление времени каждые</label>
+                    <div class="sg-inline-field">
+                        <input
+                            id="source-polling-interval-{{ $type }}"
+                            type="number"
+                            name="polling_interval_minutes"
+                            value="{{ old('polling_interval_minutes', $pollingSettings['interval_minutes']) }}"
+                            min="1"
+                            max="1440"
+                            required
+                        >
+                        <span>мин.</span>
+                    </div>
+                    <small>Минимум 1 минута. У каждого источника по-прежнему остаётся собственный интервал проверки.</small>
+                    @error('polling_interval_minutes')<small class="sg-field-error">{{ $message }}</small>@enderror
+                </div>
+
+                <div class="sg-record-actions">
+                    <button class="sg-button sg-button-primary" type="submit" data-submit-button>Сохранить</button>
+                </div>
+            </form>
+        </x-modal>
+
         <x-modal id="source-create" title="Добавить источник" size="xl">
             @include('admin.sources._form', [
                 'source' => null,
@@ -120,6 +177,13 @@
     @endpush
 
     @if ($errors->any() && old('form_context'))
-        <div data-open-modal-on-load="{{ old('form_context') === 'source-create' ? 'source-create' : 'source-edit-'.str_replace('source-', '', old('form_context')) }}"></div>
+        @php
+            $modalToOpen = match (old('form_context')) {
+                'source-polling-settings' => $pollingModalId,
+                'source-create' => 'source-create',
+                default => 'source-edit-'.str_replace('source-', '', old('form_context')),
+            };
+        @endphp
+        <div data-open-modal-on-load="{{ $modalToOpen }}"></div>
     @endif
 </x-layouts.admin>
