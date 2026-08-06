@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Source;
 use App\Models\TechnicalAccount;
+use App\Services\SourcePollingSettings;
 use App\Services\SourceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,13 +17,14 @@ use Throwable;
 
 class SourceController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request, SourcePollingSettings $pollingSettings): View
     {
         $type = $this->type($request);
 
         return view('admin.sources.index', [
             'type' => $type,
             'title' => $type === Source::TYPE_NEWS ? 'Новости' : 'Воздушная тревога',
+            'pollingSettings' => $pollingSettings->get($type),
             'sources' => Source::query()
                 ->where('type', $type)
                 ->with(['technicalAccount.telegramApi', 'rules'])
