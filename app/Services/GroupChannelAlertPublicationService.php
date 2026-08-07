@@ -346,11 +346,23 @@ class GroupChannelAlertPublicationService
             }
 
             $isRefresh = $card !== null || $startedAt->lessThan($now->subMinute());
+            $cycleStartedAt = $card?->started_at?->toImmutable();
+            if (! $cycleStartedAt || $startedAt->lessThan($cycleStartedAt)) {
+                $cycleStartedAt = $startedAt;
+            }
+            $cardPayload = $this->renderActiveCardPayload(
+                $bot,
+                $states,
+                $startedAt,
+                $cycleStartedAt,
+                $now,
+                $isRefresh,
+            );
 
             try {
                 $response = $this->telegram->request($bot, 'sendMessage', [
                     'chat_id' => $bot->chat_id,
-                    'text' => $this->renderActiveCard($bot, $states, $startedAt, $now, $isRefresh),
+                    ...$cardPayload,
                     'disable_notification' => (bool) $bot->moduleSetting(
                         GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
                         'disable_notification',
@@ -367,7 +379,7 @@ class GroupChannelAlertPublicationService
                     [
                         'snapshot_hash' => hash('sha256', 'retry|'.$hash),
                         'telegram_message_id' => $card?->telegram_message_id,
-                        'started_at' => $startedAt,
+                        'started_at' => $cycleStartedAt,
                         'published_at' => $card?->published_at,
                     ],
                 );
@@ -398,7 +410,7 @@ class GroupChannelAlertPublicationService
                 [
                     'snapshot_hash' => $hash,
                     'telegram_message_id' => $messageId,
-                    'started_at' => $startedAt,
+                    'started_at' => $cycleStartedAt,
                     'published_at' => $now,
                 ],
             );
@@ -706,6 +718,100 @@ class GroupChannelAlertPublicationService
         }
 
         return $this->finishMessage($message);
+    }
+
+    /**
+     * @param  Collection<int, GroupChannelAlertState>  $states
+     * @return array{text: string, entities?: array<int, array{type: string, offset: int, length: int}>}
+     */
+    private function renderActiveCardPayload(
+        GroupChannelBot $bot,
+        Collection $states,
+        CarbonImmutable $startedAt,
+        CarbonImmutable $cycleStartedAt,
+        CarbonImmutable $updatedAt,
+        bool $isRefresh,
+    ): array {
+        $text = $this->renderActiveCard($bot, $states, $startedAt, $updatedAt, $isRefresh);
+        /** @var GroupChannelAlertState $first */
+        $first = $states->first();
+        $oblast = $this->scopeName($first->scope_region_uid, $first->region_name);
+        $history = $this->partialClearHistory(
+            $bot,
+            $first->scope_region_uid,
+            $first->alert_type,
+            $cycleStartedAt,
+            $oblast,
+        );
+
+        if ($history === '') {
+            return ['text' => $text];
+        }
+
+        $heading = '🔻 Відбій під час цієї тривоги:';
+        $separator = "\n\n{$heading}\n";
+        $availableHistoryUnits = 4096
+            - $this->telegramUtf16Length($text)
+            - $this->telegramUtf16Length($separator);
+
+        if ($availableHistoryUnits <= 1) {
+            return ['text' => $text];
+        }
+
+        if ($this->telegramUtf16Length($history) > $availableHistoryUnits) {
+            $history = rtrim(mb_substr($history, 0, max(1, $availableHistoryUnits - 1))).'…';
+        }
+
+        $section = $separator.$history;
+        $updatedMarker = "\n🔄";
+        $insertAt = strpos($text, $updatedMarker);
+
+        if ($insertAt === false) {
+            $before = $text;
+            $text .= $section;
+        } else {
+            $before = substr($text, 0, $insertAt);
+            $text = $before.$section.substr($text, $insertAt);
+        }
+
+        return [
+            'text' => $text,
+            'entities' => [[
+                'type' => 'spoiler',
+                'offset' => $this->telegramUtf16Length($before."\n\n{$heading}\n"),
+                'length' => $this->telegramUtf16Length($history),
+            ]],
+        ];
+    }
+
+    private function partialClearHistory(
+        GroupChannelBot $bot,
+        ?string $scopeRegionUid,
+        string $alertType,
+        CarbonImmutable $cycleStartedAt,
+        string $oblast,
+    ): string {
+        return GroupChannelAlertEvent::query()
+            ->where('group_channel_bot_id', $bot->id)
+            ->where('kind', GroupChannelAlertEvent::KIND_END)
+            ->where('scope_region_uid', $scopeRegionUid)
+            ->where('alert_type', $alertType)
+            ->where('status', GroupChannelAlertEvent::STATUS_SENT)
+            ->where('event_at', '>=', $cycleStartedAt)
+            ->orderBy('event_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (GroupChannelAlertEvent $event): string => '› '
+                .$this->territoryLabel($event->region_name, $oblast)
+                .' — '.$event->event_at->timezone('Europe/Kyiv')->format('H:i'))
+            ->unique()
+            ->values()
+            ->implode("\n");
+    }
+
+    private function telegramUtf16Length(string $value): int
+    {
+        return intdiv(strlen(mb_convert_encoding($value, 'UTF-16LE', 'UTF-8')), 2);
     }
 
     /**
