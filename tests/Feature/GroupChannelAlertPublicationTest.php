@@ -42,16 +42,25 @@ class GroupChannelAlertPublicationTest extends TestCase
         ]);
 
         $this->assertFalse($started['baseline']);
-        $this->assertSame(1, $started['queued']);
+        $this->assertSame(0, $started['queued']);
         $this->assertSame(1, $started['sent']);
-        $this->assertDatabaseHas('group_channel_alert_events', [
+        $this->assertDatabaseMissing('group_channel_alert_events', [
             'group_channel_bot_id' => $bot->id,
             'kind' => GroupChannelAlertEvent::KIND_START,
-            'region_uid' => '24',
-            'status' => GroupChannelAlertEvent::STATUS_SENT,
+        ]);
+        $this->assertDatabaseHas('group_channel_alert_cards', [
+            'group_channel_bot_id' => $bot->id,
+            'scope_region_uid' => '14',
+            'telegram_message_id' => null,
+        ]);
+        $this->assertDatabaseHas('group_channel_alert_cards', [
+            'group_channel_bot_id' => $bot->id,
+            'scope_region_uid' => '24',
+            'telegram_message_id' => 101,
         ]);
         Http::assertSent(function (Request $request): bool {
-            return str_contains((string) $request['text'], 'Черкаська область')
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains((string) $request['text'], 'Черкаська область')
                 && str_contains((string) $request['text'], 'Повітряна тривога');
         });
 
@@ -60,15 +69,143 @@ class GroupChannelAlertPublicationTest extends TestCase
         $this->assertSame(2, $ended['queued']);
         $this->assertSame(2, $ended['sent']);
         $this->assertDatabaseCount('group_channel_alert_states', 0);
-        $this->assertDatabaseCount('group_channel_alert_events', 3);
-        Http::assertSentCount(2);
+        $this->assertDatabaseCount('group_channel_alert_cards', 0);
+        $this->assertDatabaseCount('group_channel_alert_events', 2);
         Http::assertSent(function (Request $request): bool {
-            $text = (string) $request['text'];
-
-            return str_contains($text, 'ВІДБІЙ ТРИВОГИ')
-                && str_contains($text, 'Київська область')
-                && str_contains($text, 'Черкаська область');
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains((string) $request['text'], 'ВІДБІЙ ТРИВОГИ')
+                && str_contains((string) $request['text'], 'Київська область');
         });
+        Http::assertSent(function (Request $request): bool {
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains((string) $request['text'], 'ВІДБІЙ ТРИВОГИ')
+                && str_contains((string) $request['text'], 'Черкаська область');
+        });
+        Http::assertSent(function (Request $request): bool {
+            return str_ends_with($request->url(), '/deleteMessage')
+                && (int) $request['message_id'] === 101;
+        });
+    }
+
+    public function test_partial_all_clear_publishes_green_post_and_replaces_active_card(): void
+    {
+        $nextMessageId = 500;
+        Http::fake(function (Request $request) use (&$nextMessageId) {
+            if (str_ends_with($request->url(), '/deleteMessage')) {
+                return Http::response(['ok' => true, 'result' => true]);
+            }
+
+            return Http::response([
+                'ok' => true,
+                'result' => ['message_id' => ++$nextMessageId],
+            ]);
+        });
+
+        $bot = $this->alertBot();
+        $service = app(GroupChannelAlertPublicationService::class);
+        $service->processSnapshot($bot, []);
+
+        $initial = $service->processSnapshot($bot->fresh(), [
+            $this->alert(124, 'м. Харків та тергромада', 'city', 4101, 'air_raid', 22),
+            $this->alert(2201, 'Купʼянський район', 'raion', 4102, 'air_raid', 22),
+            $this->alert(2202, 'Чугуївський район', 'raion', 4103, 'air_raid', 22),
+        ]);
+
+        $this->assertSame(0, $initial['queued']);
+        $this->assertSame(1, $initial['sent']);
+        $this->assertDatabaseHas('group_channel_alert_cards', [
+            'group_channel_bot_id' => $bot->id,
+            'scope_region_uid' => '22',
+            'alert_type' => 'air_raid',
+            'telegram_message_id' => 501,
+        ]);
+
+        $partial = $service->processSnapshot($bot->fresh(), [
+            $this->alert(2201, 'Купʼянський район', 'raion', 4102, 'air_raid', 22),
+            $this->alert(2202, 'Чугуївський район', 'raion', 4103, 'air_raid', 22),
+        ]);
+
+        $this->assertSame(1, $partial['queued']);
+        $this->assertSame(2, $partial['sent']);
+        $this->assertDatabaseHas('group_channel_alert_events', [
+            'group_channel_bot_id' => $bot->id,
+            'kind' => GroupChannelAlertEvent::KIND_END,
+            'region_uid' => '124',
+            'scope_region_uid' => '22',
+            'status' => GroupChannelAlertEvent::STATUS_SENT,
+        ]);
+        $this->assertDatabaseHas('group_channel_alert_cards', [
+            'group_channel_bot_id' => $bot->id,
+            'scope_region_uid' => '22',
+            'telegram_message_id' => 503,
+        ]);
+
+        Http::assertSent(function (Request $request): bool {
+            $text = (string) ($request['text'] ?? '');
+
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains($text, 'ВІДБІЙ ТРИВОГИ')
+                && str_contains($text, 'м. Харків та тергромада');
+        });
+        Http::assertSent(function (Request $request): bool {
+            $text = (string) ($request['text'] ?? '');
+
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains($text, 'Купʼянський район')
+                && str_contains($text, 'Чугуївський район')
+                && ! str_contains($text, 'м. Харків та тергромада')
+                && str_contains($text, '🔄 Оновлено:');
+        });
+        Http::assertSent(function (Request $request): bool {
+            return str_ends_with($request->url(), '/deleteMessage')
+                && (int) $request['message_id'] === 501;
+        });
+
+        $fullClear = $service->processSnapshot($bot->fresh(), []);
+
+        $this->assertSame(2, $fullClear['queued']);
+        $this->assertSame(2, $fullClear['sent']);
+        $this->assertDatabaseCount('group_channel_alert_states', 0);
+        $this->assertDatabaseCount('group_channel_alert_cards', 0);
+        Http::assertSent(function (Request $request): bool {
+            $text = (string) ($request['text'] ?? '');
+
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains($text, 'ВІДБІЙ ТРИВОГИ')
+                && str_contains($text, 'Купʼянський район')
+                && str_contains($text, 'Чугуївський район');
+        });
+        Http::assertSent(function (Request $request): bool {
+            return str_ends_with($request->url(), '/deleteMessage')
+                && (int) $request['message_id'] === 503;
+        });
+    }
+
+    public function test_unchanged_snapshot_does_not_republish_active_card(): void
+    {
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response([
+                'ok' => true,
+                'result' => ['message_id' => 601],
+            ]),
+        ]);
+
+        $bot = $this->alertBot();
+        $service = app(GroupChannelAlertPublicationService::class);
+        $service->processSnapshot($bot, []);
+
+        $alerts = [
+            $this->alert(124, 'м. Харків та тергромада', 'city', 5101, 'air_raid', 22),
+            $this->alert(2201, 'Купʼянський район', 'raion', 5102, 'air_raid', 22),
+        ];
+        $service->processSnapshot($bot->fresh(), $alerts);
+        Http::assertSentCount(1);
+
+        $unchanged = $service->processSnapshot($bot->fresh(), $alerts);
+
+        $this->assertSame(0, $unchanged['queued']);
+        $this->assertSame(0, $unchanged['sent']);
+        Http::assertSentCount(1);
     }
 
     public function test_all_supported_location_levels_and_notes_are_published(): void
@@ -111,17 +248,19 @@ class GroupChannelAlertPublicationTest extends TestCase
 
         $this->assertFalse($result['baseline']);
         $this->assertSame(4, $result['active']);
-        $this->assertSame(4, $result['queued']);
-        $this->assertSame(4, $result['sent']);
+        $this->assertSame(0, $result['queued']);
+        $this->assertSame(1, $result['sent']);
         $this->assertDatabaseHas('group_channel_alert_states', [
             'group_channel_bot_id' => $bot->id,
             'region_uid' => '2201',
+            'scope_region_uid' => '22',
             'region_name' => 'Харківська область — Берестинський район',
             'details' => 'КАБИ → на північ Харківщини!',
         ]);
         $this->assertDatabaseHas('group_channel_alert_states', [
             'group_channel_bot_id' => $bot->id,
             'region_uid' => '2202',
+            'scope_region_uid' => '22',
             'region_name' => 'Харківська область — Лозівський район — Лозівська міська громада',
         ]);
         $this->assertDatabaseMissing('group_channel_alert_states', [
@@ -132,7 +271,8 @@ class GroupChannelAlertPublicationTest extends TestCase
         Http::assertSent(function (Request $request): bool {
             $text = (string) $request['text'];
 
-            return str_contains($text, 'Харківська область — Берестинський район')
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains($text, 'Харківська область — Берестинський район')
                 && str_contains($text, '🎯 КАБИ → на північ Харківщини!')
                 && str_contains($text, '🕒 Початок: 10:00');
         });
@@ -166,16 +306,19 @@ class GroupChannelAlertPublicationTest extends TestCase
         $this->assertDatabaseHas('group_channel_alert_states', [
             'group_channel_bot_id' => $bot->id,
             'region_uid' => '2201',
+            'scope_region_uid' => '22',
             'alert_type' => 'air_raid',
         ]);
         $this->assertDatabaseHas('group_channel_alert_states', [
             'group_channel_bot_id' => $bot->id,
             'region_uid' => '124',
+            'scope_region_uid' => '22',
             'alert_type' => 'air_raid',
         ]);
         $this->assertDatabaseHas('group_channel_alert_states', [
             'group_channel_bot_id' => $bot->id,
             'region_uid' => '2202',
+            'scope_region_uid' => '22',
             'alert_type' => 'air_raid',
         ]);
         $this->assertDatabaseMissing('group_channel_alert_states', [
