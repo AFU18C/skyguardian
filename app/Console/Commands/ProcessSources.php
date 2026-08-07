@@ -11,7 +11,9 @@ use Throwable;
 
 class ProcessSources extends Command
 {
-    protected $signature = 'skyguardian:sources:process {--limit=40 : Максимальное количество источников за запуск}';
+    protected $signature = 'skyguardian:sources:process
+        {--type= : Тип источника: news или air_alert}
+        {--limit=40 : Максимальное количество источников за запуск}';
 
     protected $description = 'Обработать Telegram-источники, для которых наступило время проверки';
 
@@ -21,13 +23,21 @@ class ProcessSources extends Command
         SourcePollingSettings $polling,
     ): int {
         $limit = max(1, min((int) $this->option('limit'), 40));
+        $requestedType = trim((string) $this->option('type'));
+
+        if ($requestedType !== '' && ! in_array($requestedType, [Source::TYPE_NEWS, Source::TYPE_AIR_ALERT], true)) {
+            $this->error('Недопустимый тип источника.');
+
+            return self::INVALID;
+        }
+
+        $types = $requestedType !== ''
+            ? [$requestedType]
+            : [Source::TYPE_NEWS, Source::TYPE_AIR_ALERT];
+
         $failed = 0;
 
-        foreach ([Source::TYPE_NEWS, Source::TYPE_AIR_ALERT] as $type) {
-            if (! $polling->shouldRun($type)) {
-                continue;
-            }
-
+        foreach ($types as $type) {
             try {
                 $sources = $scheduler->due($limit, $type);
 
