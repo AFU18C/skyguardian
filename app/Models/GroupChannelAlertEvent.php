@@ -30,6 +30,7 @@ class GroupChannelAlertEvent extends Model
         'alert_type',
         'details',
         'event_at',
+        'started_at',
         'status',
         'attempts',
         'sending_started_at',
@@ -46,6 +47,7 @@ class GroupChannelAlertEvent extends Model
     {
         return [
             'event_at' => UtcDateTime::class,
+            'started_at' => UtcDateTime::class,
             'attempts' => 'integer',
             'sending_started_at' => UtcDateTime::class,
             'sent_at' => UtcDateTime::class,
