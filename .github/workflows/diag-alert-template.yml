@@ -1,0 +1,20 @@
+name: Alert Template Diagnostic
+
+on:
+  push:
+    branches:
+      - feature/alert-territory-times
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: self-hosted
+    steps:
+      - name: Inspect production alert templates
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cd /var/www/skyguardian
+          php artisan tinker --execute='App\Models\GroupChannelBot::query()->where("is_active", true)->get()->each(function ($bot) { if ($bot->moduleEnabled(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS)) { dump(["id" => $bot->id, "group" => $bot->group_name, "start_template" => $bot->moduleSetting(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS, "start_template"), "map_button_enabled" => $bot->moduleSetting(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS, "map_button_enabled"), "publish_start" => $bot->moduleSetting(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS, "publish_start"), "publish_end" => $bot->moduleSetting(App\Models\GroupChannelBot::MODULE_ALERT_PUBLICATIONS, "publish_end")]); } });'
