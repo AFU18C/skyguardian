@@ -199,14 +199,34 @@ class GroupChannelAlertPublicationService
         }
 
         $sent = 0;
+        $endTemplate = trim((string) $bot->moduleSetting(
+            GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+            'end_template',
+            GroupChannelBot::DEFAULT_ALERT_END_TEMPLATE,
+        ));
+        $endTemplate = $endTemplate !== '' ? $endTemplate : GroupChannelBot::DEFAULT_ALERT_END_TEMPLATE;
+        $aggregateEndEvents = in_array($this->normalizeTemplate($endTemplate), [
+            $this->normalizeTemplate(GroupChannelBot::LEGACY_ALERT_END_TEMPLATE),
+            $this->normalizeTemplate(GroupChannelBot::DEFAULT_ALERT_END_TEMPLATE),
+        ], true);
 
-        foreach ($events->groupBy(fn (GroupChannelAlertEvent $event): string => implode('|', [
-            $event->kind,
-            $event->scope_region_uid ?: 'unknown-scope',
-            $event->alert_type,
-            $event->event_at->timezone('Europe/Kyiv')->format('Y-m-d H:i'),
-            hash('sha256', trim((string) $event->details)),
-        ])) as $batch) {
+        foreach ($events->groupBy(function (GroupChannelAlertEvent $event) use ($aggregateEndEvents): string {
+            if ($event->kind === GroupChannelAlertEvent::KIND_END && $aggregateEndEvents) {
+                return implode('|', [
+                    $event->kind,
+                    $event->alert_type,
+                    $event->event_at->format('Y-m-d H:i:s'),
+                ]);
+            }
+
+            return implode('|', [
+                $event->kind,
+                $event->scope_region_uid ?: 'unknown-scope',
+                $event->alert_type,
+                $event->event_at->timezone('Europe/Kyiv')->format('Y-m-d H:i'),
+                hash('sha256', trim((string) $event->details)),
+            ]);
+        }) as $batch) {
             $ids = $batch->pluck('id')->all();
             $claimed = GroupChannelAlertEvent::query()
                 ->whereIn('id', $ids)
@@ -588,6 +608,7 @@ class GroupChannelAlertPublicationService
                 'alert_type' => $item['alert_type'],
                 'details' => $item['details'] ?? null,
                 'event_at' => $eventAt,
+                'started_at' => $item['started_at'] ?? null,
                 'status' => GroupChannelAlertEvent::STATUS_PENDING,
             ],
         );
@@ -623,6 +644,11 @@ class GroupChannelAlertPublicationService
             $template = GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE;
         }
 
+        if ($first->kind === GroupChannelAlertEvent::KIND_END
+            && $this->normalizeTemplate($template) === $this->normalizeTemplate(GroupChannelBot::LEGACY_ALERT_END_TEMPLATE)) {
+            $template = GroupChannelBot::DEFAULT_ALERT_END_TEMPLATE;
+        }
+
         $regions = $events
             ->pluck('region_name')
             ->filter()
@@ -645,6 +671,9 @@ class GroupChannelAlertPublicationService
             ->unique()
             ->values()
             ->implode("\n");
+        $clearBlocks = $first->kind === GroupChannelAlertEvent::KIND_END
+            ? $this->renderAllClearBlocks($events)
+            : '';
         $hasDetailsVariable = str_contains($template, '{details}');
         $message = strtr($template, [
             '{region}' => $regions,
@@ -654,6 +683,7 @@ class GroupChannelAlertPublicationService
             '{headline}' => $this->alertHeadline($first->alert_type),
             '{oblast}' => $oblast,
             '{territories}' => $territories,
+            '{clear_blocks}' => $clearBlocks,
             '{updated}' => $first->event_at->timezone('Europe/Kyiv')->format('H:i'),
         ]);
 
@@ -745,6 +775,73 @@ class GroupChannelAlertPublicationService
         }
 
         return $this->finishMessage($message);
+    }
+
+    /**
+     * @param  Collection<int, GroupChannelAlertEvent>  $events
+     */
+    private function renderAllClearBlocks(Collection $events): string
+    {
+        return $events
+            ->groupBy(fn (GroupChannelAlertEvent $event): string => $event->scope_region_uid ?: 'unknown-scope')
+            ->sortBy(function (Collection $scopeEvents): string {
+                /** @var GroupChannelAlertEvent $first */
+                $first = $scopeEvents->first();
+
+                return $this->scopeName($first->scope_region_uid, $first->region_name);
+            })
+            ->map(function (Collection $scopeEvents): string {
+                /** @var GroupChannelAlertEvent $first */
+                $first = $scopeEvents->first();
+                $oblast = $this->scopeName($first->scope_region_uid, $first->region_name);
+                $sorted = $scopeEvents->sortBy(
+                    fn (GroupChannelAlertEvent $event): string => $this->territoryLabel($event->region_name, $oblast),
+                );
+                $territories = $sorted
+                    ->map(fn (GroupChannelAlertEvent $event): string => '› '
+                        .$this->territoryLabel($event->region_name, $oblast)
+                        .' — '.$event->event_at->timezone('Europe/Kyiv')->format('H:i'))
+                    ->unique()
+                    ->values()
+                    ->implode("\n");
+                $durations = $sorted
+                    ->map(fn (GroupChannelAlertEvent $event): string => '› '
+                        .$this->territoryLabel($event->region_name, $oblast)
+                        .' — '.$this->formatAlertDuration($event->started_at, $event->event_at))
+                    ->unique()
+                    ->values()
+                    ->implode("\n");
+
+                return "📍 {$oblast}\n\n🟢 СТАТУС: БЕЗПЕЧНО\n{$territories}\n\n🕒 Тривога тривала:\n{$durations}";
+            })
+            ->implode("\n\n");
+    }
+
+    private function formatAlertDuration(?CarbonImmutable $startedAt, CarbonImmutable $endedAt): string
+    {
+        if (! $startedAt) {
+            return 'невідомо';
+        }
+
+        $totalMinutes = max(0, (int) floor($startedAt->diffInMinutes($endedAt)));
+        $days = intdiv($totalMinutes, 1440);
+        $hours = intdiv($totalMinutes % 1440, 60);
+        $minutes = $totalMinutes % 60;
+        $parts = [];
+
+        if ($days > 0) {
+            $parts[] = $days.' д';
+        }
+
+        if ($hours > 0) {
+            $parts[] = $hours.' год';
+        }
+
+        if ($minutes > 0 || $parts === []) {
+            $parts[] = $minutes.' хв';
+        }
+
+        return implode(' ', $parts);
     }
 
     private function alertHeadline(string $alertType): string

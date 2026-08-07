@@ -7,7 +7,7 @@ return new class extends Migration
 {
     private const LEGACY = "✅ ВІДБІЙ ТРИВОГИ\n\n📍 {region}\n🕒 Відбій: {time}";
 
-    private const CURRENT = "✅ ВІДБІЙ ТРИВОГИ\n\n📍 {oblast}\n\n🟢 СТАТУС: БЕЗПЕЧНО\n{territories}\n\n🕒 Тривога тривала:\n{durations}";
+    private const CURRENT = "✅ ВІДБІЙ ТРИВОГИ\n\n{clear_blocks}";
 
     public function up(): void
     {
