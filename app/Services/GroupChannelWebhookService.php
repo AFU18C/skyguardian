@@ -12,7 +12,10 @@ use Throwable;
 
 class GroupChannelWebhookService
 {
-    public function __construct(private readonly GroupChannelTelegramService $telegram) {}
+    public function __construct(
+        private readonly GroupChannelTelegramService $telegram,
+        private readonly GroupChannelAlertPublicationService $alertPublications,
+    ) {}
 
     public function handle(GroupChannelBot $bot, array $update): void
     {
@@ -219,6 +222,10 @@ class GroupChannelWebhookService
 
     private function handleCallback(GroupChannelBot $bot, array $callback): void
     {
+        if ($this->alertPublications->handleHistoryCallback($bot, $callback)) {
+            return;
+        }
+
         $data = (string) ($callback['data'] ?? '');
         $callbackId = $callback['id'] ?? null;
         $fromId = isset($callback['from']['id']) ? (string) $callback['from']['id'] : null;

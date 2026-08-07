@@ -172,6 +172,84 @@ class GroupChannelAlertPublicationService
         });
     }
 
+    public function handleHistoryCallback(GroupChannelBot $bot, array $callback): bool
+    {
+        $data = (string) ($callback['data'] ?? '');
+
+        if (! str_starts_with($data, 'sg_ah:')) {
+            return false;
+        }
+
+        $callbackId = $callback['id'] ?? null;
+        $message = is_array($callback['message'] ?? null) ? $callback['message'] : [];
+        [, $scopeRegionUid, $alertType, $cycleTimestamp, $action] = array_pad(
+            explode(':', $data, 5),
+            5,
+            null,
+        );
+        $messageId = $message['message_id'] ?? null;
+        $chatId = $message['chat']['id'] ?? null;
+        $currentText = $message['text'] ?? null;
+
+        if (! is_string($scopeRegionUid)
+            || ! array_key_exists($scopeRegionUid, GroupChannelBot::ALERT_REGIONS)
+            || ! is_string($alertType)
+            || ! array_key_exists($alertType, GroupChannelBot::ALERT_TYPES)
+            || ! ctype_digit((string) $cycleTimestamp)
+            || ! in_array($action, ['show', 'hide'], true)
+            || ! is_numeric($messageId)
+            || (string) $chatId !== (string) $bot->chat_id
+            || ! is_string($currentText)) {
+            $this->answerHistoryCallback($bot, $callbackId, 'Історія недоступна.');
+
+            return true;
+        }
+
+        $cycleStartedAt = CarbonImmutable::createFromTimestampUTC((int) $cycleTimestamp);
+        $historyUntil = is_numeric($message['date'] ?? null)
+            ? CarbonImmutable::createFromTimestampUTC((int) $message['date'])->addSecond()
+            : CarbonImmutable::now('UTC');
+        $oblast = GroupChannelBot::ALERT_REGIONS[$scopeRegionUid];
+        $history = $this->partialClearHistoryEntries(
+            $bot,
+            $scopeRegionUid,
+            $alertType,
+            $cycleStartedAt,
+            $oblast,
+            $historyUntil,
+        );
+
+        if ($history->isEmpty()) {
+            $this->answerHistoryCallback($bot, $callbackId, 'Історія відбоїв відсутня.');
+
+            return true;
+        }
+
+        $expanded = $action === 'show';
+        $updatedText = $this->toggleHistorySection($currentText, $history, $expanded);
+
+        if ($updatedText === null) {
+            $this->answerHistoryCallback($bot, $callbackId, 'Не вдалося знайти блок історії.');
+
+            return true;
+        }
+
+        $this->telegram->request($bot, 'editMessageText', [
+            'chat_id' => $bot->chat_id,
+            'message_id' => (int) $messageId,
+            'text' => $updatedText,
+            'reply_markup' => $this->historyReplyMarkup(
+                $scopeRegionUid,
+                $alertType,
+                $cycleStartedAt,
+                $expanded,
+            ),
+        ]);
+        $this->answerHistoryCallback($bot, $callbackId);
+
+        return true;
+    }
+
     private function deliverPending(GroupChannelBot $bot): int
     {
         $events = $bot->alertEvents()
@@ -722,7 +800,7 @@ class GroupChannelAlertPublicationService
 
     /**
      * @param  Collection<int, GroupChannelAlertState>  $states
-     * @return array{text: string, entities?: array<int, array{type: string, offset: int, length: int}>}
+     * @return array{text: string, reply_markup?: array<string, mixed>}
      */
     private function renderActiveCardPayload(
         GroupChannelBot $bot,
@@ -736,7 +814,7 @@ class GroupChannelAlertPublicationService
         /** @var GroupChannelAlertState $first */
         $first = $states->first();
         $oblast = $this->scopeName($first->scope_region_uid, $first->region_name);
-        $history = $this->partialClearHistory(
+        $history = $this->partialClearHistoryEntries(
             $bot,
             $first->scope_region_uid,
             $first->alert_type,
@@ -744,60 +822,57 @@ class GroupChannelAlertPublicationService
             $oblast,
         );
 
-        if ($history === '') {
+        if ($history->isEmpty()) {
             return ['text' => $text];
         }
 
-        $heading = '🔻 Відбій під час цієї тривоги:';
-        $separator = "\n\n{$heading}\n";
-        $availableHistoryUnits = 4096
-            - $this->telegramUtf16Length($text)
-            - $this->telegramUtf16Length($separator);
-
-        if ($availableHistoryUnits <= 1) {
-            return ['text' => $text];
-        }
-
-        if ($this->telegramUtf16Length($history) > $availableHistoryUnits) {
-            $history = rtrim(mb_substr($history, 0, max(1, $availableHistoryUnits - 1))).'…';
-        }
-
-        $section = $separator.$history;
-        $updatedMarker = "\n🔄";
+        $summary = $this->historySummary($history->count());
+        $updatedMarker = "
+🔄";
         $insertAt = strpos($text, $updatedMarker);
+        $text = $insertAt === false
+            ? $this->finishMessage($text."
 
-        if ($insertAt === false) {
-            $before = $text;
-            $text .= $section;
-        } else {
-            $before = substr($text, 0, $insertAt);
-            $text = $before.$section.substr($text, $insertAt);
-        }
+{$summary}")
+            : $this->finishMessage(substr($text, 0, $insertAt)."
+
+{$summary}".substr($text, $insertAt));
 
         return [
             'text' => $text,
-            'entities' => [[
-                'type' => 'spoiler',
-                'offset' => $this->telegramUtf16Length($before."\n\n{$heading}\n"),
-                'length' => $this->telegramUtf16Length($history),
-            ]],
+            'reply_markup' => $this->historyReplyMarkup(
+                (string) $first->scope_region_uid,
+                $first->alert_type,
+                $cycleStartedAt,
+                false,
+            ),
         ];
     }
 
-    private function partialClearHistory(
+    /**
+     * @return Collection<int, string>
+     */
+    private function partialClearHistoryEntries(
         GroupChannelBot $bot,
         ?string $scopeRegionUid,
         string $alertType,
         CarbonImmutable $cycleStartedAt,
         string $oblast,
-    ): string {
-        return GroupChannelAlertEvent::query()
+        ?CarbonImmutable $until = null,
+    ): Collection {
+        $query = GroupChannelAlertEvent::query()
             ->where('group_channel_bot_id', $bot->id)
             ->where('kind', GroupChannelAlertEvent::KIND_END)
             ->where('scope_region_uid', $scopeRegionUid)
             ->where('alert_type', $alertType)
             ->where('status', GroupChannelAlertEvent::STATUS_SENT)
-            ->where('event_at', '>=', $cycleStartedAt)
+            ->where('event_at', '>=', $cycleStartedAt);
+
+        if ($until) {
+            $query->where('event_at', '<=', $until);
+        }
+
+        return $query
             ->orderBy('event_at')
             ->orderBy('id')
             ->get()
@@ -805,8 +880,117 @@ class GroupChannelAlertPublicationService
                 .$this->territoryLabel($event->region_name, $oblast)
                 .' — '.$event->event_at->timezone('Europe/Kyiv')->format('H:i'))
             ->unique()
-            ->values()
-            ->implode("\n");
+            ->values();
+    }
+
+    private function historySummary(int $count): string
+    {
+        $lastTwo = $count % 100;
+        $last = $count % 10;
+        $word = $lastTwo >= 11 && $lastTwo <= 14
+            ? 'територій'
+            : match ($last) {
+                1 => 'територія',
+                2, 3, 4 => 'території',
+                default => 'територій',
+            };
+
+        return "🔻 Відбій під час цієї тривоги — {$count} {$word}";
+    }
+
+    /** @return array{inline_keyboard: array<int, array<int, array<string, string>>>} */
+    private function historyReplyMarkup(
+        string $scopeRegionUid,
+        string $alertType,
+        CarbonImmutable $cycleStartedAt,
+        bool $expanded,
+    ): array {
+        return [
+            'inline_keyboard' => [[
+                [
+                    'text' => $expanded ? 'Сховати історію ▴' : 'Показати історію ▾',
+                    'callback_data' => implode(':', [
+                        'sg_ah',
+                        $scopeRegionUid,
+                        $alertType,
+                        $cycleStartedAt->getTimestamp(),
+                        $expanded ? 'hide' : 'show',
+                    ]),
+                ],
+            ]],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, string>  $history
+     */
+    private function toggleHistorySection(string $text, Collection $history, bool $expanded): ?string
+    {
+        $marker = '🔻 Відбій під час цієї тривоги';
+        $start = strpos($text, $marker);
+
+        if ($start === false) {
+            return null;
+        }
+
+        $updatedAt = strpos($text, "
+🔄", $start);
+        $before = rtrim(substr($text, 0, $start));
+        $after = $updatedAt === false ? '' : substr($text, $updatedAt);
+
+        if (! $expanded) {
+            return $this->finishMessage(
+                $before."
+
+".$this->historySummary($history->count()).$after,
+            );
+        }
+
+        $visible = $history->values();
+        do {
+            $truncated = $visible->count() < $history->count();
+            $lines = $visible->implode("
+").($truncated ? "
+› …" : '');
+            $candidate = $this->finishMessage(
+                $before."
+
+🔻 Відбій під час цієї тривоги:
+{$lines}".$after,
+            );
+
+            if ($this->telegramUtf16Length($candidate) <= 4096) {
+                return $candidate;
+            }
+
+            $visible->pop();
+        } while ($visible->isNotEmpty());
+
+        return $this->finishMessage(
+            $before."
+
+".$this->historySummary($history->count()).$after,
+        );
+    }
+
+    private function answerHistoryCallback(
+        GroupChannelBot $bot,
+        mixed $callbackId,
+        ?string $text = null,
+    ): void {
+        if (! is_string($callbackId) || $callbackId === '') {
+            return;
+        }
+
+        try {
+            $payload = ['callback_query_id' => $callbackId];
+            if ($text !== null && $text !== '') {
+                $payload['text'] = $text;
+            }
+            $this->telegram->request($bot, 'answerCallbackQuery', $payload);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     private function telegramUtf16Length(string $value): int
