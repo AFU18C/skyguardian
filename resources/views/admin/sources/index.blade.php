@@ -141,7 +141,7 @@
                             <option value="hours" @selected(old('polling_interval_unit', $pollingSettings['interval_unit']) === 'hours')>Часы</option>
                         </select>
                     </div>
-                    <small>Минимальный интервал — 10 секунд. У каждого источника по-прежнему остаётся собственный интервал проверки.</small>
+                    <small>Минимальный интервал — 1 секунда. У каждого источника по-прежнему остаётся собственный интервал проверки.</small>
                     @error('polling_interval_value')<small class="sg-field-error">{{ $message }}</small>@enderror
                     @error('polling_interval_unit')<small class="sg-field-error">{{ $message }}</small>@enderror
                 </div>
