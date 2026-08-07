@@ -187,6 +187,80 @@ class GroupChannelAlertPublicationTest extends TestCase
         });
     }
 
+    public function test_partial_clear_history_is_spoilered_in_red_card_and_green_clear_posts_remain(): void
+    {
+        $nextMessageId = 900;
+        Http::fake(function (Request $request) use (&$nextMessageId) {
+            if (str_ends_with($request->url(), '/deleteMessage')) {
+                return Http::response(['ok' => true, 'result' => true]);
+            }
+
+            return Http::response([
+                'ok' => true,
+                'result' => ['message_id' => ++$nextMessageId],
+            ]);
+        });
+
+        $bot = $this->alertBot();
+        $service = app(GroupChannelAlertPublicationService::class);
+        $service->processSnapshot($bot, []);
+
+        $service->processSnapshot($bot->fresh(), [
+            $this->alert(1401, 'Бориспільський район', 'raion', 5101, 'air_raid', 14),
+            $this->alert(1402, 'Броварський район', 'raion', 5102, 'air_raid', 14),
+            $this->alert(1403, 'Бучанський район', 'raion', 5103, 'air_raid', 14),
+        ]);
+
+        $beforePartial = count(Http::recorded());
+        $service->processSnapshot($bot->fresh(), [
+            $this->alert(1401, 'Бориспільський район', 'raion', 5101, 'air_raid', 14),
+            $this->alert(1402, 'Броварський район', 'raion', 5102, 'air_raid', 14),
+        ]);
+
+        $partialRequests = collect(Http::recorded())
+            ->slice($beforePartial)
+            ->map(fn (array $record): Request => $record[0]);
+        $green = $partialRequests->first(fn (Request $request): bool => str_ends_with($request->url(), '/sendMessage')
+            && str_contains((string) ($request['text'] ?? ''), 'ВІДБІЙ ТРИВОГИ'));
+        $red = $partialRequests->first(fn (Request $request): bool => str_ends_with($request->url(), '/sendMessage')
+            && str_contains((string) ($request['text'] ?? ''), 'СТАТУС: АКТИВНА'));
+
+        $this->assertNotNull($green);
+        $this->assertNotNull($red);
+        $this->assertStringContainsString('Бучанський район', (string) $green['text']);
+        $this->assertStringContainsString('🔻 Відбій під час цієї тривоги:', (string) $red['text']);
+        $this->assertStringContainsString('› Бучанський район — ', (string) $red['text']);
+        $activePart = strstr((string) $red['text'], '🔻 Відбій під час цієї тривоги:', true);
+        $this->assertIsString($activePart);
+        $this->assertStringNotContainsString('Бучанський район', $activePart);
+        $entities = (array) ($red['entities'] ?? []);
+        $this->assertCount(1, $entities);
+        $this->assertSame('spoiler', $entities[0]['type'] ?? null);
+        $this->assertGreaterThan(0, (int) ($entities[0]['offset'] ?? 0));
+        $this->assertGreaterThan(0, (int) ($entities[0]['length'] ?? 0));
+
+        $beforeSecondPartial = count(Http::recorded());
+        $service->processSnapshot($bot->fresh(), [
+            $this->alert(1401, 'Бориспільський район', 'raion', 5101, 'air_raid', 14),
+        ]);
+
+        $secondRequests = collect(Http::recorded())
+            ->slice($beforeSecondPartial)
+            ->map(fn (array $record): Request => $record[0]);
+        $secondGreen = $secondRequests->first(fn (Request $request): bool => str_ends_with($request->url(), '/sendMessage')
+            && str_contains((string) ($request['text'] ?? ''), 'ВІДБІЙ ТРИВОГИ'));
+        $secondRed = $secondRequests->first(fn (Request $request): bool => str_ends_with($request->url(), '/sendMessage')
+            && str_contains((string) ($request['text'] ?? ''), 'СТАТУС: АКТИВНА'));
+
+        $this->assertNotNull($secondGreen);
+        $this->assertStringContainsString('Броварський район', (string) $secondGreen['text']);
+        $this->assertNotNull($secondRed);
+        $this->assertStringContainsString('› Бучанський район — ', (string) $secondRed['text']);
+        $this->assertStringContainsString('› Броварський район — ', (string) $secondRed['text']);
+        $this->assertStringContainsString('› Бориспільський район — ', strstr((string) $secondRed['text'], '🔻 Відбій під час цієї тривоги:', true) ?: '');
+        $this->assertCount(1, (array) ($secondRed['entities'] ?? []));
+    }
+
     public function test_unchanged_snapshot_does_not_republish_active_card(): void
     {
         Http::fake([

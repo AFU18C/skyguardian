@@ -346,11 +346,20 @@ class GroupChannelAlertPublicationService
             }
 
             $isRefresh = $card !== null || $startedAt->lessThan($now->subMinute());
+            $historySince = $card?->created_at?->toImmutable() ?? $now;
+            $cardPayload = $this->renderActiveCardPayload(
+                $bot,
+                $states,
+                $startedAt,
+                $historySince,
+                $now,
+                $isRefresh,
+            );
 
             try {
                 $response = $this->telegram->request($bot, 'sendMessage', [
                     'chat_id' => $bot->chat_id,
-                    'text' => $this->renderActiveCard($bot, $states, $startedAt, $now, $isRefresh),
+                    ...$cardPayload,
                     'disable_notification' => (bool) $bot->moduleSetting(
                         GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
                         'disable_notification',
@@ -706,6 +715,87 @@ class GroupChannelAlertPublicationService
         }
 
         return $this->finishMessage($message);
+    }
+
+    /**
+     * @param  Collection<int, GroupChannelAlertState>  $states
+     * @return array{text: string, entities?: array<int, array{type: string, offset: int, length: int}>}
+     */
+    private function renderActiveCardPayload(
+        GroupChannelBot $bot,
+        Collection $states,
+        CarbonImmutable $startedAt,
+        CarbonImmutable $historySince,
+        CarbonImmutable $updatedAt,
+        bool $isRefresh,
+    ): array {
+        $text = $this->renderActiveCard($bot, $states, $startedAt, $updatedAt, $isRefresh);
+        /** @var GroupChannelAlertState $first */
+        $first = $states->first();
+        $oblast = $this->scopeName($first->scope_region_uid, $first->region_name);
+        $history = $this->partialClearHistory(
+            $bot,
+            $first->scope_region_uid,
+            $first->alert_type,
+            $historySince,
+            $oblast,
+        );
+
+        if ($history === '') {
+            return ['text' => $text];
+        }
+
+        $heading = '🔻 Відбій під час цієї тривоги:';
+        $section = "\n\n{$heading}\n{$history}";
+        $updatedMarker = "\n🔄";
+        $insertAt = strpos($text, $updatedMarker);
+
+        if ($insertAt === false) {
+            $before = $text;
+            $text .= $section;
+        } else {
+            $before = substr($text, 0, $insertAt);
+            $text = $before.$section.substr($text, $insertAt);
+        }
+
+        return [
+            'text' => $text,
+            'entities' => [[
+                'type' => 'spoiler',
+                'offset' => $this->telegramUtf16Length($before."\n\n{$heading}\n"),
+                'length' => $this->telegramUtf16Length($history),
+            ]],
+        ];
+    }
+
+    private function partialClearHistory(
+        GroupChannelBot $bot,
+        ?string $scopeRegionUid,
+        string $alertType,
+        CarbonImmutable $historySince,
+        string $oblast,
+    ): string {
+        return GroupChannelAlertEvent::query()
+            ->where('group_channel_bot_id', $bot->id)
+            ->where('kind', GroupChannelAlertEvent::KIND_END)
+            ->where('scope_region_uid', $scopeRegionUid)
+            ->where('alert_type', $alertType)
+            ->where('status', GroupChannelAlertEvent::STATUS_SENT)
+            ->where('event_at', '>=', $historySince)
+            ->orderBy('event_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (GroupChannelAlertEvent $event): string => '› '
+                .$this->territoryLabel($event->region_name, $oblast)
+                .' — '.$event->event_at->timezone('Europe/Kyiv')->format('H:i'))
+            ->unique()
+            ->values()
+            ->implode("\n");
+    }
+
+    private function telegramUtf16Length(string $value): int
+    {
+        return intdiv(strlen(mb_convert_encoding($value, 'UTF-16LE', 'UTF-8')), 2);
     }
 
     /**
