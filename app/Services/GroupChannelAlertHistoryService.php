@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
 
 class GroupChannelAlertHistoryService
 {
-    public function __construct(private readonly GroupChannelTelegramService $telegram) {}
+    public function __construct(private readonly DirectGroupChannelTelegramService $telegram) {}
 
     public function handleStart(GroupChannelBot $bot, array $message): bool
     {

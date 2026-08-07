@@ -176,6 +176,10 @@ class GroupChannelAlertPublicationService
     {
         $data = (string) ($callback['data'] ?? '');
 
+        if (app(GroupChannelAlertHistoryService::class)->handleRefreshCallback($bot, $callback)) {
+            return true;
+        }
+
         if (! str_starts_with($data, 'sg_ah:')) {
             return false;
         }
@@ -239,45 +243,7 @@ class GroupChannelAlertPublicationService
 
     public function handleHistoryStart(GroupChannelBot $bot, array $message): bool
     {
-        $chat = is_array($message['chat'] ?? null) ? $message['chat'] : [];
-        $chatId = $chat['id'] ?? null;
-        $text = trim((string) ($message['text'] ?? ''));
-
-        if (($chat['type'] ?? null) !== 'private'
-            || ! is_numeric($chatId)
-            || ! preg_match('/^\/start(?:@[A-Za-z0-9_]+)?\s+(ah_[A-Za-z0-9_]+)$/', $text, $matches)) {
-            return false;
-        }
-
-        $history = $this->parseHistoryStartPayload($matches[1]);
-        if ($history === null || $history['bot_id'] !== (int) $bot->id) {
-            $this->telegram->request($bot, 'sendMessage', [
-                'chat_id' => (int) $chatId,
-                'text' => 'Посилання на історію тривоги недійсне.',
-            ]);
-
-            return true;
-        }
-
-        $oblast = GroupChannelBot::ALERT_REGIONS[$history['scope_region_uid']];
-        $entries = $this->partialClearHistoryEntries(
-            $bot,
-            $history['scope_region_uid'],
-            $history['alert_type'],
-            $history['cycle_started_at'],
-            $oblast,
-            $history['history_until'],
-        );
-
-        $this->sendPrivateHistory(
-            $bot,
-            (int) $chatId,
-            $oblast,
-            $history['alert_type'],
-            $entries,
-        );
-
-        return true;
+        return app(GroupChannelAlertHistoryService::class)->handleStart($bot, $message);
     }
 
     private function deliverPending(GroupChannelBot $bot): int
