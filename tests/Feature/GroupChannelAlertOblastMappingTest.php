@@ -123,12 +123,18 @@ class GroupChannelAlertOblastMappingTest extends TestCase
             ]);
 
             Http::assertSent(function (Request $request): bool {
+                $text = (string) ($request['text'] ?? '');
+
                 return str_contains($request->url(), 'api.telegram.org')
-                    && str_contains((string) $request['text'], 'Дніпропетровська область — м. Марганець');
+                    && str_contains($text, '📍 Дніпропетровська область')
+                    && str_contains($text, '› м. Марганець — 12:00');
             });
             Http::assertSent(function (Request $request): bool {
+                $text = (string) ($request['text'] ?? '');
+
                 return str_contains($request->url(), 'api.telegram.org')
-                    && str_contains((string) $request['text'], 'Харківська область — Ізюмський район');
+                    && str_contains($text, '📍 Харківська область')
+                    && str_contains($text, '› Ізюмський район — 13:01');
             });
         } finally {
             CarbonImmutable::setTestNow();
