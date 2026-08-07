@@ -56,15 +56,22 @@ class GroupChannelAlertPublicationService
                     'baseline' => true,
                     'active' => count($current),
                     'queued' => 0,
+                    'changed_scopes' => [],
                 ];
             }
 
             $queued = 0;
+            $changedScopes = [];
 
             foreach ($current as $key => $item) {
                 $state = $states->get($key);
 
                 if ($state) {
+                    if ($this->stateChanged($state, $item)) {
+                        $changedScopes[$this->cardKey($state->scope_region_uid, $state->alert_type)] = true;
+                        $changedScopes[$this->cardKey($item['scope_region_uid'], $item['alert_type'])] = true;
+                    }
+
                     $state->update($this->statePayload($item, $now));
                     $states->forget($key);
 
@@ -72,9 +79,12 @@ class GroupChannelAlertPublicationService
                 }
 
                 $lockedBot->alertStates()->create($this->statePayload($item, $now));
+                $changedScopes[$this->cardKey($item['scope_region_uid'], $item['alert_type'])] = true;
             }
 
             foreach ($states as $state) {
+                $changedScopes[$this->cardKey($state->scope_region_uid, $state->alert_type)] = true;
+
                 if ($lockedBot->moduleSetting(
                     GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
                     'publish_end',
@@ -109,6 +119,7 @@ class GroupChannelAlertPublicationService
                 'baseline' => false,
                 'active' => count($current),
                 'queued' => $queued,
+                'changed_scopes' => array_keys($changedScopes),
             ];
         });
 
@@ -121,11 +132,13 @@ class GroupChannelAlertPublicationService
                 'publish_start',
                 true,
             )) {
-                $sent += $this->syncActiveCards($freshBot, $now);
+                $sent += $this->syncActiveCards($freshBot, $now, $result['changed_scopes']);
             } else {
                 $this->removeActiveCards($freshBot);
             }
         }
+
+        unset($result['changed_scopes']);
 
         return [...$result, 'sent' => $sent];
     }
@@ -249,12 +262,16 @@ class GroupChannelAlertPublicationService
         return $sent;
     }
 
-    private function syncActiveCards(GroupChannelBot $bot, CarbonImmutable $now): int
+    /**
+     * @param  array<int, string>  $changedScopes
+     */
+    private function syncActiveCards(GroupChannelBot $bot, CarbonImmutable $now, array $changedScopes): int
     {
         if (! $bot->chat_id) {
             throw new RuntimeException('Сначала проверьте подключение бота, чтобы определить Chat ID.');
         }
 
+        $changedScopes = array_fill_keys($changedScopes, true);
         $groups = GroupChannelAlertState::query()
             ->where('group_channel_bot_id', $bot->id)
             ->whereNotNull('scope_region_uid')
@@ -281,28 +298,62 @@ class GroupChannelAlertPublicationService
             /** @var GroupChannelAlertCard|null $card */
             $card = $cards->get($key);
             $hash = $this->activeSnapshotHash($states);
+            $startedAt = $states
+                ->pluck('started_at')
+                ->filter()
+                ->sortBy(fn (CarbonImmutable $date): int => $date->getTimestamp())
+                ->first()?->toImmutable() ?? $now;
 
             $cards->forget($key);
+
+            if (! $card && ! isset($changedScopes[$key])) {
+                GroupChannelAlertCard::query()->create([
+                    'group_channel_bot_id' => $bot->id,
+                    'scope_region_uid' => $first->scope_region_uid,
+                    'alert_type' => $first->alert_type,
+                    'snapshot_hash' => $hash,
+                    'telegram_message_id' => null,
+                    'started_at' => $startedAt,
+                    'published_at' => null,
+                ]);
+
+                continue;
+            }
 
             if ($card && hash_equals($card->snapshot_hash, $hash)) {
                 continue;
             }
 
-            $startedAt = $states
-                ->pluck('started_at')
-                ->filter()
-                ->sortBy(fn ($date) => $date->getTimestamp())
-                ->first()?->toImmutable() ?? $now;
             $isRefresh = $card !== null || $startedAt->lessThan($now->subMinute());
-            $response = $this->telegram->request($bot, 'sendMessage', [
-                'chat_id' => $bot->chat_id,
-                'text' => $this->renderActiveCard($bot, $states, $startedAt, $now, $isRefresh),
-                'disable_notification' => (bool) $bot->moduleSetting(
-                    GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
-                    'disable_notification',
-                    false,
-                ),
-            ]);
+
+            try {
+                $response = $this->telegram->request($bot, 'sendMessage', [
+                    'chat_id' => $bot->chat_id,
+                    'text' => $this->renderActiveCard($bot, $states, $startedAt, $now, $isRefresh),
+                    'disable_notification' => (bool) $bot->moduleSetting(
+                        GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+                        'disable_notification',
+                        false,
+                    ),
+                ]);
+            } catch (Throwable $e) {
+                GroupChannelAlertCard::query()->updateOrCreate(
+                    [
+                        'group_channel_bot_id' => $bot->id,
+                        'scope_region_uid' => $first->scope_region_uid,
+                        'alert_type' => $first->alert_type,
+                    ],
+                    [
+                        'snapshot_hash' => hash('sha256', 'retry|'.$hash),
+                        'telegram_message_id' => $card?->telegram_message_id,
+                        'started_at' => $startedAt,
+                        'published_at' => $card?->published_at,
+                    ],
+                );
+
+                throw $e;
+            }
+
             $messageId = is_array($response) && is_numeric($response['message_id'] ?? null)
                 ? (int) $response['message_id']
                 : null;
@@ -329,7 +380,11 @@ class GroupChannelAlertPublicationService
             $sent++;
         }
 
-        foreach ($cards as $card) {
+        foreach ($cards as $key => $card) {
+            if (! isset($changedScopes[$key])) {
+                continue;
+            }
+
             if ($card->telegram_message_id) {
                 $this->safeDeleteMessage($bot, $card->telegram_message_id);
             }
@@ -673,6 +728,18 @@ class GroupChannelAlertPublicationService
             ->all();
 
         return hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function stateChanged(GroupChannelAlertState $state, array $item): bool
+    {
+        return (string) $state->scope_region_uid !== (string) $item['scope_region_uid']
+            || $state->region_name !== $item['region_name']
+            || (string) $state->details !== (string) $item['details']
+            || $state->source_alert_id !== $item['source_alert_id']
+            || $state->started_at?->toIso8601String() !== $item['started_at']->toIso8601String();
     }
 
     private function finishMessage(string $message): string
