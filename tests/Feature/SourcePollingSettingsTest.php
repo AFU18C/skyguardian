@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\SourcePollingSettings;
 use App\Services\SourceProcessor;
 use App\Services\SourceScheduler;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -79,5 +80,28 @@ class SourcePollingSettingsTest extends TestCase
 
         $this->artisan('skyguardian:sources:process')->assertSuccessful();
         $this->artisan('skyguardian:sources:process')->assertSuccessful();
+    }
+
+    public function test_scheduler_does_not_launch_source_processor_before_section_interval_is_due(): void
+    {
+        $settings = app(SourcePollingSettings::class);
+        $settings->update(Source::TYPE_NEWS, true, 4);
+        $settings->update(Source::TYPE_AIR_ALERT, false, 1);
+
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($event): bool => str_contains((string) $event->command, 'skyguardian:sources:process'));
+
+        $this->assertNotNull($event);
+        $this->assertTrue($event->filtersPass($this->app));
+
+        $settings->markRun(Source::TYPE_NEWS);
+
+        $this->assertFalse($event->filtersPass($this->app));
+
+        $this->travel(3)->minutes();
+        $this->assertFalse($event->filtersPass($this->app));
+
+        $this->travel(1)->minutes();
+        $this->assertTrue($event->filtersPass($this->app));
     }
 }
