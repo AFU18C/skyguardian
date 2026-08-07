@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Source;
+use App\Models\TechnicalAccount;
+use App\Models\TelegramApi;
 use App\Models\User;
 use App\Services\SourcePollingSettings;
 use App\Services\SourceProcessor;
@@ -30,7 +32,9 @@ class SourcePollingSettingsTest extends TestCase
                 ->assertSee('⚙')
                 ->assertSee($label)
                 ->assertSee('Автоматическая проверка источников')
-                ->assertSee('Проверять наступление времени каждые')
+                ->assertSee('Интервал опроса раздела')
+                ->assertSee('Раздел только проверяет, наступил ли индивидуальный')
+                ->assertSee('Реальную проверку источника разрешает только его индивидуальный')
                 ->assertSee('Минимальный интервал — 1 секунда')
                 ->assertSee('Секунды')
                 ->assertSee('Минуты')
@@ -136,6 +140,53 @@ class SourcePollingSettingsTest extends TestCase
 
         $this->travel(1)->seconds();
         $this->assertTrue($event->filtersPass($this->app));
+    }
+
+    public function test_section_poll_only_asks_and_individual_next_check_at_decides_when_source_is_due(): void
+    {
+        $this->travelTo(now()->startOfMinute());
+
+        $settings = app(SourcePollingSettings::class);
+        $settings->update(Source::TYPE_NEWS, true, 4, 'minutes');
+        $settings->update(Source::TYPE_AIR_ALERT, false, 1, 'minutes');
+
+        $api = TelegramApi::query()->create([
+            'name' => 'Polling test API',
+            'api_id' => 123456,
+            'api_hash' => 'test-hash',
+        ]);
+
+        $account = TechnicalAccount::query()->create([
+            'telegram_api_id' => $api->id,
+            'name' => 'Polling test account',
+            'is_active' => true,
+        ]);
+
+        $source = Source::query()->create([
+            'technical_account_id' => $account->id,
+            'type' => Source::TYPE_NEWS,
+            'name' => 'Eight minute source',
+            'source_peer' => '@eight_minute_source',
+            'is_active' => true,
+            'check_interval' => 8,
+            'check_interval_unit' => 'minutes',
+            'next_check_at' => now()->addMinutes(8),
+        ]);
+
+        $event = $this->sourceProcessingEvent(Source::TYPE_NEWS);
+        $scheduler = app(SourceScheduler::class);
+
+        $settings->markRun(Source::TYPE_NEWS);
+
+        $this->travel(4)->minutes();
+        $this->assertTrue($event->filtersPass($this->app));
+        $this->assertFalse($scheduler->due(40, Source::TYPE_NEWS)->contains('id', $source->id));
+
+        $settings->markRun(Source::TYPE_NEWS);
+
+        $this->travel(4)->minutes();
+        $this->assertTrue($event->filtersPass($this->app));
+        $this->assertTrue($scheduler->due(40, Source::TYPE_NEWS)->contains('id', $source->id));
     }
 
     private function sourceProcessingEvent(string $type): object
