@@ -37,7 +37,7 @@ class GroupChannelWebhookController extends Controller
             ->where('token_fingerprint', $fingerprint)
             ->where('webhook_secret', $secret)
             ->where('is_active', true);
-        $historyBotId = $this->historyStartBotId($update);
+        $historyBotId = $this->historyBotId($update);
 
         if ($historyBotId !== null) {
             $botQuery->whereKey($historyBotId);
@@ -72,18 +72,23 @@ class GroupChannelWebhookController extends Controller
         return response('', 200);
     }
 
-    private function historyStartBotId(array $update): ?int
+    private function historyBotId(array $update): ?int
     {
-        if (data_get($update, 'message.chat.type') !== 'private') {
-            return null;
+        if (data_get($update, 'message.chat.type') === 'private') {
+            $text = trim((string) data_get($update, 'message.text', ''));
+            if (preg_match('/^\/start(?:@[A-Za-z0-9_]+)?\s+ah_(\d+)_/', $text, $matches)) {
+                return (int) $matches[1];
+            }
         }
 
-        $text = trim((string) data_get($update, 'message.text', ''));
-        if (! preg_match('/^\/start(?:@[A-Za-z0-9_]+)?\s+ah_(\d+)_/', $text, $matches)) {
-            return null;
+        if (data_get($update, 'callback_query.message.chat.type') === 'private') {
+            $data = (string) data_get($update, 'callback_query.data', '');
+            if (preg_match('/^sg_ahr:(\d+):/', $data, $matches)) {
+                return (int) $matches[1];
+            }
         }
 
-        return (int) $matches[1];
+        return null;
     }
 
     private function chatId(array $update): int|string|null

@@ -36,6 +36,7 @@ class GroupChannelAlertHistoryDeepLinkTest extends TestCase
             'region_name' => 'Бучанський район',
             'alert_type' => 'air_raid',
             'event_at' => CarbonImmutable::parse('2026-08-07T17:31:00Z'),
+            'started_at' => $cycle,
             'status' => GroupChannelAlertEvent::STATUS_SENT,
             'sent_at' => CarbonImmutable::parse('2026-08-07T17:31:01Z'),
         ]);
@@ -75,7 +76,7 @@ class GroupChannelAlertHistoryDeepLinkTest extends TestCase
         Http::assertSent(function (Request $request): bool {
             return str_ends_with($request->url(), '/sendMessage')
                 && (string) ($request['chat_id'] ?? '') === '777'
-                && str_contains((string) ($request['text'] ?? ''), 'ВІДБІЙ ПІД ЧАС ЦІЄЇ ТРИВОГИ')
+                && str_contains((string) ($request['text'] ?? ''), '📊 ІСТОРІЯ: ПОВІТРЯНА ТРИВОГА')
                 && str_contains((string) ($request['text'] ?? ''), 'Київська область')
                 && str_contains((string) ($request['text'] ?? ''), 'Бучанський район');
         });
