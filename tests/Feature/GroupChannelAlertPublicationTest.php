@@ -61,7 +61,7 @@ class GroupChannelAlertPublicationTest extends TestCase
         Http::assertSent(function (Request $request): bool {
             return str_ends_with($request->url(), '/sendMessage')
                 && str_contains((string) $request['text'], 'Черкаська область')
-                && str_contains((string) $request['text'], 'Повітряна тривога');
+                && str_contains((string) $request['text'], 'ПОВІТРЯНА ТРИВОГА');
         });
 
         $ended = $service->processSnapshot($bot->fresh(), []);
@@ -272,9 +272,44 @@ class GroupChannelAlertPublicationTest extends TestCase
             $text = (string) $request['text'];
 
             return str_ends_with($request->url(), '/sendMessage')
-                && str_contains($text, 'Харківська область — Берестинський район')
+                && str_contains($text, '📍 Харківська область')
+                && str_contains($text, '› Берестинський район — 10:00')
                 && str_contains($text, '🎯 КАБИ → на північ Харківщини!')
-                && str_contains($text, '🕒 Початок: 10:00');
+                && ! str_contains($text, 'Активні території')
+                && ! str_contains($text, '🕒 Початок:');
+        });
+    }
+
+    public function test_active_card_shows_scope_and_individual_start_time_for_each_territory(): void
+    {
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response([
+                'ok' => true,
+                'result' => ['message_id' => 777],
+            ]),
+        ]);
+
+        $bot = $this->alertBot();
+        $service = app(GroupChannelAlertPublicationService::class);
+        $service->processSnapshot($bot, []);
+
+        $service->processSnapshot($bot->fresh(), [
+            $this->alert(1201, 'Бердянський район', 'raion', 7001, 'air_raid', 12, null, null, '2026-08-07T19:52:00+03:00'),
+            $this->alert(1202, 'м. Запоріжжя', 'city', 7002, 'air_raid', 12, null, null, '2026-08-07T19:57:00+03:00'),
+        ]);
+
+        Http::assertSent(function (Request $request): bool {
+            $text = (string) ($request['text'] ?? '');
+
+            return str_ends_with($request->url(), '/sendMessage')
+                && str_contains($text, '🚨 ПОВІТРЯНА ТРИВОГА')
+                && str_contains($text, '📍 Запорізька область')
+                && str_contains($text, '🔴 СТАТУС: АКТИВНА')
+                && str_contains($text, '› Бердянський район — 19:52')
+                && str_contains($text, '› м. Запоріжжя — 19:57')
+                && str_contains($text, '🔄 Оновлено:')
+                && ! str_contains($text, 'Активні території')
+                && ! str_contains($text, '🕒 Початок:');
         });
     }
 
@@ -369,6 +404,7 @@ class GroupChannelAlertPublicationTest extends TestCase
         ?int $oblastUid = null,
         ?string $raion = null,
         ?string $notes = null,
+        ?string $startedAt = null,
     ): array {
         $oblastUid ??= $regionUid;
         $oblastName = GroupChannelBot::ALERT_REGIONS[(string) $oblastUid] ?? $title;
@@ -377,7 +413,7 @@ class GroupChannelAlertPublicationTest extends TestCase
             'id' => $id,
             'location_title' => $title,
             'location_type' => $locationType,
-            'started_at' => '2026-08-04T10:00:00+03:00',
+            'started_at' => $startedAt ?? '2026-08-04T10:00:00+03:00',
             'finished_at' => null,
             'updated_at' => '2026-08-04T10:00:01+03:00',
             'alert_type' => $alertType,

@@ -70,7 +70,9 @@ class GroupChannelBot extends Model
         'nuclear' => 'Радіаційна загроза',
     ];
 
-    public const DEFAULT_ALERT_START_TEMPLATE = "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 {region}\n⚠️ {threat_type}\n🕒 Початок: {time}";
+    public const LEGACY_ALERT_START_TEMPLATE = "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 {region}\n⚠️ {threat_type}\n🕒 Початок: {time}";
+
+    public const DEFAULT_ALERT_START_TEMPLATE = "🚨 {headline}\n\n📍 {oblast}\n\n🔴 СТАТУС: АКТИВНА\n{territories}\n\n🔄 Оновлено: {updated}";
 
     public const DEFAULT_ALERT_END_TEMPLATE = "✅ ВІДБІЙ ТРИВОГИ\n\n📍 {region}\n🕒 Відбій: {time}";
 

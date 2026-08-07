@@ -618,6 +618,11 @@ class GroupChannelAlertPublicationService
             $template = $default;
         }
 
+        if ($first->kind === GroupChannelAlertEvent::KIND_START
+            && $this->normalizeTemplate($template) === $this->normalizeTemplate(GroupChannelBot::LEGACY_ALERT_START_TEMPLATE)) {
+            $template = GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE;
+        }
+
         $regions = $events
             ->pluck('region_name')
             ->filter()
@@ -631,20 +636,33 @@ class GroupChannelAlertPublicationService
             ->unique()
             ->values()
             ->implode("\n🎯 ");
+        $oblast = $this->scopeName($first->scope_region_uid, $first->region_name);
+        $territories = $events
+            ->sortBy(fn (GroupChannelAlertEvent $event): string => $this->territoryLabel($event->region_name, $oblast))
+            ->map(fn (GroupChannelAlertEvent $event): string => '› '
+                .$this->territoryLabel($event->region_name, $oblast)
+                .' — '.$event->event_at->timezone('Europe/Kyiv')->format('H:i'))
+            ->unique()
+            ->values()
+            ->implode("\n");
         $hasDetailsVariable = str_contains($template, '{details}');
         $message = strtr($template, [
             '{region}' => $regions,
             '{time}' => $first->event_at->timezone('Europe/Kyiv')->format('H:i'),
             '{threat_type}' => GroupChannelBot::ALERT_TYPES[$first->alert_type] ?? $first->alert_type,
             '{details}' => $details,
+            '{headline}' => $this->alertHeadline($first->alert_type),
+            '{oblast}' => $oblast,
+            '{territories}' => $territories,
+            '{updated}' => $first->event_at->timezone('Europe/Kyiv')->format('H:i'),
         ]);
 
         if ($first->kind === GroupChannelAlertEvent::KIND_START
             && $details !== ''
             && ! $hasDetailsVariable) {
             $detailsLine = "🎯 {$details}";
-            $message = str_contains($message, "\n🕒")
-                ? str_replace("\n🕒", "\n{$detailsLine}\n🕒", $message)
+            $message = str_contains($message, "\n🔄")
+                ? str_replace("\n🔄", "\n\n{$detailsLine}\n\n🔄", $message)
                 : $message."\n{$detailsLine}";
         }
 
@@ -673,6 +691,11 @@ class GroupChannelAlertPublicationService
             $template = GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE;
         }
 
+        if ($this->normalizeTemplate($template) === $this->normalizeTemplate(GroupChannelBot::LEGACY_ALERT_START_TEMPLATE)) {
+            $template = GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE;
+        }
+
+        $oblast = $this->scopeName($first->scope_region_uid, $first->region_name);
         $regions = $states
             ->pluck('region_name')
             ->filter()
@@ -680,6 +703,17 @@ class GroupChannelAlertPublicationService
             ->sort()
             ->values()
             ->implode("\n📍 ");
+        $territories = $states
+            ->sortBy(fn (GroupChannelAlertState $state): string => $this->territoryLabel($state->region_name, $oblast))
+            ->map(function (GroupChannelAlertState $state) use ($oblast, $startedAt): string {
+                $time = $state->started_at?->timezone('Europe/Kyiv')->format('H:i')
+                    ?? $startedAt->timezone('Europe/Kyiv')->format('H:i');
+
+                return '› '.$this->territoryLabel($state->region_name, $oblast).' — '.$time;
+            })
+            ->unique()
+            ->values()
+            ->implode("\n");
         $details = $states
             ->pluck('details')
             ->filter()
@@ -687,25 +721,65 @@ class GroupChannelAlertPublicationService
             ->values()
             ->implode("\n🎯 ");
         $hasDetailsVariable = str_contains($template, '{details}');
+        $hasUpdatedVariable = str_contains($template, '{updated}');
         $message = strtr($template, [
             '{region}' => $regions,
             '{time}' => $startedAt->timezone('Europe/Kyiv')->format('H:i'),
             '{threat_type}' => GroupChannelBot::ALERT_TYPES[$first->alert_type] ?? $first->alert_type,
             '{details}' => $details,
+            '{headline}' => $this->alertHeadline($first->alert_type),
+            '{oblast}' => $oblast,
+            '{territories}' => $territories,
+            '{updated}' => $updatedAt->timezone('Europe/Kyiv')->format('H:i'),
         ]);
 
         if ($details !== '' && ! $hasDetailsVariable) {
             $detailsLine = "🎯 {$details}";
-            $message = str_contains($message, "\n🕒")
-                ? str_replace("\n🕒", "\n{$detailsLine}\n🕒", $message)
+            $message = str_contains($message, "\n🔄")
+                ? str_replace("\n🔄", "\n\n{$detailsLine}\n\n🔄", $message)
                 : $message."\n{$detailsLine}";
         }
 
-        if ($isRefresh) {
+        if ($isRefresh && ! $hasUpdatedVariable) {
             $message .= "\n🔄 Оновлено: ".$updatedAt->timezone('Europe/Kyiv')->format('H:i');
         }
 
         return $this->finishMessage($message);
+    }
+
+    private function alertHeadline(string $alertType): string
+    {
+        return mb_strtoupper(GroupChannelBot::ALERT_TYPES[$alertType] ?? $alertType);
+    }
+
+    private function scopeName(?string $scopeRegionUid, string $regionName): string
+    {
+        if ($scopeRegionUid !== null && isset(GroupChannelBot::ALERT_REGIONS[$scopeRegionUid])) {
+            return GroupChannelBot::ALERT_REGIONS[$scopeRegionUid];
+        }
+
+        return trim(explode(' — ', $regionName)[0] ?? $regionName);
+    }
+
+    private function territoryLabel(string $regionName, string $oblast): string
+    {
+        $regionName = trim($regionName);
+
+        if ($regionName === '' || $regionName === $oblast) {
+            return $regionName !== '' ? $regionName : 'Невідома локація';
+        }
+
+        $parts = array_values(array_filter(
+            array_map('trim', explode(' — ', $regionName)),
+            fn (string $part): bool => $part !== '',
+        ));
+
+        return $parts !== [] ? (string) end($parts) : $regionName;
+    }
+
+    private function normalizeTemplate(string $template): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", trim($template));
     }
 
     /**
