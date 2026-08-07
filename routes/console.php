@@ -26,7 +26,3 @@ Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50'
 Schedule::command('skyguardian:promo-campaign:status')
     ->everyMinute()
     ->withoutOverlapping(1);
-
-Schedule::command('skyguardian:anti-casino-campaign:status')
-    ->everyMinute()
-    ->withoutOverlapping(1);
