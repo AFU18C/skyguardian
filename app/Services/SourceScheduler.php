@@ -8,10 +8,11 @@ use Illuminate\Support\Collection;
 
 class SourceScheduler
 {
-    public function due(int $limit = 40): Collection
+    public function due(int $limit = 40, ?string $type = null): Collection
     {
         return Source::query()
             ->with('technicalAccount.telegramApi')
+            ->when($type !== null, fn ($query) => $query->where('type', $type))
             ->due()
             ->orderByRaw('next_check_at IS NULL DESC')
             ->orderBy('next_check_at')

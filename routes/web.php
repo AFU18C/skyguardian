@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\SiteMenuController;
 use App\Http\Controllers\Admin\SitePageController as AdminSitePageController;
 use App\Http\Controllers\Admin\SiteSettingsController;
 use App\Http\Controllers\Admin\SourceController;
+use App\Http\Controllers\Admin\SourcePollingSettingsController;
 use App\Http\Controllers\Admin\SystemMetricsController;
 use App\Http\Controllers\Admin\TelegramController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -49,12 +50,14 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
         ->name('system.backup.store');
 
     Route::get('/news', [SourceController::class, 'index'])->defaults('sourceType', Source::TYPE_NEWS)->name('news.index');
+    Route::put('/news/polling-settings', SourcePollingSettingsController::class)->defaults('sourceType', Source::TYPE_NEWS)->name('news.polling-settings.update');
     Route::post('/news', [SourceController::class, 'store'])->defaults('sourceType', Source::TYPE_NEWS)->name('news.store');
     Route::put('/news/{source}', [SourceController::class, 'update'])->defaults('sourceType', Source::TYPE_NEWS)->name('news.update');
     Route::delete('/news/{source}', [SourceController::class, 'destroy'])->defaults('sourceType', Source::TYPE_NEWS)->name('news.destroy');
     Route::post('/news/{source}/check', [SourceController::class, 'check'])->defaults('sourceType', Source::TYPE_NEWS)->name('news.check');
 
     Route::get('/air-alert', [SourceController::class, 'index'])->defaults('sourceType', Source::TYPE_AIR_ALERT)->name('air-alert.index');
+    Route::put('/air-alert/polling-settings', SourcePollingSettingsController::class)->defaults('sourceType', Source::TYPE_AIR_ALERT)->name('air-alert.polling-settings.update');
     Route::post('/air-alert', [SourceController::class, 'store'])->defaults('sourceType', Source::TYPE_AIR_ALERT)->name('air-alert.store');
     Route::put('/air-alert/{source}', [SourceController::class, 'update'])->defaults('sourceType', Source::TYPE_AIR_ALERT)->name('air-alert.update');
     Route::delete('/air-alert/{source}', [SourceController::class, 'destroy'])->defaults('sourceType', Source::TYPE_AIR_ALERT)->name('air-alert.destroy');

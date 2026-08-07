@@ -8,6 +8,7 @@
     @vite([
         'resources/css/app.css',
         'resources/css/source-copying.css',
+        'resources/css/source-polling-settings.css',
         'resources/css/collapsible-cards.css',
         'resources/css/topbar-metrics.css',
         'resources/css/source-health.css',
@@ -40,8 +41,9 @@
         </header>
         <main class="sg-main">
             <div class="sg-page-header">
-                <div>
+                <div class="sg-page-title-row">
                     <h1>{{ $title ?? 'Админка' }}</h1>
+                    @isset($titleActions)<div class="sg-page-title-actions">{{ $titleActions }}</div>@endisset
                 </div>
                 @isset($actions)<div class="sg-page-actions">{{ $actions }}</div>@endisset
             </div>
