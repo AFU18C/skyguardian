@@ -4,15 +4,12 @@ use App\Models\Source;
 use App\Services\SourcePollingSettings;
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command('skyguardian:sources:process --limit=40')
-    ->everyTenSeconds()
-    ->when(function (): bool {
-        $polling = app(SourcePollingSettings::class);
-
-        return $polling->shouldRun(Source::TYPE_NEWS)
-            || $polling->shouldRun(Source::TYPE_AIR_ALERT);
-    })
-    ->withoutOverlapping(1);
+foreach ([Source::TYPE_NEWS, Source::TYPE_AIR_ALERT] as $type) {
+    Schedule::command("skyguardian:sources:process --type={$type} --limit=40")
+        ->everySecond()
+        ->when(fn (): bool => app(SourcePollingSettings::class)->shouldRun($type))
+        ->withoutOverlapping(1);
+}
 
 Schedule::command('skyguardian:group-channel-publications:process --limit=20')
     ->everyTenSeconds()
