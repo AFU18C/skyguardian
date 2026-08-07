@@ -1,0 +1,39 @@
+name: Apply Alert History Deep Link
+
+on:
+  push:
+    branches:
+      - fix/alert-history-deep-link
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/alert-history-deep-link
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, dom, pdo_sqlite
+          coverage: none
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: cp .env.example .env
+      - name: Apply deep-link implementation
+        run: python3 .github/scripts/apply_alert_history_deep_link.py
+      - name: Format changed PHP files
+        run: vendor/bin/pint app/Services/GroupChannelAlertPublicationService.php app/Services/GroupChannelWebhookService.php app/Services/DirectGroupChannelTelegramService.php app/Http/Controllers/GroupChannelWebhookController.php tests/Feature/GroupChannelAlertPublicationTest.php tests/Feature/GroupChannelAlertDirectTelegramTest.php tests/Feature/GroupChannelAlertHistoryDeepLinkTest.php
+      - name: Run focused regression tests
+        run: php artisan test tests/Feature/GroupChannelAlertPublicationTest.php tests/Feature/GroupChannelAlertDirectTelegramTest.php tests/Feature/GroupChannelAlertHistoryDeepLinkTest.php --display-warnings --display-deprecations --fail-on-warning
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/Services/GroupChannelAlertPublicationService.php app/Services/GroupChannelWebhookService.php app/Services/DirectGroupChannelTelegramService.php app/Http/Controllers/GroupChannelWebhookController.php tests/Feature/GroupChannelAlertPublicationTest.php tests/Feature/GroupChannelAlertDirectTelegramTest.php tests/Feature/GroupChannelAlertHistoryDeepLinkTest.php
+          git commit -m "Открывать историю тревоги в личном чате бота"
+          git push origin HEAD:fix/alert-history-deep-link
