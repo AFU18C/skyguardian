@@ -11,6 +11,7 @@ class GroupChannelAlertState extends Model
     protected $fillable = [
         'group_channel_bot_id',
         'region_uid',
+        'scope_region_uid',
         'region_name',
         'alert_type',
         'details',
