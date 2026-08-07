@@ -27,7 +27,6 @@ jobs:
           cd /var/www/skyguardian
           sudo -u www-data php artisan skyguardian:group-channel-publications:process --limit=20
           sudo -u www-data php artisan skyguardian:promo-campaign:status
-          sudo -u www-data php artisan skyguardian:anti-casino-campaign:status
 
       - name: Publish campaign status to issue
         uses: actions/github-script@v8
@@ -35,7 +34,6 @@ jobs:
           script: |
             const fs = require('fs');
             const promoPath = '/var/www/skyguardian/public/storage/skyguardian-campaign-status.json';
-            const antiCasinoPath = '/var/www/skyguardian/public/storage/anti-casino-campaign-status.json';
             const marker = '<!-- skyguardian-campaign-status -->';
             const redact = (value) => String(value ?? '')
               .replace(/https:\/\/api\.telegram\.org\/bot[^/\s]+/gi, 'https://api.telegram.org/bot[REDACTED]')
@@ -47,44 +45,18 @@ jobs:
               return;
             }
 
-            if (!fs.existsSync(antiCasinoPath)) {
-              core.setFailed(`Status file not found: ${antiCasinoPath}`);
-              return;
-            }
-
             const status = JSON.parse(fs.readFileSync(promoPath, 'utf8'));
-            const antiCasino = JSON.parse(fs.readFileSync(antiCasinoPath, 'utf8'));
             const rows = (status.posts || []).map((post) => {
               const link = post.post_link ? `[Відкрити](${post.post_link})` : '—';
               const error = post.last_error ? redact(post.last_error) : '—';
               return `| ${post.number ?? '—'} | ${post.status ?? '—'} | ${post.scheduled_at ?? '—'} | ${post.sent_at ?? '—'} | ${link} | ${error} |`;
             });
-            const counts = antiCasino.statuses || {};
-            const processing = (counts.sending ?? 0) + Math.max(
-              0,
-              (antiCasino.total ?? 0)
-                - (counts.sent ?? 0)
-                - (counts.scheduled ?? 0)
-                - (counts.error ?? 0)
-                - (counts.sending ?? 0),
-            );
 
             const body = [
               marker,
-              '## Статус кампаний SkyGuardian',
+              '## Статус кампании SkyGuardian',
               '',
-              `Обновлено: ${antiCasino.generated_at ?? status.generated_at ?? new Date().toISOString()}`,
-              '',
-              '### Антиказино — 1000 фото-постов',
-              '',
-              `- Всего создано: **${antiCasino.total ?? 0}**`,
-              `- Отправлено: **${counts.sent ?? 0}**`,
-              `- В очереди: **${counts.scheduled ?? 0}**`,
-              `- Обрабатывается сейчас: **${processing}**`,
-              `- Ошибок: **${counts.error ?? 0}**`,
-              `- Первый слот: **${antiCasino.first_scheduled_at ?? '—'}**`,
-              `- Последний слот: **${antiCasino.last_scheduled_at ?? '—'}**`,
-              `- Последняя отправка: **${antiCasino.latest_sent_at ?? '—'}**`,
+              `Обновлено: ${status.generated_at ?? new Date().toISOString()}`,
               '',
               '### Первая промо-кампания',
               '',
