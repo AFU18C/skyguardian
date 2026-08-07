@@ -5,7 +5,7 @@ use App\Services\SourcePollingSettings;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('skyguardian:sources:process --limit=40')
-    ->everyMinute()
+    ->everyTenSeconds()
     ->when(function (): bool {
         $polling = app(SourcePollingSettings::class);
 
