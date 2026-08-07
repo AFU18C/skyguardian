@@ -130,16 +130,20 @@
                         <input
                             id="source-polling-interval-{{ $type }}"
                             type="number"
-                            name="polling_interval_minutes"
-                            value="{{ old('polling_interval_minutes', $pollingSettings['interval_minutes']) }}"
+                            name="polling_interval_value"
+                            value="{{ old('polling_interval_value', $pollingSettings['interval_value']) }}"
                             min="1"
-                            max="1440"
                             required
                         >
-                        <span>мин.</span>
+                        <select name="polling_interval_unit" required>
+                            <option value="seconds" @selected(old('polling_interval_unit', $pollingSettings['interval_unit']) === 'seconds')>Секунды</option>
+                            <option value="minutes" @selected(old('polling_interval_unit', $pollingSettings['interval_unit']) === 'minutes')>Минуты</option>
+                            <option value="hours" @selected(old('polling_interval_unit', $pollingSettings['interval_unit']) === 'hours')>Часы</option>
+                        </select>
                     </div>
-                    <small>Минимум 1 минута. У каждого источника по-прежнему остаётся собственный интервал проверки.</small>
-                    @error('polling_interval_minutes')<small class="sg-field-error">{{ $message }}</small>@enderror
+                    <small>Минимальный интервал — 10 секунд. У каждого источника по-прежнему остаётся собственный интервал проверки.</small>
+                    @error('polling_interval_value')<small class="sg-field-error">{{ $message }}</small>@enderror
+                    @error('polling_interval_unit')<small class="sg-field-error">{{ $message }}</small>@enderror
                 </div>
 
                 <div class="sg-record-actions">
