@@ -2,11 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\GroupChannelAlertCard;
 use App\Models\GroupChannelAlertEvent;
 use App\Models\GroupChannelBot;
 use App\Services\GroupChannelAlertPublicationService;
-use App\Services\GroupChannelWebhookService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -191,15 +189,11 @@ class GroupChannelAlertPublicationTest extends TestCase
         });
     }
 
-    public function test_partial_clear_history_is_compact_toggleable_and_green_clear_posts_remain(): void
+    public function test_partial_clear_history_is_compact_deep_linked_and_green_clear_posts_remain(): void
     {
         $nextMessageId = 900;
         Http::fake(function (Request $request) use (&$nextMessageId) {
             if (str_ends_with($request->url(), '/deleteMessage')) {
-                return Http::response(['ok' => true, 'result' => true]);
-            }
-
-            if (str_ends_with($request->url(), '/answerCallbackQuery')) {
                 return Http::response(['ok' => true, 'result' => true]);
             }
 
@@ -238,86 +232,19 @@ class GroupChannelAlertPublicationTest extends TestCase
         $this->assertStringContainsString('Бучанський район', (string) $green['text']);
         $this->assertStringContainsString('🔻 Відбій під час цієї тривоги — 1 територія', (string) $red['text']);
         $this->assertStringNotContainsString('Бучанський район', (string) $red['text']);
-        $this->assertFalse(isset($red['entities']));
         $this->assertSame('Показати історію ▾', data_get($red['reply_markup'] ?? [], 'inline_keyboard.0.0.text'));
-        $this->assertStringStartsWith('sg_ah:14:air_raid:', (string) data_get(
-            $red['reply_markup'] ?? [],
-            'inline_keyboard.0.0.callback_data',
-        ));
+        $this->assertStringStartsWith(
+            'https://t.me/test_alert_bot?start=ah_'.$bot->id.'_14_a_',
+            (string) data_get($red['reply_markup'] ?? [], 'inline_keyboard.0.0.url'),
+        );
+        $this->assertNull(data_get($red['reply_markup'] ?? [], 'inline_keyboard.0.0.callback_data'));
         $this->assertSame(
             GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_TEXT,
             data_get($red['reply_markup'] ?? [], 'inline_keyboard.1.0.text'),
         );
-
-        $card = GroupChannelAlertCard::query()
-            ->where('group_channel_bot_id', $bot->id)
-            ->where('scope_region_uid', '14')
-            ->where('alert_type', 'air_raid')
-            ->firstOrFail();
-        $showData = (string) data_get($red['reply_markup'] ?? [], 'inline_keyboard.0.0.callback_data');
-        $beforeShow = count(Http::recorded());
-
-        app(GroupChannelWebhookService::class)->handle($bot->fresh(), [
-            'callback_query' => [
-                'id' => 'history-show-1',
-                'from' => ['id' => 777],
-                'data' => $showData,
-                'message' => [
-                    'message_id' => $card->telegram_message_id,
-                    'date' => now()->timestamp,
-                    'chat' => ['id' => $bot->chat_id],
-                    'text' => (string) $red['text'],
-                ],
-            ],
-        ]);
-
-        $showRequests = collect(Http::recorded())
-            ->slice($beforeShow)
-            ->map(fn (array $record): Request => $record[0]);
-        $expanded = $showRequests->first(
+        $this->assertFalse($partialRequests->contains(
             fn (Request $request): bool => str_ends_with($request->url(), '/editMessageText'),
-        );
-
-        $this->assertNotNull($expanded);
-        $this->assertStringContainsString('🔻 Відбій під час цієї тривоги:', (string) $expanded['text']);
-        $this->assertStringContainsString('› Бучанський район — ', (string) $expanded['text']);
-        $this->assertSame('Сховати історію ▴', data_get($expanded['reply_markup'] ?? [], 'inline_keyboard.0.0.text'));
-        $this->assertSame(
-            GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_TEXT,
-            data_get($expanded['reply_markup'] ?? [], 'inline_keyboard.1.0.text'),
-        );
-        $this->assertTrue($showRequests->contains(
-            fn (Request $request): bool => str_ends_with($request->url(), '/answerCallbackQuery')
-                && $request['callback_query_id'] === 'history-show-1',
         ));
-
-        $hideData = (string) data_get($expanded['reply_markup'] ?? [], 'inline_keyboard.0.0.callback_data');
-        $beforeHide = count(Http::recorded());
-        app(GroupChannelWebhookService::class)->handle($bot->fresh(), [
-            'callback_query' => [
-                'id' => 'history-hide-1',
-                'from' => ['id' => 777],
-                'data' => $hideData,
-                'message' => [
-                    'message_id' => $card->telegram_message_id,
-                    'date' => now()->timestamp,
-                    'chat' => ['id' => $bot->chat_id],
-                    'text' => (string) $expanded['text'],
-                ],
-            ],
-        ]);
-
-        $hideRequests = collect(Http::recorded())
-            ->slice($beforeHide)
-            ->map(fn (array $record): Request => $record[0]);
-        $collapsed = $hideRequests->first(
-            fn (Request $request): bool => str_ends_with($request->url(), '/editMessageText'),
-        );
-
-        $this->assertNotNull($collapsed);
-        $this->assertStringContainsString('🔻 Відбій під час цієї тривоги — 1 територія', (string) $collapsed['text']);
-        $this->assertStringNotContainsString('Бучанський район', (string) $collapsed['text']);
-        $this->assertSame('Показати історію ▾', data_get($collapsed['reply_markup'] ?? [], 'inline_keyboard.0.0.text'));
 
         $beforeSecondPartial = count(Http::recorded());
         $service->processSnapshot($bot->fresh(), [
@@ -339,7 +266,10 @@ class GroupChannelAlertPublicationTest extends TestCase
         $this->assertStringContainsString('› Бориспільський район — ', (string) $secondRed['text']);
         $this->assertStringNotContainsString('Бучанський район', (string) $secondRed['text']);
         $this->assertStringNotContainsString('Броварський район', (string) $secondRed['text']);
-        $this->assertSame('Показати історію ▾', data_get($secondRed['reply_markup'] ?? [], 'inline_keyboard.0.0.text'));
+        $this->assertStringStartsWith(
+            'https://t.me/test_alert_bot?start=ah_'.$bot->id.'_14_a_',
+            (string) data_get($secondRed['reply_markup'] ?? [], 'inline_keyboard.0.0.url'),
+        );
     }
 
     public function test_unchanged_snapshot_does_not_republish_active_card(): void
@@ -548,6 +478,7 @@ class GroupChannelAlertPublicationTest extends TestCase
             'group_link' => 'https://t.me/test_alerts_channel',
             'chat_type' => 'channel',
             'chat_id' => '-1001234567890',
+            'bot_username' => 'test_alert_bot',
             'is_active' => true,
             'module_settings' => $settings,
         ]);

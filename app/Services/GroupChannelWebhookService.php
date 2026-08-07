@@ -39,6 +39,10 @@ class GroupChannelWebhookService
 
     private function handleMessage(GroupChannelBot $bot, array $message): void
     {
+        if ($this->alertPublications->handleHistoryStart($bot, $message)) {
+            return;
+        }
+
         $messageId = (string) ($message['message_id'] ?? '');
         $from = $message['from'] ?? [];
         $userId = isset($from['id']) ? (string) $from['id'] : null;

@@ -81,7 +81,7 @@ class GroupChannelAlertDirectTelegramTest extends TestCase
         $this->assertSame('https://example.com/map', $button['url'] ?? null);
     }
 
-    public function test_direct_alert_service_preserves_history_toggle_when_map_button_is_disabled(): void
+    public function test_direct_alert_service_preserves_history_link_when_map_button_is_disabled(): void
     {
         Http::fake(fn () => Http::response([
             'ok' => true,
@@ -104,7 +104,7 @@ class GroupChannelAlertDirectTelegramTest extends TestCase
                 'inline_keyboard' => [[
                     [
                         'text' => 'Показати історію ▾',
-                        'callback_data' => 'sg_ah:14:air_raid:1786130000:show',
+                        'url' => 'https://t.me/test_alert_bot?start=ah_1_14_a_1786130000_1786130300',
                     ],
                 ]],
             ],

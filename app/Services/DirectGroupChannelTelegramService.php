@@ -16,7 +16,8 @@ class DirectGroupChannelTelegramService extends GroupChannelTelegramService
 {
     public function request(GroupChannelBot $bot, string $method, array $payload = []): mixed
     {
-        if (in_array($method, ['sendMessage', 'editMessageText'], true)) {
+        if (in_array($method, ['sendMessage', 'editMessageText'], true)
+            && (string) ($payload['chat_id'] ?? '') === (string) $bot->chat_id) {
             $payload = $this->withConfiguredMapButton($bot, $method, $payload);
         }
 

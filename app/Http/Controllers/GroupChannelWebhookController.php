@@ -33,11 +33,19 @@ class GroupChannelWebhookController extends Controller
             return response('', 200);
         }
 
-        $bot = GroupChannelBot::query()
+        $botQuery = GroupChannelBot::query()
             ->where('token_fingerprint', $fingerprint)
-            ->where('chat_id', (string) $chatId)
-            ->where('is_active', true)
-            ->first();
+            ->where('webhook_secret', $secret)
+            ->where('is_active', true);
+        $historyBotId = $this->historyStartBotId($update);
+
+        if ($historyBotId !== null) {
+            $botQuery->whereKey($historyBotId);
+        } else {
+            $botQuery->where('chat_id', (string) $chatId);
+        }
+
+        $bot = $botQuery->first();
 
         if (! $bot) {
             return response('', 200);
@@ -62,6 +70,20 @@ class GroupChannelWebhookController extends Controller
         }
 
         return response('', 200);
+    }
+
+    private function historyStartBotId(array $update): ?int
+    {
+        if (data_get($update, 'message.chat.type') !== 'private') {
+            return null;
+        }
+
+        $text = trim((string) data_get($update, 'message.text', ''));
+        if (! preg_match('/^\/start(?:@[A-Za-z0-9_]+)?\s+ah_(\d+)_/', $text, $matches)) {
+            return null;
+        }
+
+        return (int) $matches[1];
     }
 
     private function chatId(array $update): int|string|null
