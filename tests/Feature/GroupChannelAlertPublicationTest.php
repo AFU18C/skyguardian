@@ -145,7 +145,10 @@ class GroupChannelAlertPublicationTest extends TestCase
 
             return str_ends_with($request->url(), '/sendMessage')
                 && str_contains($text, 'ВІДБІЙ ТРИВОГИ')
-                && str_contains($text, 'м. Харків та тергромада');
+                && str_contains($text, 'Харківська область')
+                && str_contains($text, 'СТАТУС: БЕЗПЕЧНО')
+                && str_contains($text, 'м. Харків та тергромада')
+                && str_contains($text, 'Тривога тривала:');
         });
         Http::assertSent(function (Request $request): bool {
             $text = (string) ($request['text'] ?? '');
@@ -172,8 +175,11 @@ class GroupChannelAlertPublicationTest extends TestCase
 
             return str_ends_with($request->url(), '/sendMessage')
                 && str_contains($text, 'ВІДБІЙ ТРИВОГИ')
+                && str_contains($text, 'Харківська область')
+                && str_contains($text, 'СТАТУС: БЕЗПЕЧНО')
                 && str_contains($text, 'Купʼянський район')
-                && str_contains($text, 'Чугуївський район');
+                && str_contains($text, 'Чугуївський район')
+                && str_contains($text, 'Тривога тривала:');
         });
         Http::assertSent(function (Request $request): bool {
             return str_ends_with($request->url(), '/deleteMessage')

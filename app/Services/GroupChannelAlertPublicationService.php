@@ -214,6 +214,7 @@ class GroupChannelAlertPublicationService
             if ($event->kind === GroupChannelAlertEvent::KIND_END && $aggregateEndEvents) {
                 return implode('|', [
                     $event->kind,
+                    $event->scope_region_uid ?: 'unknown-scope',
                     $event->alert_type,
                     $event->event_at->format('Y-m-d H:i:s'),
                 ]);
@@ -379,6 +380,15 @@ class GroupChannelAlertPublicationService
                 : null;
             $oldMessageId = $card?->telegram_message_id;
 
+            if ($oldMessageId && $oldMessageId !== $messageId
+                && ! $this->safeDeleteMessage($bot, $oldMessageId)) {
+                if ($messageId) {
+                    $this->safeDeleteMessage($bot, $messageId);
+                }
+
+                throw new RuntimeException('Не удалось удалить предыдущую активную карточку тревоги.');
+            }
+
             GroupChannelAlertCard::query()->updateOrCreate(
                 [
                     'group_channel_bot_id' => $bot->id,
@@ -393,20 +403,13 @@ class GroupChannelAlertPublicationService
                 ],
             );
 
-            if ($oldMessageId && $oldMessageId !== $messageId) {
-                $this->safeDeleteMessage($bot, $oldMessageId);
-            }
-
             $sent++;
         }
 
-        foreach ($cards as $key => $card) {
-            if (! isset($changedScopes[$key])) {
+        foreach ($cards as $card) {
+            if ($card->telegram_message_id
+                && ! $this->safeDeleteMessage($bot, $card->telegram_message_id)) {
                 continue;
-            }
-
-            if ($card->telegram_message_id) {
-                $this->safeDeleteMessage($bot, $card->telegram_message_id);
             }
 
             $card->delete();
@@ -422,23 +425,28 @@ class GroupChannelAlertPublicationService
             ->get();
 
         foreach ($cards as $card) {
-            if ($bot->chat_id && $card->telegram_message_id) {
-                $this->safeDeleteMessage($bot, $card->telegram_message_id);
+            if ($bot->chat_id && $card->telegram_message_id
+                && ! $this->safeDeleteMessage($bot, $card->telegram_message_id)) {
+                continue;
             }
 
             $card->delete();
         }
     }
 
-    private function safeDeleteMessage(GroupChannelBot $bot, int $messageId): void
+    private function safeDeleteMessage(GroupChannelBot $bot, int $messageId): bool
     {
         try {
             $this->telegram->request($bot, 'deleteMessage', [
                 'chat_id' => $bot->chat_id,
                 'message_id' => $messageId,
             ]);
+
+            return true;
         } catch (Throwable $e) {
             report($e);
+
+            return false;
         }
     }
 
