@@ -16,13 +16,16 @@ Schedule::command('skyguardian:group-channel-publications:process --limit=20')
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:group-channel-alerts:process --limit=50')
-    ->everyTenSeconds()
+    ->everySecond()
+    ->when(fn (): bool => in_array(now()->second, [5, 15, 25, 35, 45, 55], true))
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50')
-    ->everyMinute()
+    ->everySecond()
+    ->when(fn (): bool => now()->second === 2)
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:promo-campaign:status')
-    ->everyMinute()
+    ->everySecond()
+    ->when(fn (): bool => now()->second === 7)
     ->withoutOverlapping(1);
