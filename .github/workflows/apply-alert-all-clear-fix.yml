@@ -17,12 +17,12 @@ jobs:
         with:
           ref: fix/alert-all-clear-template
           fetch-depth: 0
-      - name: Apply targeted changes
-        run: python3 .github/scripts/apply_alert_all_clear_fix.py
+      - name: Finalize targeted changes
+        run: python3 .github/scripts/finalize_alert_all_clear_fix.py
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/Models/GroupChannelBot.php app/Services/GroupChannelAlertPublicationService.php database/migrations/2026_08_07_212900_update_default_alert_end_template.php
-          git commit -m "Сделать единый формат отбоя для нескольких областей"
+          git add app/Services/GroupChannelAlertPublicationService.php tests/Feature/GroupChannelAlertPublicationTest.php
+          git commit -m "Разделить отбои по областям и повторять удаление карточек"
           git push origin HEAD:fix/alert-all-clear-template
