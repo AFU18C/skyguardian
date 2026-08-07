@@ -406,12 +406,13 @@ class GroupChannelAlertPublicationService
             $sent++;
         }
 
-        foreach ($cards as $card) {
-            if ($card->telegram_message_id
-                && ! $this->safeDeleteMessage($bot, $card->telegram_message_id)) {
+        foreach ($cards as $key => $card) {
+            if (! isset($changedScopes[$key])) {
                 continue;
             }
 
+            // A fully cleared oblast keeps its last red Telegram post as history.
+            // Drop only the active-card tracking row so a future alert starts a new card.
             $card->delete();
         }
 

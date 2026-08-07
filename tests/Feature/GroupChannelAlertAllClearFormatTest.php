@@ -75,7 +75,7 @@ class GroupChannelAlertAllClearFormatTest extends TestCase
         }
     }
 
-    public function test_last_red_card_is_retried_until_telegram_deletes_it(): void
+    public function test_last_red_card_stays_in_telegram_but_is_untracked_after_full_clear(): void
     {
         $messageId = 800;
         $deleteAttempts = 0;
@@ -83,10 +83,6 @@ class GroupChannelAlertAllClearFormatTest extends TestCase
         Http::fake(function (Request $request) use (&$messageId, &$deleteAttempts) {
             if (str_ends_with($request->url(), '/deleteMessage')) {
                 $deleteAttempts++;
-
-                if ($deleteAttempts === 1) {
-                    return Http::response(['ok' => false, 'description' => 'temporary delete failure'], 500);
-                }
 
                 return Http::response(['ok' => true, 'result' => true]);
             }
@@ -106,20 +102,32 @@ class GroupChannelAlertAllClearFormatTest extends TestCase
         ]);
 
         $card = GroupChannelAlertCard::query()->where('group_channel_bot_id', $bot->id)->firstOrFail();
-        $this->assertNotNull($card->telegram_message_id);
+        $historicalMessageId = $card->telegram_message_id;
+        $this->assertNotNull($historicalMessageId);
 
         $service->processSnapshot($bot->fresh(), []);
 
-        $this->assertSame(1, $deleteAttempts);
-        $this->assertDatabaseHas('group_channel_alert_cards', [
-            'id' => $card->id,
-            'telegram_message_id' => $card->telegram_message_id,
+        $this->assertSame(0, $deleteAttempts);
+        $this->assertDatabaseMissing('group_channel_alert_cards', ['id' => $card->id]);
+        Http::assertNotSent(function (Request $request) use ($historicalMessageId): bool {
+            return str_ends_with($request->url(), '/deleteMessage')
+                && (int) $request['message_id'] === $historicalMessageId;
+        });
+
+        $service->processSnapshot($bot->fresh(), [
+            $this->alert('2003', 'Конотопський район', '20', '2026-08-07T21:30:00+03:00'),
         ]);
 
-        $service->processSnapshot($bot->fresh(), []);
-
-        $this->assertSame(2, $deleteAttempts);
-        $this->assertDatabaseMissing('group_channel_alert_cards', ['id' => $card->id]);
+        $this->assertDatabaseHas('group_channel_alert_cards', [
+            'group_channel_bot_id' => $bot->id,
+            'scope_region_uid' => '20',
+            'alert_type' => 'air_raid',
+        ]);
+        $this->assertSame(0, $deleteAttempts);
+        Http::assertNotSent(function (Request $request) use ($historicalMessageId): bool {
+            return str_ends_with($request->url(), '/deleteMessage')
+                && (int) $request['message_id'] === $historicalMessageId;
+        });
     }
 
     private function alertBot(): GroupChannelBot
