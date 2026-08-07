@@ -346,12 +346,15 @@ class GroupChannelAlertPublicationService
             }
 
             $isRefresh = $card !== null || $startedAt->lessThan($now->subMinute());
-            $historySince = $card?->created_at?->toImmutable() ?? $now;
+            $cycleStartedAt = $card?->started_at?->toImmutable();
+            if (! $cycleStartedAt || $startedAt->lessThan($cycleStartedAt)) {
+                $cycleStartedAt = $startedAt;
+            }
             $cardPayload = $this->renderActiveCardPayload(
                 $bot,
                 $states,
                 $startedAt,
-                $historySince,
+                $cycleStartedAt,
                 $now,
                 $isRefresh,
             );
@@ -376,7 +379,7 @@ class GroupChannelAlertPublicationService
                     [
                         'snapshot_hash' => hash('sha256', 'retry|'.$hash),
                         'telegram_message_id' => $card?->telegram_message_id,
-                        'started_at' => $startedAt,
+                        'started_at' => $cycleStartedAt,
                         'published_at' => $card?->published_at,
                     ],
                 );
@@ -407,7 +410,7 @@ class GroupChannelAlertPublicationService
                 [
                     'snapshot_hash' => $hash,
                     'telegram_message_id' => $messageId,
-                    'started_at' => $startedAt,
+                    'started_at' => $cycleStartedAt,
                     'published_at' => $now,
                 ],
             );
@@ -725,7 +728,7 @@ class GroupChannelAlertPublicationService
         GroupChannelBot $bot,
         Collection $states,
         CarbonImmutable $startedAt,
-        CarbonImmutable $historySince,
+        CarbonImmutable $cycleStartedAt,
         CarbonImmutable $updatedAt,
         bool $isRefresh,
     ): array {
@@ -737,7 +740,7 @@ class GroupChannelAlertPublicationService
             $bot,
             $first->scope_region_uid,
             $first->alert_type,
-            $historySince,
+            $cycleStartedAt,
             $oblast,
         );
 
@@ -746,7 +749,20 @@ class GroupChannelAlertPublicationService
         }
 
         $heading = '🔻 Відбій під час цієї тривоги:';
-        $section = "\n\n{$heading}\n{$history}";
+        $separator = "\n\n{$heading}\n";
+        $availableHistoryUnits = 4096
+            - $this->telegramUtf16Length($text)
+            - $this->telegramUtf16Length($separator);
+
+        if ($availableHistoryUnits <= 1) {
+            return ['text' => $text];
+        }
+
+        if ($this->telegramUtf16Length($history) > $availableHistoryUnits) {
+            $history = rtrim(mb_substr($history, 0, max(1, $availableHistoryUnits - 1))).'…';
+        }
+
+        $section = $separator.$history;
         $updatedMarker = "\n🔄";
         $insertAt = strpos($text, $updatedMarker);
 
@@ -772,7 +788,7 @@ class GroupChannelAlertPublicationService
         GroupChannelBot $bot,
         ?string $scopeRegionUid,
         string $alertType,
-        CarbonImmutable $historySince,
+        CarbonImmutable $cycleStartedAt,
         string $oblast,
     ): string {
         return GroupChannelAlertEvent::query()
@@ -781,7 +797,7 @@ class GroupChannelAlertPublicationService
             ->where('scope_region_uid', $scopeRegionUid)
             ->where('alert_type', $alertType)
             ->where('status', GroupChannelAlertEvent::STATUS_SENT)
-            ->where('event_at', '>=', $historySince)
+            ->where('event_at', '>=', $cycleStartedAt)
             ->orderBy('event_at')
             ->orderBy('id')
             ->get()
