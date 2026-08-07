@@ -81,7 +81,7 @@ class GroupChannelAlertPublicationTest extends TestCase
                 && str_contains((string) $request['text'], 'ВІДБІЙ ТРИВОГИ')
                 && str_contains((string) $request['text'], 'Черкаська область');
         });
-        Http::assertSent(function (Request $request): bool {
+        Http::assertNotSent(function (Request $request): bool {
             return str_ends_with($request->url(), '/deleteMessage')
                 && (int) $request['message_id'] === 101;
         });
