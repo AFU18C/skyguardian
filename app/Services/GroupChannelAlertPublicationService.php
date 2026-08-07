@@ -827,8 +827,8 @@ class GroupChannelAlertPublicationService
         }
 
         $summary = $this->historySummary($history->count());
-        $updatedMarker = "
-🔄";
+        $updatedMarker = '
+🔄';
         $insertAt = strpos($text, $updatedMarker);
         $text = $insertAt === false
             ? $this->finishMessage($text."
@@ -933,25 +933,25 @@ class GroupChannelAlertPublicationService
             return null;
         }
 
-        $updatedAt = strpos($text, "
-🔄", $start);
+        $updatedAt = strpos($text, '
+🔄', $start);
         $before = rtrim(substr($text, 0, $start));
         $after = $updatedAt === false ? '' : substr($text, $updatedAt);
 
         if (! $expanded) {
             return $this->finishMessage(
-                $before."
+                $before.'
 
-".$this->historySummary($history->count()).$after,
+'.$this->historySummary($history->count()).$after,
             );
         }
 
         $visible = $history->values();
         do {
             $truncated = $visible->count() < $history->count();
-            $lines = $visible->implode("
-").($truncated ? "
-› …" : '');
+            $lines = $visible->implode('
+').($truncated ? '
+› …' : '');
             $candidate = $this->finishMessage(
                 $before."
 
@@ -967,9 +967,9 @@ class GroupChannelAlertPublicationService
         } while ($visible->isNotEmpty());
 
         return $this->finishMessage(
-            $before."
+            $before.'
 
-".$this->historySummary($history->count()).$after,
+'.$this->historySummary($history->count()).$after,
         );
     }
 

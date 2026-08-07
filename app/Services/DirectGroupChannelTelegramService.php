@@ -83,5 +83,4 @@ class DirectGroupChannelTelegramService extends GroupChannelTelegramService
             fn (mixed $row): bool => is_array($row) && $row !== [],
         ));
     }
-
 }
