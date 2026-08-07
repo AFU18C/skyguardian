@@ -16,7 +16,7 @@ class SourcePollingSettings
 
     public const DEFAULT_INTERVAL_UNIT = 'minutes';
 
-    public const MIN_INTERVAL_SECONDS = 10;
+    public const MIN_INTERVAL_SECONDS = 1;
 
     public const MAX_INTERVAL_SECONDS = 86400;
 
