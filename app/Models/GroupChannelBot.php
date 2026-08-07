@@ -74,7 +74,9 @@ class GroupChannelBot extends Model
 
     public const DEFAULT_ALERT_START_TEMPLATE = "🚨 {headline}\n\n📍 {oblast}\n\n🔴 СТАТУС: АКТИВНА\n{territories}\n\n🔄 Оновлено: {updated}";
 
-    public const DEFAULT_ALERT_END_TEMPLATE = "✅ ВІДБІЙ ТРИВОГИ\n\n📍 {region}\n🕒 Відбій: {time}";
+    public const LEGACY_ALERT_END_TEMPLATE = "✅ ВІДБІЙ ТРИВОГИ\n\n📍 {region}\n🕒 Відбій: {time}";
+
+    public const DEFAULT_ALERT_END_TEMPLATE = "✅ ВІДБІЙ ТРИВОГИ\n\n{clear_blocks}";
 
     public const DEFAULT_ALERT_MAP_BUTTON_TEXT = '🗺 Мапа тривог України';
 
