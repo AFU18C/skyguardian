@@ -113,7 +113,7 @@
                 <label class="sg-switch-row">
                     <span>
                         <strong>Автоматическая проверка источников</strong>
-                        <small>Проверять, наступило ли время <code>next_check_at</code>, только для раздела {{ $pollingSectionName }}.</small>
+                        <small>Раздел только проверяет, наступил ли индивидуальный <code>next_check_at</code> у его источников.</small>
                     </span>
                     <input type="hidden" name="polling_enabled" value="0">
                     <input
@@ -125,7 +125,7 @@
                 </label>
 
                 <div class="sg-field">
-                    <label for="source-polling-interval-{{ $type }}">Проверять наступление времени каждые</label>
+                    <label for="source-polling-interval-{{ $type }}">Интервал опроса раздела</label>
                     <div class="sg-inline-field">
                         <input
                             id="source-polling-interval-{{ $type }}"
@@ -141,7 +141,7 @@
                             <option value="hours" @selected(old('polling_interval_unit', $pollingSettings['interval_unit']) === 'hours')>Часы</option>
                         </select>
                     </div>
-                    <small>Минимальный интервал — 1 секунда. У каждого источника по-прежнему остаётся собственный интервал проверки.</small>
+                    <small>Минимальный интервал — 1 секунда. Реальную проверку источника разрешает только его индивидуальный <code>next_check_at</code>, рассчитанный из его собственного интервала.</small>
                     @error('polling_interval_value')<small class="sg-field-error">{{ $message }}</small>@enderror
                     @error('polling_interval_unit')<small class="sg-field-error">{{ $message }}</small>@enderror
                 </div>
