@@ -25,6 +25,7 @@ class GroupChannelAlertEvent extends Model
         'event_key',
         'kind',
         'region_uid',
+        'scope_region_uid',
         'region_name',
         'alert_type',
         'details',

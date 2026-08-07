@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\GroupChannelAlertCard;
 use App\Models\GroupChannelAlertEvent;
 use App\Models\GroupChannelAlertState;
 use App\Models\GroupChannelBot;
@@ -55,15 +56,22 @@ class GroupChannelAlertPublicationService
                     'baseline' => true,
                     'active' => count($current),
                     'queued' => 0,
+                    'changed_scopes' => [],
                 ];
             }
 
             $queued = 0;
+            $changedScopes = [];
 
             foreach ($current as $key => $item) {
                 $state = $states->get($key);
 
                 if ($state) {
+                    if ($this->stateChanged($state, $item)) {
+                        $changedScopes[$this->cardKey($state->scope_region_uid, $state->alert_type)] = true;
+                        $changedScopes[$this->cardKey($item['scope_region_uid'], $item['alert_type'])] = true;
+                    }
+
                     $state->update($this->statePayload($item, $now));
                     $states->forget($key);
 
@@ -71,22 +79,12 @@ class GroupChannelAlertPublicationService
                 }
 
                 $lockedBot->alertStates()->create($this->statePayload($item, $now));
-
-                if ($lockedBot->moduleSetting(
-                    GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
-                    'publish_start',
-                    true,
-                )) {
-                    $queued += $this->queueEvent(
-                        $lockedBot,
-                        GroupChannelAlertEvent::KIND_START,
-                        $item,
-                        $item['started_at'] ?? $now,
-                    );
-                }
+                $changedScopes[$this->cardKey($item['scope_region_uid'], $item['alert_type'])] = true;
             }
 
             foreach ($states as $state) {
+                $changedScopes[$this->cardKey($state->scope_region_uid, $state->alert_type)] = true;
+
                 if ($lockedBot->moduleSetting(
                     GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
                     'publish_end',
@@ -97,6 +95,7 @@ class GroupChannelAlertPublicationService
                         GroupChannelAlertEvent::KIND_END,
                         [
                             'region_uid' => $state->region_uid,
+                            'scope_region_uid' => $state->scope_region_uid,
                             'region_name' => $state->region_name,
                             'alert_type' => $state->alert_type,
                             'details' => $state->details,
@@ -120,10 +119,26 @@ class GroupChannelAlertPublicationService
                 'baseline' => false,
                 'active' => count($current),
                 'queued' => $queued,
+                'changed_scopes' => array_keys($changedScopes),
             ];
         });
 
-        $sent = $this->deliverPending($bot->fresh());
+        $freshBot = $bot->fresh();
+        $sent = $this->deliverPending($freshBot);
+
+        if (! $result['baseline']) {
+            if ($freshBot->moduleSetting(
+                GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+                'publish_start',
+                true,
+            )) {
+                $sent += $this->syncActiveCards($freshBot, $now, $result['changed_scopes']);
+            } else {
+                $this->removeActiveCards($freshBot);
+            }
+        }
+
+        unset($result['changed_scopes']);
 
         return [...$result, 'sent' => $sent];
     }
@@ -138,6 +153,8 @@ class GroupChannelAlertPublicationService
 
     public function resetBaseline(GroupChannelBot $bot): void
     {
+        $this->removeActiveCards($bot);
+
         DB::transaction(function () use ($bot): void {
             $lockedBot = GroupChannelBot::query()->lockForUpdate()->findOrFail($bot->id);
             $lockedBot->alertStates()->delete();
@@ -185,6 +202,7 @@ class GroupChannelAlertPublicationService
 
         foreach ($events->groupBy(fn (GroupChannelAlertEvent $event): string => implode('|', [
             $event->kind,
+            $event->scope_region_uid ?: 'unknown-scope',
             $event->alert_type,
             $event->event_at->timezone('Europe/Kyiv')->format('Y-m-d H:i'),
             hash('sha256', trim((string) $event->details)),
@@ -245,6 +263,166 @@ class GroupChannelAlertPublicationService
     }
 
     /**
+     * @param  array<int, string>  $changedScopes
+     */
+    private function syncActiveCards(GroupChannelBot $bot, CarbonImmutable $now, array $changedScopes): int
+    {
+        if (! $bot->chat_id) {
+            throw new RuntimeException('Сначала проверьте подключение бота, чтобы определить Chat ID.');
+        }
+
+        $changedScopes = array_fill_keys($changedScopes, true);
+        $groups = GroupChannelAlertState::query()
+            ->where('group_channel_bot_id', $bot->id)
+            ->whereNotNull('scope_region_uid')
+            ->orderBy('region_name')
+            ->get()
+            ->groupBy(fn (GroupChannelAlertState $state): string => $this->cardKey(
+                $state->scope_region_uid,
+                $state->alert_type,
+            ));
+
+        $cards = GroupChannelAlertCard::query()
+            ->where('group_channel_bot_id', $bot->id)
+            ->get()
+            ->keyBy(fn (GroupChannelAlertCard $card): string => $this->cardKey(
+                $card->scope_region_uid,
+                $card->alert_type,
+            ));
+
+        $sent = 0;
+
+        foreach ($groups as $key => $states) {
+            /** @var GroupChannelAlertState $first */
+            $first = $states->first();
+            /** @var GroupChannelAlertCard|null $card */
+            $card = $cards->get($key);
+            $hash = $this->activeSnapshotHash($states);
+            $startedAt = $states
+                ->pluck('started_at')
+                ->filter()
+                ->sortBy(fn (CarbonImmutable $date): int => $date->getTimestamp())
+                ->first()?->toImmutable() ?? $now;
+
+            $cards->forget($key);
+
+            if (! $card && ! isset($changedScopes[$key])) {
+                GroupChannelAlertCard::query()->create([
+                    'group_channel_bot_id' => $bot->id,
+                    'scope_region_uid' => $first->scope_region_uid,
+                    'alert_type' => $first->alert_type,
+                    'snapshot_hash' => $hash,
+                    'telegram_message_id' => null,
+                    'started_at' => $startedAt,
+                    'published_at' => null,
+                ]);
+
+                continue;
+            }
+
+            if ($card && hash_equals($card->snapshot_hash, $hash)) {
+                continue;
+            }
+
+            $isRefresh = $card !== null || $startedAt->lessThan($now->subMinute());
+
+            try {
+                $response = $this->telegram->request($bot, 'sendMessage', [
+                    'chat_id' => $bot->chat_id,
+                    'text' => $this->renderActiveCard($bot, $states, $startedAt, $now, $isRefresh),
+                    'disable_notification' => (bool) $bot->moduleSetting(
+                        GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+                        'disable_notification',
+                        false,
+                    ),
+                ]);
+            } catch (Throwable $e) {
+                GroupChannelAlertCard::query()->updateOrCreate(
+                    [
+                        'group_channel_bot_id' => $bot->id,
+                        'scope_region_uid' => $first->scope_region_uid,
+                        'alert_type' => $first->alert_type,
+                    ],
+                    [
+                        'snapshot_hash' => hash('sha256', 'retry|'.$hash),
+                        'telegram_message_id' => $card?->telegram_message_id,
+                        'started_at' => $startedAt,
+                        'published_at' => $card?->published_at,
+                    ],
+                );
+
+                throw $e;
+            }
+
+            $messageId = is_array($response) && is_numeric($response['message_id'] ?? null)
+                ? (int) $response['message_id']
+                : null;
+            $oldMessageId = $card?->telegram_message_id;
+
+            GroupChannelAlertCard::query()->updateOrCreate(
+                [
+                    'group_channel_bot_id' => $bot->id,
+                    'scope_region_uid' => $first->scope_region_uid,
+                    'alert_type' => $first->alert_type,
+                ],
+                [
+                    'snapshot_hash' => $hash,
+                    'telegram_message_id' => $messageId,
+                    'started_at' => $startedAt,
+                    'published_at' => $now,
+                ],
+            );
+
+            if ($oldMessageId && $oldMessageId !== $messageId) {
+                $this->safeDeleteMessage($bot, $oldMessageId);
+            }
+
+            $sent++;
+        }
+
+        foreach ($cards as $key => $card) {
+            if (! isset($changedScopes[$key])) {
+                continue;
+            }
+
+            if ($card->telegram_message_id) {
+                $this->safeDeleteMessage($bot, $card->telegram_message_id);
+            }
+
+            $card->delete();
+        }
+
+        return $sent;
+    }
+
+    private function removeActiveCards(GroupChannelBot $bot): void
+    {
+        $cards = GroupChannelAlertCard::query()
+            ->where('group_channel_bot_id', $bot->id)
+            ->get();
+
+        foreach ($cards as $card) {
+            if ($bot->chat_id && $card->telegram_message_id) {
+                $this->safeDeleteMessage($bot, $card->telegram_message_id);
+            }
+
+            $card->delete();
+        }
+    }
+
+    private function safeDeleteMessage(GroupChannelBot $bot, int $messageId): void
+    {
+        try {
+            $this->telegram->request($bot, 'deleteMessage', [
+                'chat_id' => $bot->chat_id,
+                'message_id' => $messageId,
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $alerts
      * @return array<string, array<string, mixed>>
      */
@@ -292,6 +470,7 @@ class GroupChannelAlertPublicationService
             $startedAt = $this->date($alert['started_at'] ?? null) ?? $now;
             $item = [
                 'region_uid' => $locationUid,
+                'scope_region_uid' => $scopeRegionUid,
                 'region_name' => $this->locationName($alert, $locationType, $scopeRegionUid),
                 'alert_type' => $alertType,
                 'details' => $this->details($alert['notes'] ?? null),
@@ -369,6 +548,7 @@ class GroupChannelAlertPublicationService
     {
         return [
             'region_uid' => $item['region_uid'],
+            'scope_region_uid' => $item['scope_region_uid'],
             'region_name' => $item['region_name'],
             'alert_type' => $item['alert_type'],
             'details' => $item['details'],
@@ -403,6 +583,7 @@ class GroupChannelAlertPublicationService
             [
                 'kind' => $kind,
                 'region_uid' => $item['region_uid'],
+                'scope_region_uid' => $item['scope_region_uid'] ?? null,
                 'region_name' => $item['region_name'],
                 'alert_type' => $item['alert_type'],
                 'details' => $item['details'] ?? null,
@@ -467,6 +648,102 @@ class GroupChannelAlertPublicationService
                 : $message."\n{$detailsLine}";
         }
 
+        return $this->finishMessage($message);
+    }
+
+    /**
+     * @param  Collection<int, GroupChannelAlertState>  $states
+     */
+    private function renderActiveCard(
+        GroupChannelBot $bot,
+        Collection $states,
+        CarbonImmutable $startedAt,
+        CarbonImmutable $updatedAt,
+        bool $isRefresh,
+    ): string {
+        /** @var GroupChannelAlertState $first */
+        $first = $states->first();
+        $template = trim((string) $bot->moduleSetting(
+            GroupChannelBot::MODULE_ALERT_PUBLICATIONS,
+            'start_template',
+            GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE,
+        ));
+
+        if ($template === '') {
+            $template = GroupChannelBot::DEFAULT_ALERT_START_TEMPLATE;
+        }
+
+        $regions = $states
+            ->pluck('region_name')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->implode("\n📍 ");
+        $details = $states
+            ->pluck('details')
+            ->filter()
+            ->unique()
+            ->values()
+            ->implode("\n🎯 ");
+        $hasDetailsVariable = str_contains($template, '{details}');
+        $message = strtr($template, [
+            '{region}' => $regions,
+            '{time}' => $startedAt->timezone('Europe/Kyiv')->format('H:i'),
+            '{threat_type}' => GroupChannelBot::ALERT_TYPES[$first->alert_type] ?? $first->alert_type,
+            '{details}' => $details,
+        ]);
+
+        if ($details !== '' && ! $hasDetailsVariable) {
+            $detailsLine = "🎯 {$details}";
+            $message = str_contains($message, "\n🕒")
+                ? str_replace("\n🕒", "\n{$detailsLine}\n🕒", $message)
+                : $message."\n{$detailsLine}";
+        }
+
+        if ($isRefresh) {
+            $message .= "\n🔄 Оновлено: ".$updatedAt->timezone('Europe/Kyiv')->format('H:i');
+        }
+
+        return $this->finishMessage($message);
+    }
+
+    /**
+     * @param  Collection<int, GroupChannelAlertState>  $states
+     */
+    private function activeSnapshotHash(Collection $states): string
+    {
+        $payload = $states
+            ->sortBy(fn (GroupChannelAlertState $state): string => $state->region_uid.'|'.$state->alert_type)
+            ->map(fn (GroupChannelAlertState $state): array => [
+                'region_uid' => $state->region_uid,
+                'scope_region_uid' => $state->scope_region_uid,
+                'region_name' => $state->region_name,
+                'alert_type' => $state->alert_type,
+                'details' => $state->details,
+                'source_alert_id' => $state->source_alert_id,
+                'started_at' => $state->started_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
+        return hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function stateChanged(GroupChannelAlertState $state, array $item): bool
+    {
+        return (string) $state->scope_region_uid !== (string) $item['scope_region_uid']
+            || $state->region_name !== $item['region_name']
+            || (string) $state->details !== (string) $item['details']
+            || $state->source_alert_id !== $item['source_alert_id']
+            || $state->started_at?->toIso8601String() !== $item['started_at']->toIso8601String();
+    }
+
+    private function finishMessage(string $message): string
+    {
         $message = trim(preg_replace('/\n{3,}/', "\n\n", $message) ?? $message);
 
         if ($message === '') {
@@ -479,6 +756,11 @@ class GroupChannelAlertPublicationService
     private function stateKey(string $regionUid, string $alertType): string
     {
         return $regionUid.'|'.$alertType;
+    }
+
+    private function cardKey(?string $scopeRegionUid, string $alertType): string
+    {
+        return ($scopeRegionUid ?: 'unknown-scope').'|'.$alertType;
     }
 
     private function date(mixed $value): ?CarbonImmutable

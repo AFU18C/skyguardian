@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\GroupChannelAlertEvent;
 use App\Models\GroupChannelBot;
 use App\Services\AlertsInUaClient;
 use App\Services\GroupChannelAlertPublicationService;
@@ -91,25 +90,36 @@ class GroupChannelAlertOblastMappingTest extends TestCase
 
             $this->assertFalse($result['baseline']);
             $this->assertSame(3, $result['active']);
-            $this->assertSame(2, $result['queued']);
+            $this->assertSame(0, $result['queued']);
             $this->assertSame(2, $result['sent']);
 
             $this->assertDatabaseHas('group_channel_alert_states', [
                 'group_channel_bot_id' => $bot->id,
                 'region_uid' => '5349',
+                'scope_region_uid' => '9',
                 'region_name' => 'Дніпропетровська область — м. Марганець',
             ]);
-            $this->assertDatabaseHas('group_channel_alert_events', [
+            $this->assertDatabaseHas('group_channel_alert_states', [
                 'group_channel_bot_id' => $bot->id,
-                'kind' => GroupChannelAlertEvent::KIND_START,
-                'region_uid' => '5349',
-                'status' => GroupChannelAlertEvent::STATUS_SENT,
-            ]);
-            $this->assertDatabaseHas('group_channel_alert_events', [
-                'group_channel_bot_id' => $bot->id,
-                'kind' => GroupChannelAlertEvent::KIND_START,
                 'region_uid' => '125',
-                'status' => GroupChannelAlertEvent::STATUS_SENT,
+                'scope_region_uid' => '22',
+                'region_name' => 'Харківська область — Ізюмський район',
+            ]);
+            $this->assertDatabaseHas('group_channel_alert_cards', [
+                'group_channel_bot_id' => $bot->id,
+                'scope_region_uid' => '9',
+                'alert_type' => 'air_raid',
+                'telegram_message_id' => 301,
+            ]);
+            $this->assertDatabaseHas('group_channel_alert_cards', [
+                'group_channel_bot_id' => $bot->id,
+                'scope_region_uid' => '22',
+                'alert_type' => 'air_raid',
+                'telegram_message_id' => 301,
+            ]);
+            $this->assertDatabaseMissing('group_channel_alert_events', [
+                'group_channel_bot_id' => $bot->id,
+                'kind' => 'start',
             ]);
 
             Http::assertSent(function (Request $request): bool {
