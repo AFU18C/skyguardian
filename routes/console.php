@@ -24,8 +24,3 @@ Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50'
     ->everySecond()
     ->when(fn (): bool => now()->second === 2)
     ->withoutOverlapping(1);
-
-Schedule::command('skyguardian:promo-campaign:status')
-    ->everySecond()
-    ->when(fn (): bool => now()->second === 7)
-    ->withoutOverlapping(1);
