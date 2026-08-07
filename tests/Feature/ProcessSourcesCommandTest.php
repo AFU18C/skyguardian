@@ -37,7 +37,6 @@ class ProcessSourcesCommandTest extends TestCase
             ]);
 
         $polling = Mockery::mock(SourcePollingSettings::class);
-        $polling->shouldReceive('shouldRun')->twice()->andReturnTrue();
         $polling->shouldReceive('markRun')->twice();
 
         $this->app->instance(SourceScheduler::class, $scheduler);
@@ -68,7 +67,6 @@ class ProcessSourcesCommandTest extends TestCase
         $processor->shouldReceive('process')->once()->andReturn([]);
 
         $polling = Mockery::mock(SourcePollingSettings::class);
-        $polling->shouldReceive('shouldRun')->twice()->andReturnTrue();
         $polling->shouldReceive('markRun')->twice();
 
         $this->app->instance(SourceScheduler::class, $scheduler);
