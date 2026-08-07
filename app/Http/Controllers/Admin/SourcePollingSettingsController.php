@@ -23,10 +23,15 @@ class SourcePollingSettingsController extends Controller
             'hours' => [1, 24],
             default => [1, 1440],
         };
+        $intervalRules = ['required', 'integer', 'min:'.$min, 'max:'.$max];
+
+        if ($unit === 'seconds') {
+            $intervalRules[] = 'multiple_of:10';
+        }
 
         $data = $request->validate([
             'polling_enabled' => ['nullable', 'boolean'],
-            'polling_interval_value' => ['required', 'integer', 'min:'.$min, 'max:'.$max],
+            'polling_interval_value' => $intervalRules,
             'polling_interval_unit' => ['required', Rule::in(['seconds', 'minutes', 'hours'])],
             'source_type' => ['required', Rule::in([$type])],
         ]);
