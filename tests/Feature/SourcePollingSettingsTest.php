@@ -31,7 +31,9 @@ class SourcePollingSettingsTest extends TestCase
                 ->assertSee($label)
                 ->assertSee('Автоматическая проверка источников')
                 ->assertSee('Проверять наступление времени каждые')
-                ->assertSee('value="1"', false);
+                ->assertSee('Секунды')
+                ->assertSee('Минуты')
+                ->assertSee('Часы');
         }
     }
 
@@ -44,31 +46,37 @@ class SourcePollingSettingsTest extends TestCase
             'form_context' => 'source-polling-settings',
             'source_type' => Source::TYPE_NEWS,
             'polling_enabled' => '1',
-            'polling_interval_minutes' => '5',
+            'polling_interval_value' => '5',
+            'polling_interval_unit' => 'minutes',
         ])->assertSessionHasNoErrors();
 
         $this->actingAs($user)->put(route('admin.air-alert.polling-settings.update'), [
             'form_context' => 'source-polling-settings',
             'source_type' => Source::TYPE_AIR_ALERT,
             'polling_enabled' => '0',
-            'polling_interval_minutes' => '1',
+            'polling_interval_value' => '10',
+            'polling_interval_unit' => 'seconds',
         ])->assertSessionHasNoErrors();
 
         $this->assertSame([
             'enabled' => true,
-            'interval_minutes' => 5,
+            'interval_value' => 5,
+            'interval_unit' => 'minutes',
+            'interval_seconds' => 300,
         ], $settings->get(Source::TYPE_NEWS));
         $this->assertSame([
             'enabled' => false,
-            'interval_minutes' => 1,
+            'interval_value' => 10,
+            'interval_unit' => 'seconds',
+            'interval_seconds' => 10,
         ], $settings->get(Source::TYPE_AIR_ALERT));
     }
 
     public function test_automatic_processor_skips_disabled_section_and_respects_its_interval(): void
     {
         $settings = app(SourcePollingSettings::class);
-        $settings->update(Source::TYPE_NEWS, true, 5);
-        $settings->update(Source::TYPE_AIR_ALERT, false, 1);
+        $settings->update(Source::TYPE_NEWS, true, 5, 'minutes');
+        $settings->update(Source::TYPE_AIR_ALERT, false, 10, 'seconds');
 
         $scheduler = Mockery::mock(SourceScheduler::class);
         $scheduler->shouldReceive('due')
@@ -82,26 +90,53 @@ class SourcePollingSettingsTest extends TestCase
         $this->artisan('skyguardian:sources:process')->assertSuccessful();
     }
 
-    public function test_scheduler_does_not_launch_source_processor_before_section_interval_is_due(): void
+    public function test_scheduler_respects_four_minute_section_interval(): void
     {
         $settings = app(SourcePollingSettings::class);
-        $settings->update(Source::TYPE_NEWS, true, 4);
-        $settings->update(Source::TYPE_AIR_ALERT, false, 1);
+        $settings->update(Source::TYPE_NEWS, true, 4, 'minutes');
+        $settings->update(Source::TYPE_AIR_ALERT, false, 10, 'seconds');
 
-        $event = collect(app(Schedule::class)->events())
-            ->first(fn ($event): bool => str_contains((string) $event->command, 'skyguardian:sources:process'));
+        $event = $this->sourceProcessingEvent();
 
-        $this->assertNotNull($event);
         $this->assertTrue($event->filtersPass($this->app));
 
         $settings->markRun(Source::TYPE_NEWS);
 
         $this->assertFalse($event->filtersPass($this->app));
 
-        $this->travel(3)->minutes();
+        $this->travel(239)->seconds();
         $this->assertFalse($event->filtersPass($this->app));
 
-        $this->travel(1)->minutes();
+        $this->travel(1)->seconds();
         $this->assertTrue($event->filtersPass($this->app));
+    }
+
+    public function test_scheduler_respects_ten_second_section_interval(): void
+    {
+        $settings = app(SourcePollingSettings::class);
+        $settings->update(Source::TYPE_NEWS, false, 1, 'minutes');
+        $settings->update(Source::TYPE_AIR_ALERT, true, 10, 'seconds');
+
+        $event = $this->sourceProcessingEvent();
+
+        $this->assertTrue($event->filtersPass($this->app));
+
+        $settings->markRun(Source::TYPE_AIR_ALERT);
+
+        $this->travel(9)->seconds();
+        $this->assertFalse($event->filtersPass($this->app));
+
+        $this->travel(1)->seconds();
+        $this->assertTrue($event->filtersPass($this->app));
+    }
+
+    private function sourceProcessingEvent(): object
+    {
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($event): bool => str_contains((string) $event->command, 'skyguardian:sources:process'));
+
+        $this->assertNotNull($event);
+
+        return $event;
     }
 }
