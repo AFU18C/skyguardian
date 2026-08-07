@@ -1,0 +1,28 @@
+name: Apply Alert History Spoiler
+
+on:
+  push:
+    branches:
+      - fix/alert-history-spoiler
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/alert-history-spoiler
+          fetch-depth: 0
+      - name: Apply change
+        run: python3 .github/scripts/apply_alert_history_spoiler.py
+      - name: Commit change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/Services/GroupChannelAlertPublicationService.php tests/Feature/GroupChannelAlertPublicationTest.php
+          git commit -m "Добавить историю частичных отбоев под спойлером"
+          git push origin HEAD:fix/alert-history-spoiler
