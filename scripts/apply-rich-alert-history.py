@@ -32,7 +32,7 @@ replacement = (
     "    }\n\n"
     "    private function deliverPending"
 )
-text, count = pattern.subn(replacement, text, count=1)
+text, count = pattern.subn(lambda _: replacement, text, count=1)
 if count != 1:
     raise SystemExit(f'publication handleHistoryStart replacement count={count}')
 publication.write_text(text)
@@ -71,7 +71,7 @@ replacement = '''    private function historyBotId(array $update): ?int
     }
 
     private function chatId'''
-text, count = pattern.subn(replacement, text, count=1)
+text, count = pattern.subn(lambda _: replacement, text, count=1)
 if count != 1:
     raise SystemExit(f'controller history method replacement count={count}')
 controller.write_text(text)
