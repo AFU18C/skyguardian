@@ -81,6 +81,41 @@ class GroupChannelAlertDirectTelegramTest extends TestCase
         $this->assertSame('https://example.com/map', $button['url'] ?? null);
     }
 
+    public function test_direct_alert_service_preserves_history_toggle_when_map_button_is_disabled(): void
+    {
+        Http::fake(fn () => Http::response([
+            'ok' => true,
+            'result' => ['message_id' => 1004],
+        ]));
+
+        $bot = $this->bot([
+            'module_settings' => [
+                GroupChannelBot::MODULE_ALERT_PUBLICATIONS => [
+                    'enabled' => true,
+                    'map_button_enabled' => false,
+                ],
+            ],
+        ]);
+
+        app(DirectGroupChannelTelegramService::class)->request($bot, 'sendMessage', [
+            'chat_id' => $bot->chat_id,
+            'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Київська область",
+            'reply_markup' => [
+                'inline_keyboard' => [[
+                    [
+                        'text' => 'Показати історію ▾',
+                        'callback_data' => 'sg_ah:14:air_raid:1786130000:show',
+                    ],
+                ]],
+            ],
+        ]);
+
+        $request = Http::recorded()[0][0];
+
+        $this->assertSame('Показати історію ▾', data_get($request['reply_markup'] ?? [], 'inline_keyboard.0.0.text'));
+        $this->assertCount(1, data_get($request['reply_markup'] ?? [], 'inline_keyboard', []));
+    }
+
     public function test_direct_alert_service_respects_disabled_map_button_setting(): void
     {
         Http::fake(fn () => Http::response([
