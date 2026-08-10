@@ -31,6 +31,27 @@ class BetParser
         $fingerprint = hash('sha256', mb_strtolower($event.'|'.$market.'|'.$eventDay));
         $score = 78 + ($telegramOdds ? 5 : 0) + (! empty($message['date']) ? 4 : 0);
 
+        $sourceType = ($message['source_type'] ?? 'telegram') === 'website' ? 'website' : 'telegram';
+        $source = $sourceType === 'website'
+            ? [
+                'type' => 'website',
+                'name' => $message['source_name'] ?? 'Сайт',
+                'url' => $message['url'] ?? null,
+                'date' => $message['date'] ?? null,
+                'text' => mb_substr($text, 0, 2000),
+            ]
+            : [
+                'type' => 'telegram',
+                'chat_id' => $message['chat_id'] ?? null,
+                'name' => $message['chat_title'] ?? 'Telegram',
+                'chat_title' => $message['chat_title'] ?? 'Telegram',
+                'username' => $message['chat_username'] ?? null,
+                'message_id' => $message['id'] ?? null,
+                'url' => $message['url'] ?? null,
+                'date' => $message['date'] ?? null,
+                'text' => mb_substr($text, 0, 2000),
+            ];
+
         return [
             'fingerprint' => $fingerprint,
             'sport' => $this->sport($text),
@@ -42,16 +63,9 @@ class BetParser
             'market' => $market,
             'telegram_odds' => $telegramOdds,
             'ai_score' => min(97, $score),
-            'ai_reason' => 'Событие и рынок распознаны в Telegram-публикации. Оценка учитывает полноту данных и подтверждение в нескольких источниках.',
-            'telegram_sources' => [[
-                'chat_id' => $message['chat_id'] ?? null,
-                'chat_title' => $message['chat_title'] ?? 'Telegram',
-                'username' => $message['chat_username'] ?? null,
-                'message_id' => $message['id'] ?? null,
-                'url' => $message['url'] ?? null,
-                'date' => $message['date'] ?? null,
-                'text' => mb_substr($text, 0, 2000),
-            ]],
+            'ai_reason' => 'Событие и рынок распознаны в публикации. Оценка учитывает полноту данных и подтверждение в нескольких источниках.',
+            'telegram_sources' => $sourceType === 'telegram' ? [$source] : [],
+            'search_sources' => [$source],
         ];
     }
 

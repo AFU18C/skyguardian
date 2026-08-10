@@ -1,4 +1,9 @@
 @props(['bet', 'bots' => collect(), 'published' => false])
+@php
+    $searchSources = collect($bet->search_sources ?: $bet->telegram_sources ?: []);
+    $telegramSourceCount = $searchSources->filter(fn ($source) => ($source['type'] ?? 'telegram') === 'telegram')->count();
+    $websiteSourceCount = $searchSources->where('type', 'website')->count();
+@endphp
 
 <article class="bet-card">
     <div class="bet-card-main">
@@ -19,7 +24,7 @@
 
     <div class="bet-card-data">
         <div><span>Прогноз</span><strong>{{ $bet->market }}</strong></div>
-        <div><span>Telegram</span><strong>{{ $bet->telegram_odds ? number_format((float) $bet->telegram_odds, 2) : '—' }}</strong></div>
+        <div><span>Из публикации</span><strong>{{ $bet->telegram_odds ? number_format((float) $bet->telegram_odds, 2) : '—' }}</strong></div>
         <div><span>{{ data_get($bet->odds_snapshot, 'primary.name') ?: 'Основной' }}</span><strong>{{ $bet->primary_odds ? number_format((float) $bet->primary_odds, 2) : 'не найден' }}</strong></div>
         <div><span>{{ data_get($bet->odds_snapshot, 'reserve.name') ?: 'Резервный' }}</span><strong>{{ $bet->reserve_odds ? number_format((float) $bet->reserve_odds, 2) : 'не найден' }}</strong></div>
         @if($published)<div><span>Опубликован</span><strong>{{ optional($bet->published_at)->format('d.m.Y H:i') ?: '—' }}</strong></div>@endif
@@ -27,7 +32,7 @@
 
     @if(!$published)
         <p class="bet-reason">{{ $bet->ai_reason }}</p>
-        <div class="bet-sources">Источников Telegram: <b>{{ count($bet->telegram_sources ?? []) }}</b> · Проверено: {{ optional($bet->odds_checked_at)->format('d.m.Y H:i') ?: '—' }}</div>
+        <div class="bet-sources">Источники: Telegram — <b>{{ $telegramSourceCount }}</b>, сайты — <b>{{ $websiteSourceCount }}</b> · Проверено: {{ optional($bet->odds_checked_at)->format('d.m.Y H:i') ?: '—' }}</div>
         <div class="bet-source-health">
             @foreach(['primary' => 'Основной', 'reserve' => 'Резервный'] as $sourceKey => $fallbackLabel)
                 @php($snapshot = data_get($bet->odds_snapshot, $sourceKey, []))
@@ -45,7 +50,7 @@
             </form>
             <form method="POST" action="{{ route('admin.betting.reject', $bet) }}">@csrf<button class="sg-button sg-button-danger sg-button-small" type="submit">× Отклонить</button></form>
         </div>
-        <details class="bet-details"><summary>Telegram-источники</summary><div>@foreach($bet->telegram_sources ?? [] as $source)<p><b>{{ $source['chat_title'] ?? 'Telegram' }}</b> @if(!empty($source['url']))<a href="{{ $source['url'] }}" target="_blank" rel="noopener">Открыть сообщение ↗</a>@endif<br><small>{{ $source['text'] ?? '' }}</small></p>@endforeach</div></details>
+        <details class="bet-details"><summary>Источники найденной ставки</summary><div>@foreach($searchSources as $source)<p><b>{{ ($source['type'] ?? 'telegram') === 'website' ? 'Сайт: '.($source['name'] ?? 'Источник') : 'Telegram: '.($source['chat_title'] ?? $source['name'] ?? 'Канал') }}</b> @if(!empty($source['url']))<a href="{{ $source['url'] }}" target="_blank" rel="noopener">Открыть источник ↗</a>@endif<br><small>{{ $source['text'] ?? '' }}</small></p>@endforeach</div></details>
         <details class="bet-details"><summary>Редактировать перед публикацией</summary>
             <form class="sg-form bet-edit-form" method="POST" action="{{ route('admin.betting.update', $bet) }}">@csrf @method('PUT')
                 <div class="sg-form-grid">

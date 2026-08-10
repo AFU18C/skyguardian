@@ -1,9 +1,15 @@
 <x-layouts.admin title="Ставки">
+    @php
+        $websiteSourcesText = collect($settings->website_sources ?? [])->map(function ($source) {
+            return (($source['enabled'] ?? true) ? '' : '# ').($source['name'] ?? 'Сайт').' | '.($source['url'] ?? '');
+        })->implode("\n");
+    @endphp
     <div class="betting-shell">
         <nav class="betting-tabs" aria-label="Разделы ставок">
             @foreach([
                 'overview' => ['◫', 'Обзор'], 'search' => ['⌕', 'Поиск ставок'],
                 'telegram_sources' => ['✈', 'Telegram-источники'],
+                'website_sources' => ['◎', 'Сайты-источники'],
                 'published' => ['✓', 'Опубликованные'], 'statistics' => ['▥', 'Статистика'],
                 'sources' => ['⌁', 'Источники'], 'channels' => ['➤', 'Каналы публикации'],
                 'settings' => ['⚙', 'Настройки'],
@@ -24,7 +30,10 @@
             </div>
             <section class="sg-section-block">
                 <div class="sg-section-heading"><div><p class="sg-eyebrow">Последние данные</p><h2>Найденные ставки</h2><p>Модуль не работает в фоне. Новый поиск запускается только вручную.</p></div>
-                    <form method="POST" action="{{ route('admin.betting.search') }}">@csrf<button class="sg-button sg-button-primary" type="submit">⌕ Проверить ставки</button></form>
+                    <form class="betting-search-form" method="POST" action="{{ route('admin.betting.search') }}">@csrf
+                        <select name="search_mode" aria-label="Источник поиска"><option value="telegram">Telegram</option><option value="websites">Сайты</option><option value="all">Telegram + сайты</option></select>
+                        <button class="sg-button sg-button-primary" type="submit">⌕ Проверить ставки</button>
+                    </form>
                 </div>
                 @forelse($foundBets->take(3) as $bet)<x-betting.bet-card :bet="$bet" :bots="$bots" />@empty<div class="sg-compact-empty">Подходящих ставок пока нет.</div>@endforelse
             </section>
@@ -32,11 +41,14 @@
 
         @if($tab === 'search')
             <section class="sg-section-block">
-                <div class="sg-section-heading"><div><p class="sg-eyebrow">Ручной запуск</p><h2>Поиск ставок в Telegram</h2><p>После завершения поиск и все связанные процессы полностью останавливаются.</p></div>
-                    <form method="POST" action="{{ route('admin.betting.search') }}">@csrf<button class="sg-button sg-button-primary" type="submit">⌕ Проверить ставки</button></form>
+                <div class="sg-section-heading"><div><p class="sg-eyebrow">Ручной запуск</p><h2>Поиск ставок</h2><p>Выберите Telegram, сайты или оба источника. После завершения все процессы полностью останавливаются.</p></div>
+                    <form class="betting-search-form" method="POST" action="{{ route('admin.betting.search') }}">@csrf
+                        <select name="search_mode" aria-label="Источник поиска"><option value="telegram">Telegram</option><option value="websites">Сайты</option><option value="all">Telegram + сайты</option></select>
+                        <button class="sg-button sg-button-primary" type="submit">⌕ Проверить ставки</button>
+                    </form>
                 </div>
-                @if(empty($settings->telegram_channels))<div class="sg-notice sg-notice-warning">Сначала добавьте каналы в подразделе <a href="{{ route('admin.betting.index', ['tab' => 'telegram_sources']) }}">«Telegram-источники»</a>.</div>@endif
-                @if($latestRun)<div class="betting-run"><span class="sg-status sg-status-{{ $latestRun->status === 'completed' ? 'success' : ($latestRun->status === 'error' ? 'error' : 'warning') }}">{{ $latestRun->status === 'completed' ? 'Завершено' : ($latestRun->status === 'error' ? 'Ошибка' : 'Выполняется') }}</span><span>Сообщений: <b>{{ $latestRun->messages_found }}</b></span><span>Ставок: <b>{{ $latestRun->bets_found }}</b></span><span>{{ optional($latestRun->finished_at)->format('d.m.Y H:i') }}</span></div>@endif
+                @if(empty($settings->telegram_channels) && empty($settings->website_sources))<div class="sg-notice sg-notice-warning">Добавьте хотя бы один Telegram-канал или сайт-источник.</div>@endif
+                @if($latestRun)<div class="betting-run"><span class="sg-status sg-status-{{ $latestRun->status === 'completed' ? 'success' : ($latestRun->status === 'error' ? 'error' : 'warning') }}">{{ $latestRun->status === 'completed' ? 'Завершено' : ($latestRun->status === 'error' ? 'Ошибка' : 'Выполняется') }}</span><span>Источник: <b>{{ match($latestRun->search_mode) {'websites' => 'Сайты', 'all' => 'Telegram + сайты', default => 'Telegram'} }}</b></span><span>Публикаций: <b>{{ $latestRun->messages_found }}</b></span><span>Ставок: <b>{{ $latestRun->bets_found }}</b></span><span>{{ optional($latestRun->finished_at)->format('d.m.Y H:i') }}</span></div>@endif
                 @if($latestRun?->last_error)<div class="sg-notice sg-notice-warning">{{ $latestRun->last_error }}</div>@endif
             </section>
             <div class="betting-list">
@@ -61,12 +73,13 @@
             <div class="sg-notice sg-notice-warning">Проходимость = выигрыши / (выигрыши + проигрыши) × 100%. Возвраты не учитываются.</div>
         @endif
 
-        @if(in_array($tab, ['telegram_sources', 'sources', 'channels', 'settings'], true))
+        @if(in_array($tab, ['telegram_sources', 'website_sources', 'sources', 'channels', 'settings'], true))
             <form class="betting-settings" method="POST" action="{{ route('admin.betting.settings.update') }}">@csrf @method('PUT')
                 <input type="hidden" name="technical_account_id" value="{{ old('technical_account_id', $settings->technical_account_id) }}">
                 <input type="hidden" name="publication_bot_id" value="{{ old('publication_bot_id', $settings->publication_bot_id) }}">
                 <input type="hidden" name="keywords_text" value="{{ old('keywords_text', implode("\n", $settings->keywords ?? [])) }}">
                 <input type="hidden" name="telegram_channels_text" value="{{ old('telegram_channels_text', implode("\n", $settings->telegram_channels ?? [])) }}">
+                <input type="hidden" name="website_sources_text" value="{{ old('website_sources_text', $websiteSourcesText) }}">
                 <input type="hidden" name="freshness_hours" value="{{ old('freshness_hours', $settings->freshness_hours) }}">
                 <input type="hidden" name="minimum_ai_score" value="{{ old('minimum_ai_score', $settings->minimum_ai_score) }}">
                 <input type="hidden" name="maximum_results" value="{{ old('maximum_results', $settings->maximum_results) }}">
@@ -82,6 +95,12 @@
                     <section class="sg-section-block"><div class="sg-section-heading"><div><p class="sg-eyebrow">Поиск в Telegram</p><h2>Каналы-источники</h2><p>Поиск выполняется только в этом списке и только после нажатия «Проверить ставки». Технический аккаунт должен иметь доступ к частным каналам.</p></div></div>
                         <div class="sg-form-grid">
                             <label class="sg-field sg-field-wide"><span>Telegram-каналы — по одному в строке</span><textarea name="telegram_channels_text" rows="10" placeholder="@sports_channel&#10;https://t.me/football_predictions&#10;https://t.me/+AbCdEf123456&#10;-1001234567890">{{ old('telegram_channels_text', implode("\n", $settings->telegram_channels ?? [])) }}</textarea><small>Поддерживаются @username, публичные и приватные ссылки t.me, а также ID канала -100…</small></label>
+                        </div>
+                    </section>
+                @elseif($tab === 'website_sources')
+                    <section class="sg-section-block"><div class="sg-section-heading"><div><p class="sg-eyebrow">Поиск на сайтах</p><h2>Сайты-источники</h2><p>Сайты проверяются только после ручного запуска. Источники коэффициентов настраиваются отдельно.</p></div></div>
+                        <div class="sg-form-grid">
+                            <label class="sg-field sg-field-wide"><span>Сайты — по одному в строке</span><textarea name="website_sources_text" rows="10" placeholder="Название сайта | https://example.com/predictions&#10;# Отключённый сайт | https://example.org/bets">{{ old('website_sources_text', $websiteSourcesText) }}</textarea><small>Формат: «Название | https://адрес». Чтобы временно отключить сайт, поставьте # в начале строки.</small></label>
                         </div>
                     </section>
                 @elseif($tab === 'sources')
