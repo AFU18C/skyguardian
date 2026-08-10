@@ -8,6 +8,7 @@ use App\Models\BettingSetting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Throwable;
 
 class BetSearchService
 {
@@ -18,42 +19,112 @@ class BetSearchService
         private readonly WebsiteBetSearchService $websites,
     ) {}
 
+    public function queue(BettingSetting $settings, string $mode, ?int $requestedByUserId = null): BetSearchRun
+    {
+        $this->assertConfiguration($settings, $mode);
+
+        $active = BetSearchRun::query()
+            ->whereIn('status', [BetSearchRun::STATUS_PENDING, BetSearchRun::STATUS_RUNNING])
+            ->where('created_at', '>=', now()->subHour())
+            ->oldest()
+            ->first();
+
+        if ($active) {
+            throw new RuntimeException('Поиск ставок уже поставлен в очередь или выполняется.');
+        }
+
+        return BetSearchRun::query()->create([
+            'status' => BetSearchRun::STATUS_PENDING,
+            'search_mode' => $mode,
+            'requested_by_user_id' => $requestedByUserId,
+        ]);
+    }
+
+    /**
+     * Synchronous entry point kept for service-level checks and tests.
+     */
     public function run(BettingSetting $settings, string $mode = 'telegram'): BetSearchRun
     {
-        if (! in_array($mode, ['telegram', 'websites', 'all'], true)) {
-            throw new RuntimeException('Неизвестный источник поиска.');
+        $this->assertConfiguration($settings, $mode);
+
+        $run = BetSearchRun::query()->create([
+            'status' => BetSearchRun::STATUS_RUNNING,
+            'search_mode' => $mode,
+            'attempts' => 1,
+            'started_at' => now(),
+        ]);
+
+        return $this->execute($settings, $run);
+    }
+
+    public function runQueued(BetSearchRun $run): BetSearchRun
+    {
+        $claimed = DB::transaction(function () use ($run): ?BetSearchRun {
+            $locked = BetSearchRun::query()->lockForUpdate()->find($run->id);
+            if (! $locked) {
+                return null;
+            }
+
+            $isPending = $locked->status === BetSearchRun::STATUS_PENDING;
+            $isStale = $locked->status === BetSearchRun::STATUS_RUNNING
+                && $locked->started_at?->lte(now()->subMinutes(30));
+
+            if (! $isPending && ! $isStale) {
+                return null;
+            }
+
+            $locked->update([
+                'status' => BetSearchRun::STATUS_RUNNING,
+                'attempts' => $locked->attempts + 1,
+                'started_at' => now(),
+                'finished_at' => null,
+                'last_error' => null,
+            ]);
+
+            return $locked->fresh();
+        });
+
+        if (! $claimed) {
+            return $run->fresh();
         }
 
-        $run = BetSearchRun::query()->create(['status' => 'running', 'search_mode' => $mode]);
-        $channels = array_values(array_filter($settings->telegram_channels ?? [], fn (mixed $channel): bool => is_string($channel) && trim($channel) !== ''));
-        $websiteSources = array_values(array_filter($settings->website_sources ?? [], fn (mixed $source): bool => is_array($source) && ($source['enabled'] ?? true) === true && ! empty($source['url'])));
+        $settings = BettingSetting::current();
+        $this->assertConfiguration($settings, $claimed->search_mode);
+
+        return $this->execute($settings, $claimed);
+    }
+
+    private function execute(BettingSetting $settings, BetSearchRun $run): BetSearchRun
+    {
+        $mode = $run->search_mode;
+        $channels = array_values(array_filter(
+            $settings->telegram_channels ?? [],
+            fn (mixed $channel): bool => is_string($channel) && trim($channel) !== '',
+        ));
+        $websiteSources = array_values(array_filter(
+            $settings->website_sources ?? [],
+            fn (mixed $source): bool => is_array($source)
+                && ($source['enabled'] ?? true) === true
+                && ! empty($source['url']),
+        ));
         $searchTelegram = in_array($mode, ['telegram', 'all'], true);
         $searchWebsites = in_array($mode, ['websites', 'all'], true);
-
-        if ($searchTelegram && $channels === []) {
-            $run->update(['status' => 'error', 'last_error' => 'Добавьте Telegram-каналы для поиска.', 'finished_at' => now()]);
-            throw new RuntimeException('Добавьте хотя бы один Telegram-канал в подразделе «Telegram-источники».');
-        }
-        if ($searchWebsites && $websiteSources === []) {
-            $run->update(['status' => 'error', 'last_error' => 'Добавьте сайты для поиска.', 'finished_at' => now()]);
-            throw new RuntimeException('Добавьте хотя бы один сайт в подразделе «Сайты-источники».');
-        }
-
         $account = $searchTelegram ? $settings->technicalAccount : null;
-        if ($searchTelegram && (! $account || ! $account->is_active || $account->status !== 'connected')) {
-            $run->update(['status' => 'error', 'last_error' => 'Выберите подключённый технический аккаунт.', 'finished_at' => now()]);
-            throw new RuntimeException('Выберите подключённый технический аккаунт для поиска ставок.');
-        }
 
-        $lock = Cache::lock('betting:manual-search', 600);
+        $lock = Cache::lock('betting:manual-search', 1800);
         if (! $lock->get()) {
-            $run->update(['status' => 'error', 'last_error' => 'Поиск уже выполняется.', 'finished_at' => now()]);
+            $run->update([
+                'status' => BetSearchRun::STATUS_ERROR,
+                'last_error' => 'Поиск уже выполняется.',
+                'finished_at' => now(),
+            ]);
             throw new RuntimeException('Поиск ставок уже выполняется. Дождитесь его завершения.');
         }
 
         try {
             $limit = min(500, max(50, $settings->maximum_results * 20));
             $response = ['messages' => [], 'channel_errors' => [], 'source_errors' => []];
+            $telegramResponse = [];
 
             if ($searchTelegram) {
                 $telegramResponse = $this->telethon->call('search_bets', $account, [
@@ -72,7 +143,7 @@ class BetSearchService
                 $response['source_errors'] = $websiteResponse['source_errors'];
             }
 
-            if ($searchTelegram && ! empty($telegramResponse['session'])) {
+            if ($searchTelegram && ! empty($telegramResponse['session']) && $account) {
                 $account->update(['session' => $telegramResponse['session'], 'last_success_at' => now()]);
             }
 
@@ -93,7 +164,10 @@ class BetSearchService
             }
 
             uasort($grouped, fn (array $a, array $b): int => $b['ai_score'] <=> $a['ai_score']);
-            $accepted = array_slice(array_filter($grouped, fn (array $bet): bool => $bet['ai_score'] >= $settings->minimum_ai_score), 0, $settings->maximum_results, true);
+            $accepted = array_slice(array_filter(
+                $grouped,
+                fn (array $bet): bool => $bet['ai_score'] >= $settings->minimum_ai_score,
+            ), 0, $settings->maximum_results, true);
 
             $prepared = [];
             foreach ($accepted as $data) {
@@ -141,7 +215,8 @@ class BetSearchService
                 $errors->push('Не удалось проверить сайты: '.$websiteErrors->join('; ').'.');
             }
             $run->update([
-                'status' => 'completed', 'messages_found' => count($response['messages'] ?? []),
+                'status' => BetSearchRun::STATUS_COMPLETED,
+                'messages_found' => count($response['messages'] ?? []),
                 'bets_found' => count($accepted),
                 'last_error' => $errors->isEmpty() ? null : $errors->join(' '),
                 'finished_at' => now(),
@@ -149,11 +224,47 @@ class BetSearchService
             $this->cleanup($settings);
 
             return $run->fresh();
-        } catch (\Throwable $e) {
-            $run->update(['status' => 'error', 'last_error' => $e->getMessage(), 'finished_at' => now()]);
+        } catch (Throwable $e) {
+            $run->update([
+                'status' => BetSearchRun::STATUS_ERROR,
+                'last_error' => mb_substr($e->getMessage(), 0, 4000),
+                'finished_at' => now(),
+            ]);
             throw $e;
         } finally {
             $lock->release();
+        }
+    }
+
+    private function assertConfiguration(BettingSetting $settings, string $mode): void
+    {
+        if (! in_array($mode, ['telegram', 'websites', 'all'], true)) {
+            throw new RuntimeException('Неизвестный источник поиска.');
+        }
+
+        $searchTelegram = in_array($mode, ['telegram', 'all'], true);
+        $searchWebsites = in_array($mode, ['websites', 'all'], true);
+        $channels = array_values(array_filter(
+            $settings->telegram_channels ?? [],
+            fn (mixed $channel): bool => is_string($channel) && trim($channel) !== '',
+        ));
+        $websiteSources = array_values(array_filter(
+            $settings->website_sources ?? [],
+            fn (mixed $source): bool => is_array($source)
+                && ($source['enabled'] ?? true) === true
+                && ! empty($source['url']),
+        ));
+
+        if ($searchTelegram && $channels === []) {
+            throw new RuntimeException('Добавьте хотя бы один Telegram-канал в подразделе «Telegram-источники».');
+        }
+        if ($searchWebsites && $websiteSources === []) {
+            throw new RuntimeException('Добавьте хотя бы один сайт в подразделе «Сайты-источники».');
+        }
+
+        $account = $searchTelegram ? $settings->technicalAccount : null;
+        if ($searchTelegram && (! $account || ! $account->is_active || $account->status !== 'connected')) {
+            throw new RuntimeException('Выберите подключённый технический аккаунт для поиска ставок.');
         }
     }
 
@@ -173,6 +284,9 @@ class BetSearchService
                 ->where('result_checked_at', '<', now()->subDays($settings->completed_retention_days))
                 ->delete();
         }
-        BetSearchRun::query()->where('created_at', '<', now()->subDays(30))->delete();
+        BetSearchRun::query()
+            ->whereIn('status', [BetSearchRun::STATUS_COMPLETED, BetSearchRun::STATUS_ERROR])
+            ->where('created_at', '<', now()->subDays(30))
+            ->delete();
     }
 }
