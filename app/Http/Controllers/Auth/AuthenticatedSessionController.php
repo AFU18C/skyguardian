@@ -29,10 +29,20 @@ class AuthenticatedSessionController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $key = Str::lower($request->string('email')).'|'.$request->ip();
+        $ip = (string) $request->ip();
+        $identityKey = 'admin-login:identity:'.hash('sha256', Str::lower($request->string('email')).'|'.$ip);
+        $ipKey = 'admin-login:ip:'.hash('sha256', $ip);
 
-        if (RateLimiter::tooManyAttempts($key, 5)) {
-            $seconds = RateLimiter::availableIn($key);
+        if (RateLimiter::tooManyAttempts($ipKey, 15)) {
+            $seconds = RateLimiter::availableIn($ipKey);
+
+            throw ValidationException::withMessages([
+                'email' => "Слишком много попыток входа с этого адреса. Повторите через {$seconds} сек.",
+            ]);
+        }
+
+        if (RateLimiter::tooManyAttempts($identityKey, 5)) {
+            $seconds = RateLimiter::availableIn($identityKey);
 
             throw ValidationException::withMessages([
                 'email' => "Слишком много попыток. Повторите через {$seconds} сек.",
@@ -40,14 +50,16 @@ class AuthenticatedSessionController extends Controller
         }
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
-            RateLimiter::hit($key, 60);
+            RateLimiter::hit($identityKey, 60);
+            RateLimiter::hit($ipKey, 300);
 
             throw ValidationException::withMessages([
                 'email' => 'Неверный Email или пароль.',
             ]);
         }
 
-        RateLimiter::clear($key);
+        RateLimiter::clear($identityKey);
+        RateLimiter::clear($ipKey);
         $request->session()->regenerate();
 
         return redirect()->intended(route('admin.dashboard'))
