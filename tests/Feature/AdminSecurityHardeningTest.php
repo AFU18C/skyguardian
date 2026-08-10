@@ -34,9 +34,11 @@ class AdminSecurityHardeningTest extends TestCase
             'password' => 'wrong-password',
         ]);
 
-        $response->assertSessionHasErrors([
-            'email' => fn (string $message): bool => str_contains($message, 'с этого адреса'),
-        ]);
+        $response->assertSessionHasErrors('email');
+        $this->assertStringContainsString(
+            'с этого адреса',
+            (string) session('errors')?->first('email'),
+        );
     }
 
     #[Test]
