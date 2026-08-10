@@ -7,6 +7,23 @@
     $alignment = in_array($alignmentValue, ['left', 'center', 'right'], true) ? $alignmentValue : 'left';
     $dividerValue = (string) ($data['style'] ?? 'solid');
     $dividerStyle = in_array($dividerValue, ['solid', 'dashed', 'ornament'], true) ? $dividerValue : 'solid';
+    $safePublicUrl = static function (mixed $value, array $schemes = ['http', 'https']): string {
+        $url = trim((string) $value);
+        if ($url === '' || str_starts_with($url, '//')) {
+            return '';
+        }
+        if (str_starts_with($url, '/')) {
+            return $url;
+        }
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return '';
+        }
+
+        return in_array(mb_strtolower((string) parse_url($url, PHP_URL_SCHEME)), $schemes, true) ? $url : '';
+    };
+    $blockSrc = $safePublicUrl($data['src'] ?? '');
+    $blockUrl = $safePublicUrl($data['url'] ?? '');
+    $linkUrl = $safePublicUrl($data['link_url'] ?? '');
 @endphp
 
 @if($type === 'heading')
@@ -19,15 +36,19 @@
         <p>{!! nl2br(e($data['content'] ?? '')) !!}</p>
     </section>
 
-@elseif($type === 'image' && !empty($data['src']))
+@elseif($type === 'image' && $blockSrc !== '')
     <figure class="site-block site-block-image">
-        <img loading="lazy" decoding="async" src="{{ $data['src'] }}" alt="{{ $data['alt'] ?? '' }}">
+        <img loading="lazy" decoding="async" src="{{ $blockSrc }}" alt="{{ $data['alt'] ?? '' }}">
         @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
     </figure>
 
 @elseif($type === 'gallery')
     @php
-        $images = collect(preg_split('/\R/u', (string) ($data['images'] ?? '')))->map(fn ($value) => trim($value))->filter();
+        $images = collect(preg_split('/\R/u', (string) ($data['images'] ?? '')))
+            ->map(fn ($value) => $safePublicUrl($value))
+            ->filter()
+            ->unique()
+            ->values();
         $columns = max(2, min(4, (int) ($data['columns'] ?? 3)));
     @endphp
     @if($images->isNotEmpty())
@@ -38,9 +59,9 @@
         </section>
     @endif
 
-@elseif($type === 'video' && !empty($data['url']))
+@elseif($type === 'video' && $blockUrl !== '')
     @php
-        $videoUrl = (string) $data['url'];
+        $videoUrl = $blockUrl;
         $embedUrl = null;
         if (preg_match('~(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{6,})~', $videoUrl, $match)) {
             $embedUrl = 'https://www.youtube-nocookie.com/embed/'.$match[1];
@@ -59,9 +80,9 @@
         @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
     </figure>
 
-@elseif($type === 'button' && !empty($data['label']) && !empty($data['url']))
+@elseif($type === 'button' && !empty($data['label']) && $blockUrl !== '')
     <section class="site-block site-block-button">
-        <a class="site-button site-button-{{ ($data['style'] ?? 'primary') === 'secondary' ? 'secondary' : 'primary' }}" href="{{ $data['url'] }}" @if($data['new_tab'] ?? false) target="_blank" rel="noopener noreferrer" @endif>
+        <a class="site-button site-button-{{ ($data['style'] ?? 'primary') === 'secondary' ? 'secondary' : 'primary' }}" href="{{ $blockUrl }}" @if($data['new_tab'] ?? false) target="_blank" rel="noopener noreferrer" @endif>
             {{ $data['label'] }}
         </a>
     </section>
@@ -80,7 +101,7 @@
     <section class="site-block site-info-card">
         @if(!empty($data['title']))<h3>{{ $data['title'] }}</h3>@endif
         @if(!empty($data['text']))<p>{!! nl2br(e($data['text'])) !!}</p>@endif
-        @if(!empty($data['link_label']) && !empty($data['link_url']))<a href="{{ $data['link_url'] }}">{{ $data['link_label'] }} →</a>@endif
+        @if(!empty($data['link_label']) && $linkUrl !== '')<a href="{{ $linkUrl }}">{{ $data['link_label'] }} →</a>@endif
     </section>
 
 @elseif($type === 'divider')
@@ -99,14 +120,14 @@
         @if(!empty($data['email']))<div><strong>Email</strong><a href="mailto:{{ $data['email'] }}">{{ $data['email'] }}</a></div>@endif
     </section>
 
-@elseif($type === 'telegram' && !empty($data['url']))
+@elseif($type === 'telegram' && $blockUrl !== '')
     <section class="site-block site-telegram-card">
         <span class="site-telegram-icon" aria-hidden="true">➤</span>
         <div>
             <strong>{{ $data['label'] ?? 'Telegram' }}</strong>
             @if(!empty($data['text']))<p>{{ $data['text'] }}</p>@endif
         </div>
-        <a href="{{ $data['url'] }}" target="_blank" rel="noopener noreferrer">Открыть</a>
+        <a href="{{ $blockUrl }}" target="_blank" rel="noopener noreferrer">Открыть</a>
     </section>
 
 @elseif($type === 'alert_map')
