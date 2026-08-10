@@ -11,29 +11,37 @@ class ProcessGroupChannelWebhookUpdates extends Command
 {
     protected $signature = 'skyguardian:group-channel-webhook-updates:process {--limit=50}';
 
-    protected $description = 'Повторяет обработку неуспешных Telegram webhook updates';
+    protected $description = 'Обрабатывает сохранённые Telegram webhook updates с retry/backoff';
 
     public function handle(GroupChannelWebhookUpdateService $service): int
     {
-        $limit = max(1, (int) $this->option('limit'));
+        $limit = max(1, min(500, (int) $this->option('limit')));
+        $failed = 0;
 
         GroupChannelWebhookUpdate::query()
             ->where(function ($query): void {
                 $query->where('status', GroupChannelWebhookUpdate::STATUS_PENDING)
-                    ->orWhere('status', GroupChannelWebhookUpdate::STATUS_FAILED)
+                    ->orWhere(function ($query): void {
+                        $query->where('status', GroupChannelWebhookUpdate::STATUS_FAILED)
+                            ->where(function ($query): void {
+                                $query->whereNull('next_attempt_at')
+                                    ->orWhere('next_attempt_at', '<=', now());
+                            });
+                    })
                     ->orWhere(function ($query): void {
                         $query->where('status', GroupChannelWebhookUpdate::STATUS_PROCESSING)
                             ->where('updated_at', '<=', now()->subMinutes(2));
                     });
             })
-            ->where('attempts', '<', 10)
+            ->where('attempts', '<', GroupChannelWebhookUpdate::MAX_ATTEMPTS)
             ->oldest('updated_at')
             ->limit($limit)
             ->get()
-            ->each(function (GroupChannelWebhookUpdate $update) use ($service): void {
+            ->each(function (GroupChannelWebhookUpdate $update) use ($service, &$failed): void {
                 try {
                     $service->process($update);
                 } catch (Throwable $e) {
+                    $failed++;
                     report($e);
                     $this->error('Webhook update #'.$update->id.': '.$e->getMessage());
                 }
@@ -44,6 +52,11 @@ class ProcessGroupChannelWebhookUpdates extends Command
             ->where('processed_at', '<', now()->subDays(7))
             ->delete();
 
-        return self::SUCCESS;
+        GroupChannelWebhookUpdate::query()
+            ->where('status', GroupChannelWebhookUpdate::STATUS_DEAD_LETTER)
+            ->where('dead_letter_at', '<', now()->subDays(30))
+            ->delete();
+
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 }
