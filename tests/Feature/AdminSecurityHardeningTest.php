@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdminAuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
@@ -60,7 +61,7 @@ class AdminSecurityHardeningTest extends TestCase
 
         $this->assertStringNotContainsString(
             'must-never-be-logged',
-            (string) \App\Models\AdminAuditLog::query()->firstOrFail()->toJson(),
+            (string) AdminAuditLog::query()->firstOrFail()->toJson(),
         );
     }
 }
