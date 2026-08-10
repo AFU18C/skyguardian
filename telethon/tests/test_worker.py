@@ -165,6 +165,62 @@ class WorkerCopyTest(unittest.TestCase):
         resume_client.send_message.assert_awaited_once()
 
 
+class WorkerAuthenticationTest(unittest.TestCase):
+    def tearDown(self) -> None:
+        worker.qr_flows.clear()
+
+    def test_phone_is_normalized_for_telegram(self) -> None:
+        self.assertEqual("+380986414076", worker.normalize_phone("098 641-40-76"))
+        self.assertEqual("+380986414076", worker.normalize_phone("+380 (98) 641-40-76"))
+        self.assertEqual("+380986414076", worker.normalize_phone("00380986414076"))
+
+    def test_invalid_local_phone_is_rejected_before_telegram_request(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "международном формате"):
+            worker.normalize_phone("986414076")
+
+    def test_telegram_auth_errors_are_explained(self) -> None:
+        phone_error = type("PhoneNumberInvalidError", (Exception,), {})()
+        api_error = type("ApiIdInvalidError", (Exception,), {})()
+
+        self.assertIn("отклонил номер", worker.public_error_message(phone_error))
+        self.assertIn("API ID", worker.public_error_message(api_error))
+
+    def test_qr_confirmation_is_not_lost_before_first_poll(self) -> None:
+        async def scenario() -> None:
+            client = SimpleNamespace(
+                get_me=AsyncMock(return_value=SimpleNamespace(
+                    id=77,
+                    username="guardian",
+                    first_name="Sky",
+                    last_name="Guardian",
+                    phone="380986414076",
+                )),
+                disconnect=AsyncMock(),
+                session=SimpleNamespace(save=Mock(return_value="saved-session")),
+            )
+
+            async def accepted_before_poll():
+                return True
+
+            task = asyncio.create_task(accepted_before_poll())
+            await task
+            worker.qr_flows["accepted"] = worker.QrFlow(
+                client=client,
+                login=SimpleNamespace(),
+                expires_at=(datetime.now(timezone.utc) + timedelta(minutes=1)).timestamp(),
+                wait_task=task,
+            )
+
+            result = await worker.process_qr_wait({"token": "accepted", "timeout": 1})
+
+            self.assertEqual("connected", result["status"])
+            self.assertEqual(77, result["user"]["id"])
+            self.assertEqual("saved-session", result["session"])
+            client.disconnect.assert_awaited_once()
+
+        asyncio.run(scenario())
+
+
 class WorkerBetSearchTest(unittest.TestCase):
     def test_search_deduplicates_messages_and_ignores_stale_results(self) -> None:
         chat = SimpleNamespace(id=77, username="bets", title="Bets")
