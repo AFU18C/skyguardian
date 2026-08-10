@@ -51,12 +51,14 @@ class BettingController extends Controller
     {
         try {
             $run = $service->run(BettingSetting::current());
+
             return redirect()->route('admin.betting.index', ['tab' => 'search'])->with('toast', [
                 'type' => 'success', 'title' => 'Проверка завершена',
                 'message' => "Найдено сообщений: {$run->messages_found}; подходящих ставок: {$run->bets_found}.",
             ]);
         } catch (Throwable $e) {
             report($e);
+
             return redirect()->route('admin.betting.index', ['tab' => 'search'])->with('toast', [
                 'type' => 'error', 'title' => 'Поиск не выполнен', 'message' => $e->getMessage(),
             ]);
@@ -146,10 +148,12 @@ class BettingController extends Controller
         try {
             $messageId = $publisher->publish($bet, $bot);
             $bet->update(['status' => Bet::STATUS_PUBLISHED, 'telegram_message_id' => $messageId, 'published_at' => now(), 'result' => 'pending']);
+
             return back()->with('toast', ['type' => 'success', 'title' => 'Ставка опубликована', 'message' => 'Бот отправил одобренную ставку в выбранный канал.']);
         } catch (Throwable $e) {
             $bet->update(['status' => Bet::STATUS_FOUND]);
             report($e);
+
             return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка публикации', 'message' => $e->getMessage()]);
         }
     }
@@ -158,6 +162,7 @@ class BettingController extends Controller
     {
         abort_unless($bet->status === Bet::STATUS_FOUND, 404);
         $bet->update(['status' => Bet::STATUS_REJECTED]);
+
         return back()->with('toast', ['type' => 'success', 'title' => 'Отклонено', 'message' => 'Ставка перемещена в архив.']);
     }
 
@@ -182,6 +187,7 @@ class BettingController extends Controller
             $data['result_checked_at'] = now();
         }
         $bet->update($data);
+
         return back()->with('toast', ['type' => 'success', 'title' => 'Ставка обновлена', 'message' => 'Изменения сохранены в истории.']);
     }
 
@@ -197,9 +203,11 @@ class BettingController extends Controller
         try {
             $messageId = $publisher->sendResult($bet, $bot, $data['text'] ?? null);
             $bet->update(['result_message_id' => $messageId, 'result_sent_at' => now()]);
+
             return back()->with('toast', ['type' => 'success', 'title' => 'Результат отправлен', 'message' => 'Бот опубликовал результат ставки.']);
         } catch (Throwable $e) {
             report($e);
+
             return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка отправки', 'message' => $e->getMessage()]);
         }
     }

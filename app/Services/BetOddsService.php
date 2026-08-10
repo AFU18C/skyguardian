@@ -160,6 +160,7 @@ class BetOddsService
         }
 
         $start = max(0, min($homePosition, $awayPosition) - 700);
+
         return mb_substr($text, $start, 7000);
     }
 
@@ -174,6 +175,7 @@ class BetOddsService
         }
         if (str_starts_with($market, 'Обе забьют')) {
             $wanted = str_contains(mb_strtolower($market), 'нет') ? 'Нет' : 'Да';
+
             return [$market, 'Обе забьют '.$wanted, "Обидві заб'ють ".$wanted, 'Both teams to score '.$wanted];
         }
         if (preg_match('/^Ф([12])\s*([+-]?[0-9.]+)/u', $market, $match)) {

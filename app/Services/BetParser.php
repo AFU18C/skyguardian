@@ -99,6 +99,7 @@ class BetParser
         foreach ($patterns as $pattern => $prefix) {
             if (preg_match($pattern, $text, $match)) {
                 $value = end($match);
+
                 return $prefix.str_replace(',', '.', (string) $value);
             }
         }

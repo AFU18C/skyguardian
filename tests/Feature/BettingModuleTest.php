@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\Bet;
 use App\Models\BettingSetting;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 

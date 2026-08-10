@@ -74,6 +74,7 @@ class BetSearchService
                         ->first();
                     if (! $existing) {
                         Bet::query()->create(array_merge($data, ['status' => Bet::STATUS_FOUND]));
+
                         continue;
                     }
 
@@ -90,6 +91,7 @@ class BetSearchService
                 'bets_found' => count($accepted), 'finished_at' => now(),
             ]);
             $this->cleanup($settings);
+
             return $run->fresh();
         } catch (\Throwable $e) {
             $run->update(['status' => 'error', 'last_error' => $e->getMessage(), 'finished_at' => now()]);

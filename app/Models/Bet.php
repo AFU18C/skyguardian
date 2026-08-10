@@ -8,8 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Bet extends Model
 {
     public const STATUS_FOUND = 'found';
+
     public const STATUS_PUBLISHING = 'publishing';
+
     public const STATUS_REJECTED = 'rejected';
+
     public const STATUS_PUBLISHED = 'published';
 
     public const RESULTS = ['win', 'loss', 'refund', 'pending'];
