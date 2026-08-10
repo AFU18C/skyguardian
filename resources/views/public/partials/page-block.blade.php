@@ -21,7 +21,7 @@
 
 @elseif($type === 'image' && !empty($data['src']))
     <figure class="site-block site-block-image">
-        <img loading="lazy" src="{{ $data['src'] }}" alt="{{ $data['alt'] ?? '' }}">
+        <img loading="lazy" decoding="async" src="{{ $data['src'] }}" alt="{{ $data['alt'] ?? '' }}">
         @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
     </figure>
 
@@ -33,7 +33,7 @@
     @if($images->isNotEmpty())
         <section class="site-block site-gallery site-gallery-columns-{{ $columns }}">
             @foreach($images as $image)
-                <img loading="lazy" src="{{ $image }}" alt="">
+                <img loading="lazy" decoding="async" src="{{ $image }}" alt="">
             @endforeach
         </section>
     @endif
@@ -50,18 +50,18 @@
     @endphp
     <figure class="site-block site-block-video">
         @if($embedUrl)
-            <div class="site-video-frame"><iframe src="{{ $embedUrl }}" title="Видео" loading="lazy" allowfullscreen></iframe></div>
+            <div class="site-video-frame"><iframe src="{{ $embedUrl }}" title="Видео" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
         @elseif(preg_match('/\.(mp4|webm)(\?.*)?$/i', $videoUrl))
             <video controls preload="metadata" src="{{ $videoUrl }}"></video>
         @else
-            <a class="site-button site-button-secondary" href="{{ $videoUrl }}" target="_blank" rel="noopener">Открыть видео</a>
+            <a class="site-button site-button-secondary" href="{{ $videoUrl }}" target="_blank" rel="noopener noreferrer">Открыть видео</a>
         @endif
         @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
     </figure>
 
 @elseif($type === 'button' && !empty($data['label']) && !empty($data['url']))
     <section class="site-block site-block-button">
-        <a class="site-button site-button-{{ ($data['style'] ?? 'primary') === 'secondary' ? 'secondary' : 'primary' }}" href="{{ $data['url'] }}" @if($data['new_tab'] ?? false) target="_blank" rel="noopener" @endif>
+        <a class="site-button site-button-{{ ($data['style'] ?? 'primary') === 'secondary' ? 'secondary' : 'primary' }}" href="{{ $data['url'] }}" @if($data['new_tab'] ?? false) target="_blank" rel="noopener noreferrer" @endif>
             {{ $data['label'] }}
         </a>
     </section>
@@ -84,7 +84,7 @@
     </section>
 
 @elseif($type === 'divider')
-    <div class="site-block site-divider is-{{ $dividerStyle }}"></div>
+    <div class="site-block site-divider is-{{ $dividerStyle }}" aria-hidden="true"></div>
 
 @elseif($type === 'columns')
     <section class="site-block site-columns">
@@ -101,12 +101,12 @@
 
 @elseif($type === 'telegram' && !empty($data['url']))
     <section class="site-block site-telegram-card">
-        <span class="site-telegram-icon">➤</span>
+        <span class="site-telegram-icon" aria-hidden="true">➤</span>
         <div>
             <strong>{{ $data['label'] ?? 'Telegram' }}</strong>
             @if(!empty($data['text']))<p>{{ $data['text'] }}</p>@endif
         </div>
-        <a href="{{ $data['url'] }}" target="_blank" rel="noopener">Открыть</a>
+        <a href="{{ $data['url'] }}" target="_blank" rel="noopener noreferrer">Открыть</a>
     </section>
 
 @elseif($type === 'alert_map')
@@ -138,6 +138,13 @@
                 sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             ></iframe>
         </div>
+        <p class="site-alert-map-source">
+            Карта загружается с внешнего сервиса alerts.in.ua.
+            <a href="{{ $mapUrl }}" target="_blank" rel="noopener noreferrer">Открыть карту отдельно</a>
+        </p>
+        <noscript>
+            <p><a href="{{ $mapUrl }}" target="_blank" rel="noopener noreferrer">Открыть карту воздушных тревог</a></p>
+        </noscript>
     </section>
 
 @elseif($type === 'html')
