@@ -14,6 +14,7 @@
         'resources/css/source-health.css',
         'resources/css/group-channel.css',
         'resources/css/site-settings.css',
+        'resources/css/betting.css',
         'resources/js/app.js',
         'resources/js/group-channel-management.js',
         'resources/js/collapsible-cards.js',

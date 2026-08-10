@@ -7,12 +7,13 @@ import re
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlparse
 
 from telethon import TelegramClient
-from telethon.errors import AuthTokenExpiredError, SessionPasswordNeededError
+from telethon.errors import AuthTokenExpiredError, FloodWaitError, SessionPasswordNeededError
 from telethon.sessions import StringSession
 from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 
@@ -42,6 +43,52 @@ class PartialCopyError(RuntimeError):
         super().__init__(message)
         self.message_ids = message_ids
         self.stage = stage
+
+
+async def search_bet_messages(
+    client: TelegramClient,
+    keywords: list[str],
+    freshness_hours: int = 24,
+    total_limit: int = 100,
+) -> list[dict[str, Any]]:
+    normalized_keywords = [str(value).strip() for value in keywords if str(value).strip()]
+    if not normalized_keywords:
+        raise RuntimeError("Не заданы ключевые слова для поиска ставок.")
+
+    freshness_hours = min(max(int(freshness_hours), 1), 720)
+    total_limit = min(max(int(total_limit), 1), 500)
+    per_keyword = max(10, min(100, total_limit // len(normalized_keywords) + 1))
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=freshness_hours)
+    found: dict[str, dict[str, Any]] = {}
+
+    for keyword in normalized_keywords:
+        try:
+            async for message in client.iter_messages(None, search=keyword, limit=per_keyword):
+                if message.date and message.date < cutoff:
+                    break
+                chat = await message.get_chat()
+                chat_id = getattr(chat, "id", None)
+                key = f"{chat_id}:{message.id}"
+                username = getattr(chat, "username", None)
+                found[key] = {
+                    "id": int(message.id),
+                    "date": message.date.isoformat() if message.date else None,
+                    "text": message.message,
+                    "chat_id": chat_id,
+                    "chat_title": getattr(chat, "title", None) or getattr(chat, "first_name", None),
+                    "chat_username": username,
+                    "url": f"https://t.me/{username}/{message.id}" if username else None,
+                }
+                if len(found) >= total_limit:
+                    break
+        except FloodWaitError as exc:
+            if exc.seconds > 60:
+                raise RuntimeError(f"Telegram ограничил поиск на {exc.seconds} сек.") from exc
+            await asyncio.sleep(exc.seconds)
+        if len(found) >= total_limit:
+            break
+
+    return list(found.values())
 
 
 class TelegramHtmlSanitizer(HTMLParser):
@@ -498,6 +545,18 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
                 "ok": True,
                 "session": client.session.save(),
                 "messages": messages,
+            }
+
+        if action == "search_bets":
+            return {
+                "ok": True,
+                "session": client.session.save(),
+                "messages": await search_bet_messages(
+                    client,
+                    payload.get("keywords", []),
+                    int(payload.get("freshness_hours") or 24),
+                    int(payload.get("limit") or 100),
+                ),
             }
 
         if action == "copy_messages":

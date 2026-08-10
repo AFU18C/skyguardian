@@ -2,6 +2,7 @@ import asyncio
 import importlib.util
 import sys
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
@@ -162,6 +163,43 @@ class WorkerCopyTest(unittest.TestCase):
         self.assertIsNone(second["partial_delivery"])
         resume_client.send_file.assert_not_awaited()
         resume_client.send_message.assert_awaited_once()
+
+
+class WorkerBetSearchTest(unittest.TestCase):
+    def test_search_deduplicates_messages_and_ignores_stale_results(self) -> None:
+        chat = SimpleNamespace(id=77, username="bets", title="Bets")
+        recent = SimpleNamespace(
+            id=10,
+            date=datetime.now(timezone.utc) - timedelta(hours=1),
+            message="Реал — Барселона, П1",
+            get_chat=AsyncMock(return_value=chat),
+        )
+        stale = SimpleNamespace(
+            id=11,
+            date=datetime.now(timezone.utc) - timedelta(hours=30),
+            message="Старый прогноз",
+            get_chat=AsyncMock(return_value=chat),
+        )
+
+        async def iter_messages(*_args, **_kwargs):
+            yield recent
+            yield stale
+
+        client = SimpleNamespace(iter_messages=iter_messages)
+        result = asyncio.run(worker.search_bet_messages(
+            client,
+            ["П1", "П1"],
+            freshness_hours=24,
+            total_limit=10,
+        ))
+
+        self.assertEqual(1, len(result))
+        self.assertEqual(10, result[0]["id"])
+        self.assertEqual("https://t.me/bets/10", result[0]["url"])
+
+    def test_search_requires_keywords(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "ключевые слова"):
+            asyncio.run(worker.search_bet_messages(SimpleNamespace(), []))
 
 
 if __name__ == "__main__":
