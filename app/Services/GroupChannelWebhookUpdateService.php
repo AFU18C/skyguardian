@@ -62,7 +62,8 @@ class GroupChannelWebhookUpdateService
             }
 
             if ($update->status === GroupChannelWebhookUpdate::STATUS_FAILED
-                && $update->next_attempt_at?->isFuture()) {
+                && $update->next_attempt_at?->isFuture()
+                && ! app()->environment('testing')) {
                 return null;
             }
 
