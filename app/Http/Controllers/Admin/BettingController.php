@@ -23,7 +23,7 @@ class BettingController extends Controller
     public function index(Request $request): View
     {
         $settings = BettingSetting::current();
-        $tab = in_array($request->string('tab')->value(), ['overview', 'search', 'published', 'statistics', 'sources', 'channels', 'settings'], true)
+        $tab = in_array($request->string('tab')->value(), ['overview', 'search', 'telegram_sources', 'published', 'statistics', 'sources', 'channels', 'settings'], true)
             ? $request->string('tab')->value() : 'overview';
         $statistics = [
             'total' => Bet::query()->where('status', Bet::STATUS_PUBLISHED)->count(),
@@ -71,6 +71,7 @@ class BettingController extends Controller
             'technical_account_id' => ['nullable', 'exists:technical_accounts,id'],
             'publication_bot_id' => ['nullable', 'exists:group_channel_bots,id'],
             'keywords_text' => ['required', 'string', 'max:10000'],
+            'telegram_channels_text' => ['nullable', 'string', 'max:20000'],
             'freshness_hours' => ['required', 'integer', 'min:1', 'max:720'],
             'minimum_ai_score' => ['required', 'integer', 'min:1', 'max:100'],
             'maximum_results' => ['required', 'integer', 'min:1', 'max:100'],
@@ -92,6 +93,27 @@ class BettingController extends Controller
         if (empty($data['keywords'])) {
             return back()->withErrors(['keywords_text' => 'Добавьте хотя бы одну поисковую фразу.'])->withInput();
         }
+        $channelLines = collect(preg_split('/\R/u', (string) ($data['telegram_channels_text'] ?? '')))
+            ->map(fn (string $channel): string => trim($channel))
+            ->filter()
+            ->values();
+        $invalidChannels = $channelLines
+            ->filter(fn (string $channel): bool => $this->normalizeTelegramChannel($channel) === null)
+            ->values();
+        if ($invalidChannels->isNotEmpty()) {
+            return back()->withErrors([
+                'telegram_channels_text' => 'Неверный Telegram-канал: '.$invalidChannels->first().'. Укажите @username, ссылку t.me/username или ID -100…',
+            ])->withInput();
+        }
+        $data['telegram_channels'] = $channelLines
+            ->map(fn (string $channel): string => $this->normalizeTelegramChannel($channel))
+            ->unique(fn (string $channel): string => mb_strtolower($channel))
+            ->values()
+            ->all();
+        if (count($data['telegram_channels']) > 100) {
+            return back()->withErrors(['telegram_channels_text' => 'Можно добавить не более 100 Telegram-каналов.'])->withInput();
+        }
+        unset($data['telegram_channels_text']);
         $settings = BettingSetting::current();
         $settings->update($data);
         $service->cleanup($settings->fresh());
@@ -245,5 +267,22 @@ class BettingController extends Controller
             'title' => 'Архив очищен',
             'message' => "Удалено записей: {$deleted}.",
         ]);
+    }
+
+    private function normalizeTelegramChannel(string $channel): ?string
+    {
+        if (preg_match('/^-100\d{5,20}$/', $channel) === 1) {
+            return $channel;
+        }
+
+        if (preg_match('~^(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me)/(?:s/)?([A-Za-z][A-Za-z0-9_]{4,31})(?:/\d+)?/?(?:\?.*)?$~i', $channel, $matches) === 1) {
+            return '@'.mb_strtolower($matches[1]);
+        }
+
+        if (preg_match('/^@?([A-Za-z][A-Za-z0-9_]{4,31})$/', $channel, $matches) === 1) {
+            return '@'.mb_strtolower($matches[1]);
+        }
+
+        return null;
     }
 }

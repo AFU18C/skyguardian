@@ -20,6 +20,11 @@ class BetSearchService
     public function run(BettingSetting $settings): BetSearchRun
     {
         $run = BetSearchRun::query()->create(['status' => 'running']);
+        $channels = array_values(array_filter($settings->telegram_channels ?? [], fn (mixed $channel): bool => is_string($channel) && trim($channel) !== ''));
+        if ($channels === []) {
+            $run->update(['status' => 'error', 'last_error' => 'Добавьте Telegram-каналы для поиска.', 'finished_at' => now()]);
+            throw new RuntimeException('Добавьте хотя бы один Telegram-канал в подразделе «Telegram-источники».');
+        }
         $account = $settings->technicalAccount;
         if (! $account || ! $account->is_active || $account->status !== 'connected') {
             $run->update(['status' => 'error', 'last_error' => 'Выберите подключённый технический аккаунт.', 'finished_at' => now()]);
@@ -35,6 +40,7 @@ class BetSearchService
         try {
             $response = $this->telethon->call('search_bets', $account, [
                 'keywords' => $settings->keywords,
+                'channels' => $channels,
                 'freshness_hours' => $settings->freshness_hours,
                 'limit' => min(500, max(50, $settings->maximum_results * 20)),
             ]);
@@ -86,9 +92,17 @@ class BetSearchService
                 }
             });
 
+            $channelErrors = collect($response['channel_errors'] ?? [])
+                ->pluck('channel')
+                ->filter()
+                ->values();
             $run->update([
                 'status' => 'completed', 'messages_found' => count($response['messages'] ?? []),
-                'bets_found' => count($accepted), 'finished_at' => now(),
+                'bets_found' => count($accepted),
+                'last_error' => $channelErrors->isEmpty()
+                    ? null
+                    : 'Не удалось проверить каналы: '.$channelErrors->join(', ').'.',
+                'finished_at' => now(),
             ]);
             $this->cleanup($settings);
 

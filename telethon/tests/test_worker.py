@@ -241,21 +241,63 @@ class WorkerBetSearchTest(unittest.TestCase):
             yield recent
             yield stale
 
-        client = SimpleNamespace(iter_messages=iter_messages)
+        client = SimpleNamespace(
+            get_entity=AsyncMock(return_value=chat),
+            iter_messages=iter_messages,
+        )
         result = asyncio.run(worker.search_bet_messages(
             client,
             ["П1", "П1"],
+            ["@bets"],
             freshness_hours=24,
             total_limit=10,
         ))
 
-        self.assertEqual(1, len(result))
-        self.assertEqual(10, result[0]["id"])
-        self.assertEqual("https://t.me/bets/10", result[0]["url"])
+        self.assertEqual(1, len(result["messages"]))
+        self.assertEqual(10, result["messages"][0]["id"])
+        self.assertEqual("https://t.me/bets/10", result["messages"][0]["url"])
+        self.assertEqual(1, result["channels_checked"])
+        client.get_entity.assert_awaited_once_with("@bets")
 
     def test_search_requires_keywords(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "ключевые слова"):
-            asyncio.run(worker.search_bet_messages(SimpleNamespace(), []))
+            asyncio.run(worker.search_bet_messages(SimpleNamespace(), [], ["@bets"]))
+
+    def test_search_requires_configured_channels(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "Telegram-каналы"):
+            asyncio.run(worker.search_bet_messages(SimpleNamespace(), ["П1"], []))
+
+    def test_search_skips_unavailable_channel_and_never_uses_global_search(self) -> None:
+        chat = SimpleNamespace(id=77, username="bets", title="Bets")
+        message = SimpleNamespace(
+            id=10,
+            date=datetime.now(timezone.utc),
+            message="Реал — Барселона, П1",
+            get_chat=AsyncMock(return_value=chat),
+        )
+
+        async def get_entity(peer):
+            if peer == "@missing":
+                raise RuntimeError("not found")
+            return chat
+
+        calls = []
+
+        async def iter_messages(entity, **kwargs):
+            calls.append((entity, kwargs))
+            yield message
+
+        result = asyncio.run(worker.search_bet_messages(
+            SimpleNamespace(get_entity=get_entity, iter_messages=iter_messages),
+            ["П1"],
+            ["@missing", "@bets"],
+            total_limit=10,
+        ))
+
+        self.assertEqual(1, result["channels_checked"])
+        self.assertEqual("@missing", result["channel_errors"][0]["channel"])
+        self.assertTrue(all(entity is chat for entity, _kwargs in calls))
+        self.assertTrue(all("search" not in kwargs for _entity, kwargs in calls))
 
 
 if __name__ == "__main__":

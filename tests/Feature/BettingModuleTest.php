@@ -34,6 +34,7 @@ class BettingModuleTest extends TestCase
 
         $this->actingAs($user)->put(route('admin.betting.settings.update'), [
             'keywords_text' => "ставка дня\nтотал больше",
+            'telegram_channels_text' => "https://t.me/Sports_Channel/123\n@sports_channel\n-1001234567890",
             'freshness_hours' => 12,
             'minimum_ai_score' => 85,
             'maximum_results' => 15,
@@ -47,6 +48,7 @@ class BettingModuleTest extends TestCase
         $this->assertSame(12, $settings->freshness_hours);
         $this->assertSame(85, $settings->minimum_ai_score);
         $this->assertSame(['ставка дня', 'тотал больше'], $settings->keywords);
+        $this->assertSame(['@sports_channel', '-1001234567890'], $settings->telegram_channels);
     }
 
     #[Test]

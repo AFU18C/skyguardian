@@ -86,24 +86,39 @@ class PartialCopyError(RuntimeError):
 async def search_bet_messages(
     client: TelegramClient,
     keywords: list[str],
+    channels: list[str],
     freshness_hours: int = 24,
     total_limit: int = 100,
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     normalized_keywords = [str(value).strip() for value in keywords if str(value).strip()]
     if not normalized_keywords:
         raise RuntimeError("Не заданы ключевые слова для поиска ставок.")
+    normalized_channels = list(dict.fromkeys(
+        str(value).strip() for value in channels if str(value).strip()
+    ))
+    if not normalized_channels:
+        raise RuntimeError("Не заданы Telegram-каналы для поиска ставок.")
 
     freshness_hours = min(max(int(freshness_hours), 1), 720)
     total_limit = min(max(int(total_limit), 1), 500)
-    per_keyword = max(10, min(100, total_limit // len(normalized_keywords) + 1))
+    normalized_keyword_checks = [value.casefold() for value in normalized_keywords]
+    per_channel_limit = max(50, min(300, total_limit))
     cutoff = datetime.now(timezone.utc) - timedelta(hours=freshness_hours)
     found: dict[str, dict[str, Any]] = {}
+    channel_errors: list[dict[str, str]] = []
+    channels_checked = 0
 
-    for keyword in normalized_keywords:
+    for channel in normalized_channels:
         try:
-            async for message in client.iter_messages(None, search=keyword, limit=per_keyword):
+            peer: str | int = int(channel) if re.fullmatch(r"-?\d+", channel) else channel
+            entity = await client.get_entity(peer)
+
+            async for message in client.iter_messages(entity, limit=per_channel_limit):
                 if message.date and message.date < cutoff:
                     break
+                message_text = str(message.message or "")
+                if not any(keyword in message_text.casefold() for keyword in normalized_keyword_checks):
+                    continue
                 chat = await message.get_chat()
                 chat_id = getattr(chat, "id", None)
                 key = f"{chat_id}:{message.id}"
@@ -119,14 +134,25 @@ async def search_bet_messages(
                 }
                 if len(found) >= total_limit:
                     break
+            channels_checked += 1
         except FloodWaitError as exc:
             if exc.seconds > 60:
                 raise RuntimeError(f"Telegram ограничил поиск на {exc.seconds} сек.") from exc
             await asyncio.sleep(exc.seconds)
+        except Exception:
+            channel_errors.append({"channel": channel, "error": "Канал недоступен для технического аккаунта."})
         if len(found) >= total_limit:
             break
 
-    return list(found.values())
+    if channels_checked == 0:
+        unavailable = ", ".join(item["channel"] for item in channel_errors[:10])
+        raise RuntimeError(f"Не удалось открыть ни одного Telegram-канала: {unavailable}.")
+
+    return {
+        "messages": list(found.values()),
+        "channels_checked": channels_checked,
+        "channel_errors": channel_errors,
+    }
 
 
 class TelegramHtmlSanitizer(HTMLParser):
@@ -599,15 +625,17 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
             }
 
         if action == "search_bets":
+            search_result = await search_bet_messages(
+                client,
+                payload.get("keywords", []),
+                payload.get("channels", []),
+                int(payload.get("freshness_hours") or 24),
+                int(payload.get("limit") or 100),
+            )
             return {
                 "ok": True,
                 "session": client.session.save(),
-                "messages": await search_bet_messages(
-                    client,
-                    payload.get("keywords", []),
-                    int(payload.get("freshness_hours") or 24),
-                    int(payload.get("limit") or 100),
-                ),
+                **search_result,
             }
 
         if action == "copy_messages":
