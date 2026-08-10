@@ -39,21 +39,38 @@ class GroupChannelWebhookUpdateService
                 ->lockForUpdate()
                 ->findOrFail($storedUpdate->id);
 
-            if ($update->status === GroupChannelWebhookUpdate::STATUS_PROCESSED) {
+            if (in_array($update->status, [
+                GroupChannelWebhookUpdate::STATUS_PROCESSED,
+                GroupChannelWebhookUpdate::STATUS_DEAD_LETTER,
+            ], true)) {
                 return null;
             }
 
-            if (
-                $update->status === GroupChannelWebhookUpdate::STATUS_PROCESSING
-                && $update->updated_at->gt(now()->subMinutes(2))
-            ) {
-                throw new RuntimeException('Telegram update уже обрабатывается.');
+            if ($update->attempts >= GroupChannelWebhookUpdate::MAX_ATTEMPTS) {
+                $update->forceFill([
+                    'status' => GroupChannelWebhookUpdate::STATUS_DEAD_LETTER,
+                    'dead_letter_at' => $update->dead_letter_at ?? now(),
+                    'next_attempt_at' => null,
+                ])->save();
+
+                return null;
+            }
+
+            if ($update->status === GroupChannelWebhookUpdate::STATUS_PROCESSING
+                && $update->updated_at->gt(now()->subMinutes(2))) {
+                return null;
+            }
+
+            if ($update->status === GroupChannelWebhookUpdate::STATUS_FAILED
+                && $update->next_attempt_at?->isFuture()) {
+                return null;
             }
 
             $update->forceFill([
                 'status' => GroupChannelWebhookUpdate::STATUS_PROCESSING,
                 'attempts' => $update->attempts + 1,
                 'last_error' => null,
+                'next_attempt_at' => null,
             ])->save();
 
             return $update;
@@ -77,16 +94,31 @@ class GroupChannelWebhookUpdateService
                 'status' => GroupChannelWebhookUpdate::STATUS_PROCESSED,
                 'processed_at' => now(),
                 'last_error' => null,
+                'next_attempt_at' => null,
+                'dead_letter_at' => null,
             ])->save();
             $bot->update([
-                'last_update_at' => now(),
                 'webhook_last_error' => null,
             ]);
         } catch (Throwable $e) {
+            $isDeadLetter = $claimed->attempts >= GroupChannelWebhookUpdate::MAX_ATTEMPTS;
+            $delaySeconds = min(900, 5 * (2 ** max(0, $claimed->attempts - 1)));
+
             $claimed->forceFill([
-                'status' => GroupChannelWebhookUpdate::STATUS_FAILED,
-                'last_error' => $e->getMessage(),
+                'status' => $isDeadLetter
+                    ? GroupChannelWebhookUpdate::STATUS_DEAD_LETTER
+                    : GroupChannelWebhookUpdate::STATUS_FAILED,
+                'last_error' => mb_substr($e->getMessage(), 0, 4000),
+                'next_attempt_at' => $isDeadLetter ? null : now()->addSeconds($delaySeconds),
+                'dead_letter_at' => $isDeadLetter ? now() : null,
             ])->save();
+
+            $claimed->bot?->update([
+                'webhook_last_error' => $isDeadLetter
+                    ? 'Webhook update #'.$claimed->telegram_update_id.' перемещён в dead-letter: '.$e->getMessage()
+                    : $e->getMessage(),
+            ]);
+
             throw $e;
         }
     }
