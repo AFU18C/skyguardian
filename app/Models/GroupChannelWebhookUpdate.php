@@ -15,6 +15,10 @@ class GroupChannelWebhookUpdate extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const STATUS_DEAD_LETTER = 'dead_letter';
+
+    public const MAX_ATTEMPTS = 10;
+
     protected $fillable = [
         'group_channel_bot_id',
         'telegram_update_id',
@@ -22,7 +26,9 @@ class GroupChannelWebhookUpdate extends Model
         'status',
         'attempts',
         'last_error',
+        'next_attempt_at',
         'processed_at',
+        'dead_letter_at',
     ];
 
     protected $attributes = [
@@ -35,7 +41,9 @@ class GroupChannelWebhookUpdate extends Model
         return [
             'payload' => 'array',
             'attempts' => 'integer',
+            'next_attempt_at' => 'datetime',
             'processed_at' => 'datetime',
+            'dead_letter_at' => 'datetime',
         ];
     }
 

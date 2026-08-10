@@ -7,6 +7,23 @@
     $alignment = in_array($alignmentValue, ['left', 'center', 'right'], true) ? $alignmentValue : 'left';
     $dividerValue = (string) ($data['style'] ?? 'solid');
     $dividerStyle = in_array($dividerValue, ['solid', 'dashed', 'ornament'], true) ? $dividerValue : 'solid';
+    $safePublicUrl = static function (mixed $value, array $schemes = ['http', 'https']): string {
+        $url = trim((string) $value);
+        if ($url === '' || str_starts_with($url, '//')) {
+            return '';
+        }
+        if (str_starts_with($url, '/')) {
+            return $url;
+        }
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return '';
+        }
+
+        return in_array(mb_strtolower((string) parse_url($url, PHP_URL_SCHEME)), $schemes, true) ? $url : '';
+    };
+    $blockSrc = $safePublicUrl($data['src'] ?? '');
+    $blockUrl = $safePublicUrl($data['url'] ?? '');
+    $linkUrl = $safePublicUrl($data['link_url'] ?? '');
 @endphp
 
 @if($type === 'heading')
@@ -19,28 +36,32 @@
         <p>{!! nl2br(e($data['content'] ?? '')) !!}</p>
     </section>
 
-@elseif($type === 'image' && !empty($data['src']))
+@elseif($type === 'image' && $blockSrc !== '')
     <figure class="site-block site-block-image">
-        <img loading="lazy" src="{{ $data['src'] }}" alt="{{ $data['alt'] ?? '' }}">
+        <img loading="lazy" decoding="async" src="{{ $blockSrc }}" alt="{{ $data['alt'] ?? '' }}">
         @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
     </figure>
 
 @elseif($type === 'gallery')
     @php
-        $images = collect(preg_split('/\R/u', (string) ($data['images'] ?? '')))->map(fn ($value) => trim($value))->filter();
+        $images = collect(preg_split('/\R/u', (string) ($data['images'] ?? '')))
+            ->map(fn ($value) => $safePublicUrl($value))
+            ->filter()
+            ->unique()
+            ->values();
         $columns = max(2, min(4, (int) ($data['columns'] ?? 3)));
     @endphp
     @if($images->isNotEmpty())
         <section class="site-block site-gallery site-gallery-columns-{{ $columns }}">
             @foreach($images as $image)
-                <img loading="lazy" src="{{ $image }}" alt="">
+                <img loading="lazy" decoding="async" src="{{ $image }}" alt="">
             @endforeach
         </section>
     @endif
 
-@elseif($type === 'video' && !empty($data['url']))
+@elseif($type === 'video' && $blockUrl !== '')
     @php
-        $videoUrl = (string) $data['url'];
+        $videoUrl = $blockUrl;
         $embedUrl = null;
         if (preg_match('~(?:youtube\.com/watch\?v=|youtu\.be/)([A-Za-z0-9_-]{6,})~', $videoUrl, $match)) {
             $embedUrl = 'https://www.youtube-nocookie.com/embed/'.$match[1];
@@ -50,18 +71,18 @@
     @endphp
     <figure class="site-block site-block-video">
         @if($embedUrl)
-            <div class="site-video-frame"><iframe src="{{ $embedUrl }}" title="Видео" loading="lazy" allowfullscreen></iframe></div>
+            <div class="site-video-frame"><iframe src="{{ $embedUrl }}" title="Видео" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
         @elseif(preg_match('/\.(mp4|webm)(\?.*)?$/i', $videoUrl))
             <video controls preload="metadata" src="{{ $videoUrl }}"></video>
         @else
-            <a class="site-button site-button-secondary" href="{{ $videoUrl }}" target="_blank" rel="noopener">Открыть видео</a>
+            <a class="site-button site-button-secondary" href="{{ $videoUrl }}" target="_blank" rel="noopener noreferrer">Открыть видео</a>
         @endif
         @if(!empty($data['caption']))<figcaption>{{ $data['caption'] }}</figcaption>@endif
     </figure>
 
-@elseif($type === 'button' && !empty($data['label']) && !empty($data['url']))
+@elseif($type === 'button' && !empty($data['label']) && $blockUrl !== '')
     <section class="site-block site-block-button">
-        <a class="site-button site-button-{{ ($data['style'] ?? 'primary') === 'secondary' ? 'secondary' : 'primary' }}" href="{{ $data['url'] }}" @if($data['new_tab'] ?? false) target="_blank" rel="noopener" @endif>
+        <a class="site-button site-button-{{ ($data['style'] ?? 'primary') === 'secondary' ? 'secondary' : 'primary' }}" href="{{ $blockUrl }}" @if($data['new_tab'] ?? false) target="_blank" rel="noopener noreferrer" @endif>
             {{ $data['label'] }}
         </a>
     </section>
@@ -80,11 +101,11 @@
     <section class="site-block site-info-card">
         @if(!empty($data['title']))<h3>{{ $data['title'] }}</h3>@endif
         @if(!empty($data['text']))<p>{!! nl2br(e($data['text'])) !!}</p>@endif
-        @if(!empty($data['link_label']) && !empty($data['link_url']))<a href="{{ $data['link_url'] }}">{{ $data['link_label'] }} →</a>@endif
+        @if(!empty($data['link_label']) && $linkUrl !== '')<a href="{{ $linkUrl }}">{{ $data['link_label'] }} →</a>@endif
     </section>
 
 @elseif($type === 'divider')
-    <div class="site-block site-divider is-{{ $dividerStyle }}"></div>
+    <div class="site-block site-divider is-{{ $dividerStyle }}" aria-hidden="true"></div>
 
 @elseif($type === 'columns')
     <section class="site-block site-columns">
@@ -99,14 +120,14 @@
         @if(!empty($data['email']))<div><strong>Email</strong><a href="mailto:{{ $data['email'] }}">{{ $data['email'] }}</a></div>@endif
     </section>
 
-@elseif($type === 'telegram' && !empty($data['url']))
+@elseif($type === 'telegram' && $blockUrl !== '')
     <section class="site-block site-telegram-card">
-        <span class="site-telegram-icon">➤</span>
+        <span class="site-telegram-icon" aria-hidden="true">➤</span>
         <div>
             <strong>{{ $data['label'] ?? 'Telegram' }}</strong>
             @if(!empty($data['text']))<p>{{ $data['text'] }}</p>@endif
         </div>
-        <a href="{{ $data['url'] }}" target="_blank" rel="noopener">Открыть</a>
+        <a href="{{ $blockUrl }}" target="_blank" rel="noopener noreferrer">Открыть</a>
     </section>
 
 @elseif($type === 'alert_map')
@@ -138,6 +159,13 @@
                 sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             ></iframe>
         </div>
+        <p class="site-alert-map-source">
+            Карта загружается с внешнего сервиса alerts.in.ua.
+            <a href="{{ $mapUrl }}" target="_blank" rel="noopener noreferrer">Открыть карту отдельно</a>
+        </p>
+        <noscript>
+            <p><a href="{{ $mapUrl }}" target="_blank" rel="noopener noreferrer">Открыть карту воздушных тревог</a></p>
+        </noscript>
     </section>
 
 @elseif($type === 'html')

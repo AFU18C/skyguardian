@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Bet;
+use App\Models\BetSearchRun;
 use App\Models\BettingSetting;
 use App\Models\User;
 use Illuminate\Database\QueryException;
@@ -61,6 +62,29 @@ class BettingModuleTest extends TestCase
             ['name' => 'Sports Tips', 'url' => 'https://tips.example/predictions', 'enabled' => true],
             ['name' => 'Reserve Tips', 'url' => 'https://reserve.example/bets', 'enabled' => false],
         ], $settings->website_sources);
+    }
+
+    #[Test]
+    public function manual_website_search_is_queued_instead_of_running_inside_the_web_request(): void
+    {
+        $user = User::factory()->create();
+        BettingSetting::current()->update([
+            'website_sources' => [[
+                'name' => 'Sports Tips',
+                'url' => 'https://93.184.216.34/predictions',
+                'enabled' => true,
+            ]],
+        ]);
+
+        $this->actingAs($user)->post(route('admin.betting.search'), [
+            'search_mode' => 'websites',
+        ])->assertRedirect(route('admin.betting.index', ['tab' => 'search']));
+
+        $run = BetSearchRun::query()->sole();
+        $this->assertSame(BetSearchRun::STATUS_PENDING, $run->status);
+        $this->assertSame('websites', $run->search_mode);
+        $this->assertSame($user->id, $run->requested_by_user_id);
+        $this->assertNull($run->started_at);
     }
 
     #[Test]

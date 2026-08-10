@@ -54,17 +54,18 @@ class BettingController extends Controller
         ])['search_mode'];
 
         try {
-            $run = $service->run(BettingSetting::current(), $mode);
+            $run = $service->queue(BettingSetting::current(), $mode, auth()->id());
 
             return redirect()->route('admin.betting.index', ['tab' => 'search'])->with('toast', [
-                'type' => 'success', 'title' => 'Проверка завершена',
-                'message' => "Найдено сообщений: {$run->messages_found}; подходящих ставок: {$run->bets_found}.",
+                'type' => 'success',
+                'title' => 'Поиск поставлен в очередь',
+                'message' => "Задача #{$run->id} будет выполнена фоновым worker после ручного запуска.",
             ]);
         } catch (Throwable $e) {
             report($e);
 
             return redirect()->route('admin.betting.index', ['tab' => 'search'])->with('toast', [
-                'type' => 'error', 'title' => 'Поиск не выполнен', 'message' => $e->getMessage(),
+                'type' => 'error', 'title' => 'Поиск не запущен', 'message' => $e->getMessage(),
             ]);
         }
     }

@@ -24,3 +24,13 @@ Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50'
     ->everySecond()
     ->when(fn (): bool => now()->second === 2)
     ->withoutOverlapping(1);
+
+Schedule::command('skyguardian:group-channel-verifications:sweep --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping(1);
+
+// Betting discovery remains manual-only: this worker only executes searches
+// explicitly queued by an administrator; it never creates searches itself.
+Schedule::command('skyguardian:betting-searches:process --limit=1')
+    ->everyTenSeconds()
+    ->withoutOverlapping(30);

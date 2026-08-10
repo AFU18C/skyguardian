@@ -25,6 +25,7 @@
     :language="$siteSettings['language'] ?? 'ru'"
     :favicon="$faviconUrl"
     :theme="$siteSettings['theme'] ?? 'classic'"
+    :login-styles="true"
 >
     <style nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
         .sg-login-page { {!! $loginStyle !!} }

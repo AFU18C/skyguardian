@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\GroupChannelBot;
+use RuntimeException;
 use Throwable;
 
 class GroupChannelSubscriptionGateService
@@ -64,8 +65,13 @@ class GroupChannelSubscriptionGateService
                     'chat_id' => $reference,
                     'user_id' => $userId,
                 ]);
-            } catch (Throwable) {
-                return false;
+            } catch (Throwable $e) {
+                // A temporary Telegram/API failure is not proof that the user is
+                // unsubscribed. Abort the update so the durable webhook queue retries.
+                throw new RuntimeException(
+                    'Не удалось проверить подписку '.$reference.'. Повторим проверку позже.',
+                    previous: $e,
+                );
             }
 
             if (! is_array($member) || ! in_array($member['status'] ?? '', [

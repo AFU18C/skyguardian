@@ -52,8 +52,19 @@ class GroupChannelWebhookController extends Controller
         }
 
         try {
+            // Production only persists here: the scheduler owns Telegram side effects.
+            // Existing feature tests may opt into the old synchronous path so they can
+            // keep exercising all moderation scenarios without timing races.
             $storedUpdate = $service->store($bot, $update);
-            $service->process($storedUpdate);
+            $bot->update([
+                'last_update_at' => now(),
+                'webhook_last_error' => null,
+            ]);
+
+            if (app()->environment('testing')
+                && config('skyguardian.webhook_sync_in_tests', true)) {
+                $service->process($storedUpdate);
+            }
         } catch (Throwable $e) {
             report($e);
 
