@@ -15,6 +15,7 @@ export default defineConfig({
                 'resources/css/source-health.css',
                 'resources/css/group-channel.css',
                 'resources/css/site-settings.css',
+                'resources/css/betting.css',
                 'resources/css/public-site.css',
                 'resources/css/login-page.css',
                 'resources/js/app.js',

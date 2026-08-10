@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\BackupController;
+use App\Http\Controllers\Admin\BettingController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GroupChannelAlertsApiCheckController;
 use App\Http\Controllers\Admin\GroupChannelAlertsApiTokenController;
@@ -118,6 +119,16 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function (): v
     Route::post('/group-channel/{groupChannelBot}/bulk-delete/execute', [GroupChannelBulkDeleteController::class, 'execute'])->name('group-channel.bulk-delete.execute');
     Route::post('/group-channel/{groupChannelBot}/technical-delete/preview', [GroupChannelTechnicalBulkDeleteController::class, 'preview'])->name('group-channel.technical-delete.preview');
     Route::post('/group-channel/{groupChannelBot}/technical-delete/execute', [GroupChannelTechnicalBulkDeleteController::class, 'execute'])->name('group-channel.technical-delete.execute');
+
+    Route::get('/betting', [BettingController::class, 'index'])->name('betting.index');
+    Route::post('/betting/search', [BettingController::class, 'search'])->middleware('throttle:3,1')->name('betting.search');
+    Route::put('/betting/settings', [BettingController::class, 'updateSettings'])->name('betting.settings.update');
+    Route::delete('/betting/archive', [BettingController::class, 'clearArchive'])->name('betting.archive.clear');
+    Route::post('/betting/{bet}/approve', [BettingController::class, 'approve'])->name('betting.approve');
+    Route::post('/betting/{bet}/reject', [BettingController::class, 'reject'])->name('betting.reject');
+    Route::put('/betting/{bet}', [BettingController::class, 'update'])->name('betting.update');
+    Route::post('/betting/{bet}/check-result', [BettingController::class, 'checkResult'])->name('betting.check-result');
+    Route::post('/betting/{bet}/send-result', [BettingController::class, 'sendResult'])->name('betting.send-result');
 });
 
 Route::get('/{slug}', [SitePageController::class, 'show'])

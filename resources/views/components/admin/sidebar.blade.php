@@ -33,6 +33,10 @@
             <span class="sg-nav-icon">⇄</span>
             <span>Группа-Канал</span>
         </a>
+        <a href="{{ route('admin.betting.index') }}" @class(['is-active' => request()->routeIs('admin.betting.*')])>
+            <span class="sg-nav-icon">◆</span>
+            <span>Ставки</span>
+        </a>
     </nav>
 
     <div class="sg-sidebar-status">
