@@ -35,6 +35,19 @@ class ProcessBetSearchRuns extends Command
                 } catch (Throwable $e) {
                     $failed++;
                     report($e);
+
+                    $fresh = $run->fresh();
+                    if ($fresh && in_array($fresh->status, [
+                        BetSearchRun::STATUS_PENDING,
+                        BetSearchRun::STATUS_RUNNING,
+                    ], true)) {
+                        $fresh->update([
+                            'status' => BetSearchRun::STATUS_ERROR,
+                            'last_error' => mb_substr($e->getMessage(), 0, 4000),
+                            'finished_at' => now(),
+                        ]);
+                    }
+
                     $this->error('Bet search #'.$run->id.': '.$e->getMessage());
                 }
             });
