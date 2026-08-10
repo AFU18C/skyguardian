@@ -135,6 +135,9 @@ class SiteMenuController extends Controller
     private function validUrl(?string $url): bool
     {
         $url = trim((string) $url);
+        if ($url === '' || str_starts_with($url, '//')) {
+            return false;
+        }
         if (str_starts_with($url, '/')) {
             return true;
         }
