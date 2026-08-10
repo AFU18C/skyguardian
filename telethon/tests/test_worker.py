@@ -267,6 +267,29 @@ class WorkerBetSearchTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Telegram-каналы"):
             asyncio.run(worker.search_bet_messages(SimpleNamespace(), ["П1"], []))
 
+    def test_search_opens_private_invite_link_for_joined_account(self) -> None:
+        invite_link = "https://t.me/+PrivateInvite123"
+        chat = SimpleNamespace(id=77, username=None, title="Private Bets")
+
+        async def iter_messages(*_args, **_kwargs):
+            if False:
+                yield None
+
+        client = SimpleNamespace(
+            get_entity=AsyncMock(return_value=chat),
+            iter_messages=iter_messages,
+        )
+
+        result = asyncio.run(worker.search_bet_messages(
+            client,
+            ["П1"],
+            [invite_link],
+            total_limit=10,
+        ))
+
+        self.assertEqual(1, result["channels_checked"])
+        client.get_entity.assert_awaited_once_with(invite_link)
+
     def test_search_skips_unavailable_channel_and_never_uses_global_search(self) -> None:
         chat = SimpleNamespace(id=77, username="bets", title="Bets")
         message = SimpleNamespace(

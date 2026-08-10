@@ -81,7 +81,7 @@
                 @if($tab === 'telegram_sources')
                     <section class="sg-section-block"><div class="sg-section-heading"><div><p class="sg-eyebrow">Поиск в Telegram</p><h2>Каналы-источники</h2><p>Поиск выполняется только в этом списке и только после нажатия «Проверить ставки». Технический аккаунт должен иметь доступ к частным каналам.</p></div></div>
                         <div class="sg-form-grid">
-                            <label class="sg-field sg-field-wide"><span>Telegram-каналы — по одному в строке</span><textarea name="telegram_channels_text" rows="10" placeholder="@sports_channel&#10;https://t.me/football_predictions&#10;-1001234567890">{{ old('telegram_channels_text', implode("\n", $settings->telegram_channels ?? [])) }}</textarea><small>Поддерживаются @username, ссылка t.me/username и ID канала -100…</small></label>
+                            <label class="sg-field sg-field-wide"><span>Telegram-каналы — по одному в строке</span><textarea name="telegram_channels_text" rows="10" placeholder="@sports_channel&#10;https://t.me/football_predictions&#10;https://t.me/+AbCdEf123456&#10;-1001234567890">{{ old('telegram_channels_text', implode("\n", $settings->telegram_channels ?? [])) }}</textarea><small>Поддерживаются @username, публичные и приватные ссылки t.me, а также ID канала -100…</small></label>
                         </div>
                     </section>
                 @elseif($tab === 'sources')

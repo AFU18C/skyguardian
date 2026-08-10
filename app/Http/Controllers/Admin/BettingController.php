@@ -102,7 +102,7 @@ class BettingController extends Controller
             ->values();
         if ($invalidChannels->isNotEmpty()) {
             return back()->withErrors([
-                'telegram_channels_text' => 'Неверный Telegram-канал: '.$invalidChannels->first().'. Укажите @username, ссылку t.me/username или ID -100…',
+                'telegram_channels_text' => 'Неверный Telegram-канал: '.$invalidChannels->first().'. Укажите @username, ссылку t.me/username, приватную ссылку t.me/+… или ID -100…',
             ])->withInput();
         }
         $data['telegram_channels'] = $channelLines
@@ -273,6 +273,10 @@ class BettingController extends Controller
     {
         if (preg_match('/^-100\d{5,20}$/', $channel) === 1) {
             return $channel;
+        }
+
+        if (preg_match('~^(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me)/(?:\+|joinchat/)([A-Za-z0-9_-]{10,128})/?(?:\?.*)?$~i', $channel, $matches) === 1) {
+            return 'https://t.me/+'.$matches[1];
         }
 
         if (preg_match('~^(?:https?://)?(?:www\.)?(?:t\.me|telegram\.me)/(?:s/)?([A-Za-z][A-Za-z0-9_]{4,31})(?:/\d+)?/?(?:\?.*)?$~i', $channel, $matches) === 1) {
