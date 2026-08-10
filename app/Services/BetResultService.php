@@ -33,7 +33,7 @@ class BetResultService
         $total = $home + $away;
         if (preg_match('/Т([БМ])\s*([0-9]+(?:\.[02575])?)/u', $market, $m)) {
             $line = (float) $m[2];
-            if ($total === $line) {
+            if ((float) $total === $line) {
                 return 'refund';
             }
             return ($m[1] === 'Б' ? $total > $line : $total < $line) ? 'win' : 'loss';
