@@ -52,8 +52,13 @@ class GroupChannelWebhookController extends Controller
         }
 
         try {
-            $storedUpdate = $service->store($bot, $update);
-            $service->process($storedUpdate);
+            // Keep the HTTP webhook fast and durable: persist the Telegram update
+            // atomically, acknowledge it, and let the scheduler perform side effects.
+            $service->store($bot, $update);
+            $bot->update([
+                'last_update_at' => now(),
+                'webhook_last_error' => null,
+            ]);
         } catch (Throwable $e) {
             report($e);
 
