@@ -13,6 +13,19 @@
         fn ($block) => ($block['type'] ?? null) === 'alert_map' && ($block['data']['layout'] ?? 'contained') === 'site',
     );
     $isFullSiteMapOnly = $hasFullSiteMap && $visibleBlocks->count() === 1 && ! $page->show_hero;
+    $canonicalUrl = ($page->system_key ?? null) === 'home'
+        ? url('/')
+        : url('/'.ltrim((string) $page->slug, '/'));
+    $structuredData = [
+        '@context' => 'https://schema.org',
+        '@type' => ($page->system_key ?? null) === 'home' ? 'WebSite' : 'WebPage',
+        'name' => $pageTitle,
+        'url' => $canonicalUrl,
+        'inLanguage' => $siteSettings['language'] ?? 'ru',
+    ];
+    if ($description) {
+        $structuredData['description'] = $description;
+    }
 @endphp
 
 <x-layouts.guest
@@ -22,6 +35,8 @@
     :language="$siteSettings['language'] ?? 'ru'"
     :favicon="$faviconUrl"
     :theme="$siteSettings['theme'] ?? 'classic'"
+    :canonical="$canonicalUrl"
+    :structured-data="$structuredData"
 >
     <div class="site-shell">
         @if($isPreview ?? false)
@@ -37,7 +52,7 @@
                 @if($logoUrl)
                     <img src="{{ $logoUrl }}" alt="{{ $siteSettings['site_name'] ?? 'SkyGuardian' }}">
                 @else
-                    <span class="site-brand-mark">SG</span>
+                    <span class="site-brand-mark" aria-hidden="true">SG</span>
                 @endif
                 <span>
                     <strong>{{ $siteSettings['site_name'] ?? 'SkyGuardian' }}</strong>
@@ -49,13 +64,13 @@
                 <nav class="site-nav" aria-label="Основное меню">
                     @foreach($siteMenu as $item)
                         <div class="site-nav-item {{ $item->children->isNotEmpty() ? 'has-children' : '' }}">
-                            <a href="{{ $item->resolvedUrl() }}" @if($item->open_in_new_tab) target="_blank" rel="noopener" @endif>
+                            <a href="{{ $item->resolvedUrl() }}" @if($item->open_in_new_tab) target="_blank" rel="noopener noreferrer" @endif>
                                 {{ $item->label }}
                             </a>
                             @if($item->children->isNotEmpty())
                                 <div class="site-submenu">
                                     @foreach($item->children as $child)
-                                        <a href="{{ $child->resolvedUrl() }}" @if($child->open_in_new_tab) target="_blank" rel="noopener" @endif>
+                                        <a href="{{ $child->resolvedUrl() }}" @if($child->open_in_new_tab) target="_blank" rel="noopener noreferrer" @endif>
                                             {{ $child->label }}
                                         </a>
                                     @endforeach
@@ -87,6 +102,8 @@
                             <img class="site-featured-image" src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($page->featured_image_path) }}" alt="{{ $page->effectiveHeading() }}">
                         @endif
                     </header>
+                @else
+                    <h1 class="sr-only">{{ $page->effectiveHeading() }}</h1>
                 @endif
 
                 <div @class([
@@ -99,7 +116,7 @@
                         @include('public.partials.page-block', ['block' => $block])
                     @empty
                         <section class="site-empty-content">
-                            <div class="site-empty-mark">SG</div>
+                            <div class="site-empty-mark" aria-hidden="true">SG</div>
                             <p>Содержимое страницы ещё не добавлено.</p>
                         </section>
                     @endforelse
