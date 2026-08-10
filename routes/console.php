@@ -21,7 +21,8 @@ Schedule::command('skyguardian:group-channel-alerts:process --limit=50')
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:group-channel-webhook-updates:process --limit=50')
-    ->everyTenSeconds()
+    ->everySecond()
+    ->when(fn (): bool => now()->second === 2)
     ->withoutOverlapping(1);
 
 Schedule::command('skyguardian:group-channel-verifications:sweep --limit=100')
