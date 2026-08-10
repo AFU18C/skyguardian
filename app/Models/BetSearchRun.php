@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class BetSearchRun extends Model
 {
-    protected $fillable = ['status', 'messages_found', 'bets_found', 'last_error', 'finished_at'];
+    protected $fillable = ['status', 'search_mode', 'messages_found', 'bets_found', 'last_error', 'finished_at'];
 
     protected function casts(): array
     {

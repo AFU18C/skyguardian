@@ -22,7 +22,9 @@ class BettingModuleTest extends TestCase
         $this->actingAs($user)->get(route('admin.betting.index'))
             ->assertOk()
             ->assertSee('Ставки')
-            ->assertSee('Проверить ставки');
+            ->assertSee('Проверить ставки')
+            ->assertSee('Сайты-источники')
+            ->assertSee('Telegram + сайты');
 
         $this->assertDatabaseCount('betting_settings', 1);
     }
@@ -35,6 +37,7 @@ class BettingModuleTest extends TestCase
         $this->actingAs($user)->put(route('admin.betting.settings.update'), [
             'keywords_text' => "ставка дня\nтотал больше",
             'telegram_channels_text' => "https://t.me/Sports_Channel/123\n@sports_channel\nhttps://t.me/+PrivateInvite123\nhttps://t.me/joinchat/LegacyInvite456\n-1001234567890",
+            'website_sources_text' => "Sports Tips | https://tips.example/predictions\n# Reserve Tips | https://reserve.example/bets",
             'freshness_hours' => 12,
             'minimum_ai_score' => 85,
             'maximum_results' => 15,
@@ -54,6 +57,10 @@ class BettingModuleTest extends TestCase
             'https://t.me/+LegacyInvite456',
             '-1001234567890',
         ], $settings->telegram_channels);
+        $this->assertSame([
+            ['name' => 'Sports Tips', 'url' => 'https://tips.example/predictions', 'enabled' => true],
+            ['name' => 'Reserve Tips', 'url' => 'https://reserve.example/bets', 'enabled' => false],
+        ], $settings->website_sources);
     }
 
     #[Test]

@@ -32,6 +32,23 @@ class BetParserTest extends TestCase
     }
 
     #[Test]
+    public function it_marks_a_website_as_the_search_source(): void
+    {
+        $bet = (new BetParser)->parse([
+            'date' => '2026-08-10T08:00:00+00:00',
+            'text' => "Реал — Барселона\nП1, коэффициент 1.85",
+            'source_type' => 'website',
+            'source_name' => 'Sports Tips',
+            'url' => 'https://tips.example/prediction-1',
+        ]);
+
+        $this->assertNotNull($bet);
+        $this->assertSame([], $bet['telegram_sources']);
+        $this->assertSame('website', $bet['search_sources'][0]['type']);
+        $this->assertSame('Sports Tips', $bet['search_sources'][0]['name']);
+    }
+
+    #[Test]
     public function it_extracts_sport_tournament_start_time_and_handicap(): void
     {
         $bet = (new BetParser)->parse([

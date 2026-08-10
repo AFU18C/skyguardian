@@ -21,7 +21,7 @@ class Bet extends Model
         'fingerprint', 'status', 'sport', 'event_name', 'home_team', 'away_team', 'tournament',
         'starts_at', 'external_event_id', 'market', 'telegram_odds', 'primary_odds',
         'reserve_odds', 'selected_odds', 'selected_odds_source', 'ai_score', 'ai_reason',
-        'telegram_sources', 'odds_snapshot', 'odds_checked_at', 'publication_bot_id',
+        'telegram_sources', 'search_sources', 'odds_snapshot', 'odds_checked_at', 'publication_bot_id',
         'publication_text',
         'telegram_message_id', 'published_at', 'result', 'result_note', 'result_checked_at',
         'result_message_id', 'result_sent_at', 'edit_history',
@@ -41,7 +41,7 @@ class Bet extends Model
         return [
             'starts_at' => 'datetime', 'odds_checked_at' => 'datetime', 'published_at' => 'datetime',
             'result_checked_at' => 'datetime', 'result_sent_at' => 'datetime',
-            'telegram_sources' => 'array', 'odds_snapshot' => 'array', 'edit_history' => 'array',
+            'telegram_sources' => 'array', 'search_sources' => 'array', 'odds_snapshot' => 'array', 'edit_history' => 'array',
             'telegram_odds' => 'decimal:3', 'primary_odds' => 'decimal:3',
             'reserve_odds' => 'decimal:3', 'selected_odds' => 'decimal:3',
         ];

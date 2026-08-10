@@ -15,18 +15,32 @@ class BetSearchService
         private readonly TelethonClient $telethon,
         private readonly BetParser $parser,
         private readonly BetOddsService $odds,
+        private readonly WebsiteBetSearchService $websites,
     ) {}
 
-    public function run(BettingSetting $settings): BetSearchRun
+    public function run(BettingSetting $settings, string $mode = 'telegram'): BetSearchRun
     {
-        $run = BetSearchRun::query()->create(['status' => 'running']);
+        if (! in_array($mode, ['telegram', 'websites', 'all'], true)) {
+            throw new RuntimeException('Неизвестный источник поиска.');
+        }
+
+        $run = BetSearchRun::query()->create(['status' => 'running', 'search_mode' => $mode]);
         $channels = array_values(array_filter($settings->telegram_channels ?? [], fn (mixed $channel): bool => is_string($channel) && trim($channel) !== ''));
-        if ($channels === []) {
+        $websiteSources = array_values(array_filter($settings->website_sources ?? [], fn (mixed $source): bool => is_array($source) && ($source['enabled'] ?? true) === true && ! empty($source['url'])));
+        $searchTelegram = in_array($mode, ['telegram', 'all'], true);
+        $searchWebsites = in_array($mode, ['websites', 'all'], true);
+
+        if ($searchTelegram && $channels === []) {
             $run->update(['status' => 'error', 'last_error' => 'Добавьте Telegram-каналы для поиска.', 'finished_at' => now()]);
             throw new RuntimeException('Добавьте хотя бы один Telegram-канал в подразделе «Telegram-источники».');
         }
-        $account = $settings->technicalAccount;
-        if (! $account || ! $account->is_active || $account->status !== 'connected') {
+        if ($searchWebsites && $websiteSources === []) {
+            $run->update(['status' => 'error', 'last_error' => 'Добавьте сайты для поиска.', 'finished_at' => now()]);
+            throw new RuntimeException('Добавьте хотя бы один сайт в подразделе «Сайты-источники».');
+        }
+
+        $account = $searchTelegram ? $settings->technicalAccount : null;
+        if ($searchTelegram && (! $account || ! $account->is_active || $account->status !== 'connected')) {
             $run->update(['status' => 'error', 'last_error' => 'Выберите подключённый технический аккаунт.', 'finished_at' => now()]);
             throw new RuntimeException('Выберите подключённый технический аккаунт для поиска ставок.');
         }
@@ -38,14 +52,28 @@ class BetSearchService
         }
 
         try {
-            $response = $this->telethon->call('search_bets', $account, [
-                'keywords' => $settings->keywords,
-                'channels' => $channels,
-                'freshness_hours' => $settings->freshness_hours,
-                'limit' => min(500, max(50, $settings->maximum_results * 20)),
-            ]);
-            if (! empty($response['session'])) {
-                $account->update(['session' => $response['session'], 'last_success_at' => now()]);
+            $limit = min(500, max(50, $settings->maximum_results * 20));
+            $response = ['messages' => [], 'channel_errors' => [], 'source_errors' => []];
+
+            if ($searchTelegram) {
+                $telegramResponse = $this->telethon->call('search_bets', $account, [
+                    'keywords' => $settings->keywords,
+                    'channels' => $channels,
+                    'freshness_hours' => $settings->freshness_hours,
+                    'limit' => $limit,
+                ]);
+                $response['messages'] = array_merge($response['messages'], $telegramResponse['messages'] ?? []);
+                $response['channel_errors'] = $telegramResponse['channel_errors'] ?? [];
+            }
+
+            if ($searchWebsites) {
+                $websiteResponse = $this->websites->search($websiteSources, $settings->keywords ?? [], $limit);
+                $response['messages'] = array_merge($response['messages'], $websiteResponse['messages']);
+                $response['source_errors'] = $websiteResponse['source_errors'];
+            }
+
+            if ($searchTelegram && ! empty($telegramResponse['session'])) {
+                $account->update(['session' => $telegramResponse['session'], 'last_success_at' => now()]);
             }
 
             $grouped = [];
@@ -57,6 +85,7 @@ class BetSearchService
                 $fingerprint = $parsed['fingerprint'];
                 if (isset($grouped[$fingerprint])) {
                     $grouped[$fingerprint]['telegram_sources'] = array_merge($grouped[$fingerprint]['telegram_sources'], $parsed['telegram_sources']);
+                    $grouped[$fingerprint]['search_sources'] = array_merge($grouped[$fingerprint]['search_sources'], $parsed['search_sources']);
                     $grouped[$fingerprint]['ai_score'] = min(97, $grouped[$fingerprint]['ai_score'] + 6);
                 } else {
                     $grouped[$fingerprint] = $parsed;
@@ -88,6 +117,10 @@ class BetSearchService
                         $existing->telegram_sources ?? [],
                         $data['telegram_sources'] ?? [],
                     ))->unique(fn (array $source): string => ($source['chat_id'] ?? 'unknown').':'.($source['message_id'] ?? 'unknown'))->values()->all();
+                    $data['search_sources'] = collect(array_merge(
+                        $existing->search_sources ?? [],
+                        $data['search_sources'] ?? [],
+                    ))->unique(fn (array $source): string => ($source['type'] ?? 'unknown').':'.($source['url'] ?? '').':'.($source['message_id'] ?? ''))->values()->all();
                     $existing->update($data);
                 }
             });
@@ -96,12 +129,21 @@ class BetSearchService
                 ->pluck('channel')
                 ->filter()
                 ->values();
+            $websiteErrors = collect($response['source_errors'] ?? [])
+                ->map(fn (array $error): string => ($error['source'] ?? 'Сайт').': '.($error['error'] ?? 'ошибка'))
+                ->filter()
+                ->values();
+            $errors = collect();
+            if ($channelErrors->isNotEmpty()) {
+                $errors->push('Не удалось проверить Telegram-каналы: '.$channelErrors->join(', ').'.');
+            }
+            if ($websiteErrors->isNotEmpty()) {
+                $errors->push('Не удалось проверить сайты: '.$websiteErrors->join('; ').'.');
+            }
             $run->update([
                 'status' => 'completed', 'messages_found' => count($response['messages'] ?? []),
                 'bets_found' => count($accepted),
-                'last_error' => $channelErrors->isEmpty()
-                    ? null
-                    : 'Не удалось проверить каналы: '.$channelErrors->join(', ').'.',
+                'last_error' => $errors->isEmpty() ? null : $errors->join(' '),
                 'finished_at' => now(),
             ]);
             $this->cleanup($settings);

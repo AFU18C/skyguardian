@@ -23,7 +23,7 @@ class BettingController extends Controller
     public function index(Request $request): View
     {
         $settings = BettingSetting::current();
-        $tab = in_array($request->string('tab')->value(), ['overview', 'search', 'telegram_sources', 'published', 'statistics', 'sources', 'channels', 'settings'], true)
+        $tab = in_array($request->string('tab')->value(), ['overview', 'search', 'telegram_sources', 'website_sources', 'published', 'statistics', 'sources', 'channels', 'settings'], true)
             ? $request->string('tab')->value() : 'overview';
         $statistics = [
             'total' => Bet::query()->where('status', Bet::STATUS_PUBLISHED)->count(),
@@ -47,10 +47,14 @@ class BettingController extends Controller
         ]);
     }
 
-    public function search(BetSearchService $service): RedirectResponse
+    public function search(Request $request, BetSearchService $service): RedirectResponse
     {
+        $mode = $request->validate([
+            'search_mode' => ['required', Rule::in(['telegram', 'websites', 'all'])],
+        ])['search_mode'];
+
         try {
-            $run = $service->run(BettingSetting::current());
+            $run = $service->run(BettingSetting::current(), $mode);
 
             return redirect()->route('admin.betting.index', ['tab' => 'search'])->with('toast', [
                 'type' => 'success', 'title' => 'Проверка завершена',
@@ -72,6 +76,7 @@ class BettingController extends Controller
             'publication_bot_id' => ['nullable', 'exists:group_channel_bots,id'],
             'keywords_text' => ['required', 'string', 'max:10000'],
             'telegram_channels_text' => ['nullable', 'string', 'max:20000'],
+            'website_sources_text' => ['nullable', 'string', 'max:30000'],
             'freshness_hours' => ['required', 'integer', 'min:1', 'max:720'],
             'minimum_ai_score' => ['required', 'integer', 'min:1', 'max:100'],
             'maximum_results' => ['required', 'integer', 'min:1', 'max:100'],
@@ -114,6 +119,36 @@ class BettingController extends Controller
             return back()->withErrors(['telegram_channels_text' => 'Можно добавить не более 100 Telegram-каналов.'])->withInput();
         }
         unset($data['telegram_channels_text']);
+        $websiteLines = collect(preg_split('/\R/u', (string) ($data['website_sources_text'] ?? '')))
+            ->map(fn (string $line): string => trim($line))
+            ->filter()
+            ->values();
+        $websiteSources = $websiteLines->map(function (string $line): array {
+            $enabled = ! str_starts_with($line, '#');
+            $line = trim(ltrim($line, '#'));
+            $parts = preg_split('/\s*\|\s*/u', $line, 2);
+            $url = count($parts) === 2 ? trim($parts[1]) : trim($parts[0]);
+            $name = count($parts) === 2 ? trim($parts[0]) : (parse_url($url, PHP_URL_HOST) ?: 'Сайт');
+
+            return ['name' => $name, 'url' => $url, 'enabled' => $enabled];
+        });
+        $invalidWebsite = $websiteSources->first(fn (array $source): bool => $source['name'] === ''
+            || mb_strlen($source['name']) > 100
+            || filter_var($source['url'], FILTER_VALIDATE_URL) === false
+            || ! in_array(parse_url($source['url'], PHP_URL_SCHEME), ['http', 'https'], true));
+        if ($invalidWebsite) {
+            return back()->withErrors([
+                'website_sources_text' => 'Неверный сайт: '.($invalidWebsite['url'] ?: 'пустой адрес').'. Используйте формат «Название | https://адрес».',
+            ])->withInput();
+        }
+        if ($websiteSources->count() > 50) {
+            return back()->withErrors(['website_sources_text' => 'Можно добавить не более 50 сайтов.'])->withInput();
+        }
+        $data['website_sources'] = $websiteSources
+            ->unique(fn (array $source): string => mb_strtolower($source['url']))
+            ->values()
+            ->all();
+        unset($data['website_sources_text']);
         $settings = BettingSetting::current();
         $settings->update($data);
         $service->cleanup($settings->fresh());
