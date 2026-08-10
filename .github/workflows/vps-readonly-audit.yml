@@ -1,0 +1,95 @@
+name: VPS Read-only Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/vps-readonly-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Read-only production VPS audit
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: System and application audit
+        shell: bash
+        run: |
+          set -u
+          section() { printf '\n===== %s =====\n' "$1"; }
+          run() { printf '\n$ %s\n' "$*"; "$@" 2>&1 || true; }
+
+          section "IDENTITY"
+          run id
+          run hostnamectl
+          run uname -a
+          run uptime
+
+          section "OS AND PATCHES"
+          run sh -c 'cat /etc/os-release | grep -E "^(PRETTY_NAME|VERSION_ID)="'
+          run sh -c 'apt list --upgradable 2>/dev/null | sed -n "1,80p"'
+          run systemctl is-enabled unattended-upgrades.service
+          run systemctl is-active unattended-upgrades.service
+          run systemctl list-timers apt-daily.timer apt-daily-upgrade.timer --no-pager
+
+          section "RESOURCES"
+          run free -h
+          run df -hT
+          run df -ih
+          run sh -c 'ps -eo pid,user,%cpu,%mem,comm --sort=-%mem | sed -n "1,20p"'
+
+          section "NETWORK AND FIREWALL"
+          run sudo -n ss -lntup
+          run sudo -n ufw status verbose
+          run sudo -n nft list ruleset
+          run sudo -n /usr/sbin/sshd -T
+          
+          section "SECURITY SERVICES"
+          run systemctl is-enabled fail2ban.service
+          run systemctl is-active fail2ban.service
+          run sudo -n fail2ban-client status
+
+          section "WEB STACK"
+          run nginx -v
+          run sudo -n nginx -t
+          run php -v
+          run mysql --version
+          run systemctl is-active nginx
+          run systemctl is-active php8.3-fpm
+          run systemctl is-active mysql
+          run systemctl is-active mariadb
+
+          section "SKYGUARDIAN SERVICES"
+          for unit in             skyguardian-telethon.service             skyguardian-scheduler.service             skyguardian-group-channel-telethon.service             skyguardian-group-channel-delete.service             skyguardian-backup.service             skyguardian-backup.timer; do
+            printf '\n-- %s --\n' "$unit"
+            systemctl is-enabled "$unit" 2>&1 || true
+            systemctl is-active "$unit" 2>&1 || true
+            systemctl show "$unit" -p ActiveState -p SubState -p Result -p NRestarts --no-pager 2>&1 || true
+          done
+          run systemctl --failed --no-pager
+
+          section "APPLICATION RELEASE"
+          run readlink -f /var/www/skyguardian
+          run sudo -n find /var/www/skyguardian-deploy/releases -mindepth 1 -maxdepth 1 -type d -printf '%TY-%Tm-%Td %TH:%TM %u:%g %m %p\n'
+          run sudo -n stat -c '%A %U:%G %n' /var/www/skyguardian-deploy/shared /var/www/skyguardian-deploy/shared/.env /var/www/skyguardian-deploy/shared/storage
+          run sudo -n sh -c 'grep -E "^(APP_ENV|APP_DEBUG|APP_URL|LOG_LEVEL)=" /var/www/skyguardian-deploy/shared/.env'
+          run sudo -u www-data test -r /var/www/skyguardian-deploy/shared/.env
+          run sudo -u www-data php /var/www/skyguardian/artisan about --only=environment
+
+          section "BACKUPS"
+          run systemctl list-timers skyguardian-backup.timer --all --no-pager
+          run sudo -n find /var/backups/skyguardian -maxdepth 1 -type f -printf '%TY-%Tm-%Td %TH:%TM %s %f\n'
+          run sudo -n sh -c 'test -s /etc/skyguardian/backup.key && echo "backup key: present" || echo "backup key: MISSING"'
+          run sudo -n sh -c 'grep -qE "^RCLONE_REMOTE=.+$" /etc/skyguardian/backup.env && echo "offsite backup: configured" || echo "offsite backup: NOT CONFIGURED"'
+
+          section "PUBLIC HEALTH"
+          run curl --fail --silent --show-error --max-time 15 -o /dev/null -w 'home=%{http_code} time=%{time_total}\n' https://skyguardian.pp.ua/
+          run curl --fail --silent --show-error --max-time 15 -o /dev/null -w 'health=%{http_code} time=%{time_total}\n' https://skyguardian.pp.ua/up
+          run curl --fail --silent --show-error --max-time 15 -o /dev/null -w 'admin=%{http_code} time=%{time_total}\n' https://skyguardian.pp.ua/admin/login
+
+          section "DONE"
+          echo "Read-only audit completed; no server settings or files were changed."
