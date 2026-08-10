@@ -168,13 +168,24 @@ class TelegramController extends Controller
         }
 
         try {
-            $account->update([
+            $changes = [
                 'name' => $validated['name'],
                 'auth_method' => $validated['auth_method'],
                 'phone' => $phone,
                 'telegram_api_id' => $validated['telegram_api_id'],
                 'is_active' => (bool) ($validated['is_active'] ?? false),
-            ]);
+            ];
+
+            if ($account->auth_method !== $validated['auth_method']) {
+                $changes += [
+                    'auth_data' => null,
+                    'auth_expires_at' => null,
+                    'status' => $account->status === 'connected' ? 'connected' : 'not_checked',
+                    'last_error' => null,
+                ];
+            }
+
+            $account->update($changes);
 
             return $this->continueAccountFlow($account)
                 ->with('toast', ['type' => 'success', 'title' => 'Аккаунт обновлён', 'message' => 'Изменения сохранены. Продолжите подключение ниже.']);
@@ -320,6 +331,7 @@ class TelegramController extends Controller
         $message = $e->getMessage();
         $allowedFragments = [
             'Не указан номер телефона',
+            'Номер телефона укажите в международном формате',
             'Код авторизации истёк',
             'Технический аккаунт не авторизован',
             'QR-сессия не найдена',

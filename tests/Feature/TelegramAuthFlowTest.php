@@ -111,6 +111,40 @@ class TelegramAuthFlowTest extends TestCase
             ->assertSessionHas('toast');
     }
 
+    public function test_switching_auth_method_clears_stale_error_state(): void
+    {
+        $user = User::factory()->create();
+        $account = TechnicalAccount::query()->create([
+            'telegram_api_id' => $this->createApi()->id,
+            'name' => 'Аккаунт с ошибкой номера',
+            'auth_method' => 'phone',
+            'phone' => '+380671234567',
+            'status' => 'error',
+            'last_error' => 'The phone number is invalid',
+            'auth_data' => ['phone_code_hash' => 'stale'],
+            'auth_expires_at' => now()->addMinutes(5),
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)->put(route('admin.telegram.accounts.update', $account), [
+            'form_context' => 'account-'.$account->id,
+            'name' => $account->name,
+            'auth_method' => 'qr',
+            'phone' => '',
+            'telegram_api_id' => $account->telegram_api_id,
+            'is_active' => '1',
+        ]);
+
+        $response->assertRedirect(route('admin.telegram.index'));
+
+        $account->refresh();
+        $this->assertSame('qr', $account->auth_method);
+        $this->assertSame('not_checked', $account->status);
+        $this->assertNull($account->last_error);
+        $this->assertNull($account->auth_data);
+        $this->assertNull($account->auth_expires_at);
+    }
+
     private function createApi(): TelegramApi
     {
         return TelegramApi::query()->create([

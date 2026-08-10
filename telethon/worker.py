@@ -33,9 +33,47 @@ class QrFlow:
     client: TelegramClient
     login: Any
     expires_at: float
+    wait_task: asyncio.Task[Any]
 
 
 qr_flows: dict[str, QrFlow] = {}
+
+
+def normalize_phone(value: Any) -> str:
+    raw = str(value or "").strip()
+    digits = re.sub(r"\D+", "", raw)
+
+    if raw.startswith("+"):
+        normalized = digits
+    elif raw.startswith("00"):
+        normalized = digits[2:]
+    elif len(digits) == 10 and digits.startswith("0"):
+        # The administration panel is used in Ukraine, so accept the familiar
+        # local form and convert it to the E.164 country format Telegram needs.
+        normalized = "380" + digits[1:]
+    elif digits.startswith("380"):
+        normalized = digits
+    else:
+        raise RuntimeError("Номер телефона укажите в международном формате, например +380XXXXXXXXX.")
+
+    if not re.fullmatch(r"[1-9]\d{7,14}", normalized):
+        raise RuntimeError("Номер телефона укажите в международном формате, например +380XXXXXXXXX.")
+
+    return "+" + normalized
+
+
+def public_error_message(exc: Exception) -> str:
+    error_name = type(exc).__name__
+    if error_name == "PhoneNumberInvalidError":
+        return "Telegram отклонил номер телефона. Проверьте номер и международный формат +380XXXXXXXXX."
+    if error_name == "ApiIdInvalidError":
+        return "Telegram API ID или API Hash неверны. Проверьте данные с my.telegram.org."
+    if error_name in {"AuthTokenInvalidError", "AuthTokenAlreadyAcceptedError"}:
+        return "QR-код недействителен или уже использован. Создайте новый QR-код."
+    if error_name == "AuthTokenExpiredError":
+        return "Срок действия QR-кода истёк. Создайте новый QR-код."
+
+    return str(exc)
 
 
 class PartialCopyError(RuntimeError):
@@ -383,6 +421,9 @@ async def require_authorized(client: TelegramClient) -> None:
 async def finish_qr_flow(token: str) -> None:
     flow = qr_flows.pop(token, None)
     if flow is not None:
+        if not flow.wait_task.done():
+            flow.wait_task.cancel()
+            await asyncio.gather(flow.wait_task, return_exceptions=True)
         await flow.client.disconnect()
 
 
@@ -399,7 +440,10 @@ async def process_qr_wait(payload: dict[str, Any]) -> dict[str, Any]:
 
     try:
         timeout = min(max(int(payload.get("timeout", 20)), 1), 45)
-        await asyncio.wait_for(flow.login.wait(), timeout=timeout)
+        # The listener starts together with the QR code. Shielding keeps it
+        # alive when a short HTTP poll times out, so a scan can never be lost
+        # between displaying the code and pressing "check" in the admin UI.
+        await asyncio.wait_for(asyncio.shield(flow.wait_task), timeout=timeout)
     except asyncio.TimeoutError:
         return {"ok": True, "status": "pending"}
     except AuthTokenExpiredError:
@@ -449,6 +493,7 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
         if action == "send_code":
             if not phone:
                 raise RuntimeError("Не указан номер телефона.")
+            phone = normalize_phone(phone)
             sent = await client.send_code_request(phone)
             return {
                 "ok": True,
@@ -459,6 +504,7 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
         if action == "sign_in":
             if not phone:
                 raise RuntimeError("Не указан номер телефона.")
+            phone = normalize_phone(phone)
             try:
                 await client.sign_in(
                     phone=phone,
@@ -492,7 +538,12 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
             login = await client.qr_login()
             token = str(uuid.uuid4())
             expires_at = min(login.expires.timestamp(), time.time() + QR_TTL_SECONDS)
-            qr_flows[token] = QrFlow(client=client, login=login, expires_at=expires_at)
+            qr_flows[token] = QrFlow(
+                client=client,
+                login=login,
+                expires_at=expires_at,
+                wait_task=asyncio.create_task(login.wait()),
+            )
             keep_client = True
             return {
                 "ok": True,
@@ -603,7 +654,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
         request = json.loads(raw.decode("utf-8"))
         response = await process_request(request)
     except Exception as exc:
-        response = {"ok": False, "error": str(exc)}
+        response = {"ok": False, "error": public_error_message(exc)}
 
     writer.write((json.dumps(response, ensure_ascii=False) + "\n").encode("utf-8"))
     await writer.drain()
