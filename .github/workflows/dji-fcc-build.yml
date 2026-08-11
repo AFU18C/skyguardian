@@ -1,0 +1,47 @@
+name: Build DJI Fly Auto FCC test APK
+
+on:
+  push:
+    branches: ["agent/dji-fly-fcc-mod"]
+    paths:
+      - ".github/workflows/dji-fcc-build.yml"
+      - "tools/dji_fcc/AutoFcc.java"
+      - "tools/dji_fcc/build_mod.sh"
+      - "tools/dji_fcc/download_apkmirror.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download verified DJI Fly 1.21.8
+        run: |
+          python -m pip install --quiet requests beautifulsoup4
+          python tools/dji_fcc/download_apkmirror.py dji-fly.apk
+          echo "c602f4ffaef95e11b40314a6281ad2ce4adc1b22b2d318022ab1655edc021eb7  dji-fly.apk" | sha256sum -c -
+
+      - name: Build auto-FCC test APK
+        run: |
+          chmod +x tools/dji_fcc/build_mod.sh
+          tools/dji_fcc/build_mod.sh dji-fly.apk DJI-Fly-1.21.8-FCC-Auto.apk | tee build-report.txt
+
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DJI-Fly-1.21.8-FCC-Auto
+          path: |
+            DJI-Fly-1.21.8-FCC-Auto.apk
+            build-report.txt
+          compression-level: 0
+          retention-days: 1
