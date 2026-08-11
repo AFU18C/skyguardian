@@ -35,13 +35,39 @@ jobs:
         run: |
           chmod +x tools/dji_fcc/build_mod.sh
           tools/dji_fcc/build_mod.sh dji-fly.apk DJI-Fly-1.21.8-FCC-Auto.apk | tee build-report.txt
+          sha256sum DJI-Fly-1.21.8-FCC-Auto.apk > DJI-Fly-1.21.8-FCC-Auto.sha256
+          split -b 300M -d -a 2 DJI-Fly-1.21.8-FCC-Auto.apk DJI-Fly-1.21.8-FCC-Auto.apk.part-
+          ls -lh DJI-Fly-1.21.8-FCC-Auto.apk.part-*
 
-      - name: Upload test APK
+      - name: Upload APK part 00
         uses: actions/upload-artifact@v4
         with:
-          name: DJI-Fly-1.21.8-FCC-Auto
-          path: |
-            DJI-Fly-1.21.8-FCC-Auto.apk
-            build-report.txt
+          name: DJI-Fly-FCC-Auto-part-00
+          path: DJI-Fly-1.21.8-FCC-Auto.apk.part-00
           compression-level: 0
+          retention-days: 1
+
+      - name: Upload APK part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: DJI-Fly-FCC-Auto-part-01
+          path: DJI-Fly-1.21.8-FCC-Auto.apk.part-01
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload APK part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: DJI-Fly-FCC-Auto-part-02
+          path: DJI-Fly-1.21.8-FCC-Auto.apk.part-02
+          compression-level: 0
+          retention-days: 1
+
+      - name: Upload build report
+        uses: actions/upload-artifact@v4
+        with:
+          name: DJI-Fly-FCC-Auto-report
+          path: |
+            build-report.txt
+            DJI-Fly-1.21.8-FCC-Auto.sha256
           retention-days: 1
