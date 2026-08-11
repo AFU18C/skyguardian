@@ -1,0 +1,64 @@
+name: DJI Fly FCC research
+
+on:
+  push:
+    branches: ["agent/dji-fly-fcc-mod"]
+    paths:
+      - ".github/workflows/dji-fcc-inspect.yml"
+      - "tools/dji_fcc/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download DJI Fly 1.21.8 and verify original hash
+        run: |
+          python -m pip install --quiet requests beautifulsoup4
+          python tools/dji_fcc/download_apkmirror.py dji-fly.apk
+          echo "c602f4ffaef95e11b40314a6281ad2ce4adc1b22b2d318022ab1655edc021eb7  dji-fly.apk" | sha256sum -c -
+
+      - name: Inspect APK shell and manifest
+        run: |
+          set -euxo pipefail
+          BUILD_TOOLS=$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -1)
+          AAPT2="$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2"
+          APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
+          {
+            echo "== SHA256 =="
+            sha256sum dji-fly.apk
+            echo
+            echo "== APK signer =="
+            "$APKSIGNER" verify --print-certs dji-fly.apk || true
+            echo
+            echo "== Badging =="
+            "$AAPT2" dump badging dji-fly.apk | head -100
+            echo
+            echo "== Permissions/features =="
+            "$AAPT2" dump permissions dji-fly.apk || true
+            echo
+            echo "== DEX/native layout =="
+            unzip -l dji-fly.apk | grep -E 'classes[0-9]*\.dex|libdatajar|AppGuard|libAppGuard|AndroidManifest' | head -200
+            echo
+            echo "== Main DEX strings (startup/packer clues) =="
+            unzip -p dji-fly.apk classes.dex > classes.dex
+            strings classes.dex | grep -E -i 'application|appguard|bangcle|dji/go/v5|attachbasecontext|oncreate' | head -300 || true
+          } | tee inspection.txt
+
+      - name: Upload inspection only
+        uses: actions/upload-artifact@v4
+        with:
+          name: dji-fly-1.21.8-inspection
+          path: inspection.txt
+          retention-days: 1
