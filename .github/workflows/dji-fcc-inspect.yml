@@ -29,12 +29,14 @@ jobs:
           python tools/dji_fcc/download_apkmirror.py dji-fly.apk
           echo "c602f4ffaef95e11b40314a6281ad2ce4adc1b22b2d318022ab1655edc021eb7  dji-fly.apk" | sha256sum -c -
 
-      - name: Inspect APK shell and manifest
+      - name: Inspect APK shell and startup
         run: |
           set -euxo pipefail
           BUILD_TOOLS=$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -1)
           AAPT2="$ANDROID_HOME/build-tools/$BUILD_TOOLS/aapt2"
           APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
+          curl -fsSL -o apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
+          java -jar apktool.jar d -f -r dji-fly.apk -o decoded
           {
             echo "== SHA256 =="
             sha256sum dji-fly.apk
@@ -42,23 +44,32 @@ jobs:
             echo "== APK signer =="
             "$APKSIGNER" verify --print-certs dji-fly.apk || true
             echo
-            echo "== Badging =="
-            "$AAPT2" dump badging dji-fly.apk | head -100
+            echo "== Badging startup lines =="
+            "$AAPT2" dump badging dji-fly.apk | grep -E "^(package:|launchable-activity:|application-label|native-code:)" | head -30
             echo
-            echo "== Permissions/features =="
-            "$AAPT2" dump permissions dji-fly.apk || true
+            echo "== Manifest application / USB / launcher =="
+            grep -nE 'application|activity|usb|MAIN|LAUNCHER|AppGuard|DJIApplication' decoded/AndroidManifest.xml | head -250 || true
             echo
             echo "== DEX/native layout =="
             unzip -l dji-fly.apk | grep -E 'classes[0-9]*\.dex|libdatajar|AppGuard|libAppGuard|AndroidManifest' | head -200
             echo
-            echo "== Main DEX strings (startup/packer clues) =="
+            echo "== Main DEX strings =="
             unzip -p dji-fly.apk classes.dex > classes.dex
-            strings classes.dex | grep -E -i 'application|appguard|bangcle|dji/go/v5|attachbasecontext|oncreate' | head -300 || true
+            strings classes.dex | grep -E -i 'application|appguard|bangcle|dji/go/v5|attachbasecontext|oncreate|usb|accessory' | head -400 || true
+            echo
+            echo "== AppGuard startup smali files =="
+            find decoded -type f -path '*smali*' | grep -E '/com/AppGuard/AppGuard/(AW|GXNGN|RGTYT|VYRTL|XNXRT)\.smali$' || true
           } | tee inspection.txt
+
+          mkdir -p startup-smali
+          while IFS= read -r f; do cp --parents "$f" startup-smali/; done < <(find decoded -type f -path '*smali*' | grep -E '/com/AppGuard/AppGuard/(AW|GXNGN|RGTYT|VYRTL|XNXRT)\.smali$' || true)
+          cp decoded/AndroidManifest.xml startup-smali/AndroidManifest.xml
 
       - name: Upload inspection only
         uses: actions/upload-artifact@v4
         with:
           name: dji-fly-1.21.8-inspection
-          path: inspection.txt
+          path: |
+            inspection.txt
+            startup-smali/
           retention-days: 1
