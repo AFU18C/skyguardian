@@ -3,7 +3,7 @@ on:
   push:
     branches: [ mini4k-gps-check ]
     paths:
-      - 'mini4k-gps-check-source.zip'
+      - 'mini4k-gps-check/**'
       - '.github/workflows/mini4k-gps-check.yml'
   workflow_dispatch:
 
@@ -19,8 +19,6 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-      - name: Unpack source
-        run: unzip -q -o mini4k-gps-check-source.zip
       - name: Build debug APK
         run: gradle -p mini4k-gps-check assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
