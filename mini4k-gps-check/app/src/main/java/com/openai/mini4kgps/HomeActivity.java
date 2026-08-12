@@ -18,15 +18,21 @@ public class HomeActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v1.2");
+        title.setText("Mini 4K GPS Tool v1.3");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button atti = new Button(this);
+        atti.setText("ATTI ON SPORT / RESTORE");
+        LinearLayout.LayoutParams pa = new LinearLayout.LayoutParams(-1, -2);
+        pa.topMargin = pad;
+        root.addView(atti, pa);
+
         Button control = new Button(this);
         control.setText("GPS ON / OFF CONTROL");
         LinearLayout.LayoutParams p1 = new LinearLayout.LayoutParams(-1, -2);
-        p1.topMargin = pad;
+        p1.topMargin = Math.round(8 * getResources().getDisplayMetrics().density);
         root.addView(control, p1);
 
         Button gnssScan = new Button(this);
@@ -42,7 +48,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, p3);
 
         TextView note = new TextView(this);
-        note.setText("Оба SCAN-режима только читают параметры полётного контроллера. FLIGHT MODE SCAN ищет fswitch/control_mode/ATTI/manual/failsafe/without_gps. Для подключения полностью закройте DJI Fly и используйте верхний телефонный порт RC-N1.");
+        note.setText("ATTI CONTROL сначала строго проверяет table 0 / index 681 / control_mode[1]. ATTI ON SPORT меняет только штатный SPORT 8 → candidate ATTI 3; RESTORE возвращает 3 → 8. Для подключения полностью закройте DJI Fly и используйте верхний телефонный порт RC-N1.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -50,6 +56,7 @@ public class HomeActivity extends Activity {
 
         setContentView(root);
 
+        atti.setOnClickListener(v -> startActivity(new Intent(this, AttiControlActivity.class)));
         control.setOnClickListener(v -> startActivity(new Intent(this, FinalActivity.class)));
         gnssScan.setOnClickListener(v -> startActivity(new Intent(this, GnssScanActivity.class)));
         modeScan.setOnClickListener(v -> startActivity(new Intent(this, FlightModeScanActivity.class)));
