@@ -18,13 +18,13 @@ public class HomeActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v1.4");
+        title.setText("Mini 4K GPS Tool v1.5");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         Button live = new Button(this);
-        live.setText("LIVE FC STATUS — READ ONLY");
+        live.setText("PASSIVE LIVE FC STATUS — READ ONLY");
         LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(-1, -2);
         pl.topMargin = pad;
         root.addView(live, pl);
@@ -54,7 +54,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, p3);
 
         TextView note = new TextView(this);
-        note.setText("LIVE FC STATUS ничего не записывает и показывает FC State / GPS Used / satellites / GPS State. Для проверки ATTI: моторы не запускать, START LIVE, затем переключить N → S. DJI Fly полностью закрыть; телефон подключить к верхнему порту RC-N1.");
+        note.setText("PASSIVE LIVE FC STATUS теперь не запрашивает 0x43, а слушает штатные push-пакеты FC. Показывает FC State / GPS Used / satellites / Non-GPS Cause и диагностирует другие FLYC push, если 0x43 не приходит. Ничего в FC не записывает. Для проверки ATTI: моторы не запускать, сначала N, затем S. DJI Fly полностью закрыть; телефон — в верхний порт RC-N1.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
