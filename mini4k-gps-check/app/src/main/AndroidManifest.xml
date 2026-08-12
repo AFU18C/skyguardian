@@ -8,7 +8,7 @@
         android:label="Mini 4K GPS Tool"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".V1Activity"
+            android:name=".FinalActivity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
