@@ -110,11 +110,11 @@ public class V2Activity extends Activity {
 
     private void showIntro() {
         status.setText("");
-        append("Mini 4K GPS Parameter Test v0.2");
+        append("Mini 4K GPS Parameter Test v0.3");
         append("ТЕСТ ТОЛЬКО НА ЗЕМЛЕ. МОТОРЫ НЕ ЗАПУСКАТЬ.");
         append("");
-        append("v0.2: проверяет несколько USB/DUML маршрутов, принимает ответ даже если RC-N1 меняет sequence,");
-        append("а если старый hash-протокол закрыт — пробует 2017 table/index.");
+        append("v0.3: для RC-N1/C5 с USB 2CA3:1020 сначала использует второй CDC/ACM порт,");
+        append("потому что v0.2 открыл port 0 и видел только служебные уведомления RC, без ответов FLYC.");
         append("");
         append("CHECK не записывает параметры полёта. GPS OFF/ON останутся заблокированы, пока gps_enable");
         append("не будет подтверждён по имени + типу + размеру + диапазону 0..1 + текущему значению.");
@@ -127,7 +127,7 @@ public class V2Activity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS CHECK v0.2");
+        title.setText("Mini 4K GPS CHECK v0.3");
         title.setTextSize(23);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -236,7 +236,7 @@ public class V2Activity extends Activity {
     private void performCheck() {
         runOnUiThread(() -> status.setText(""));
         clearConfirmation();
-        append("=== CHECK v0.2 ===");
+        append("=== CHECK v0.3 ===");
 
         UsbSerialPort port = null;
         try {
@@ -270,7 +270,7 @@ public class V2Activity extends Activity {
             append("");
             append("РЕЗУЛЬТАТ: USB RC-N1 работает, но gps_enable пока не подтверждён.");
             append("НИЧЕГО В ПАРАМЕТРАХ ДРОНА НЕ ЗАПИСАНО.");
-            append("Пришлите весь лог CHECK v0.2 — по ответам/таймаутам сделаю следующий точный шаг.");
+            append("Пришлите весь лог CHECK v0.3.");
         } catch (Exception e) {
             append("CHECK failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
         } finally {
@@ -602,16 +602,20 @@ public class V2Activity extends Activity {
         UsbSerialDriver driver = new UsbSerialProber(table).probeDevice(target);
         if (driver == null || driver.getPorts().isEmpty()) throw new IllegalStateException("CDC serial driver не найден");
 
+        List<UsbSerialPort> ports = driver.getPorts();
+        append("RC-N1 CDC ports: " + ports.size());
+        int portIndex = ports.size() > 1 ? 1 : 0;
+
         UsbDeviceConnection connection = usbManager.openDevice(target);
         if (connection == null) throw new IllegalStateException("Не удалось открыть USB device");
 
-        UsbSerialPort port = driver.getPorts().get(0);
+        UsbSerialPort port = ports.get(portIndex);
         port.open(connection);
         port.setParameters(19200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
         try { port.setDTR(true); } catch (Exception ignored) {}
         try { port.setRTS(true); } catch (Exception ignored) {}
         try { port.purgeHwBuffers(true, true); } catch (Exception ignored) {}
-        append("RC-N1 serial: OPEN 19200 8N1");
+        append("RC-N1 serial: OPEN port=" + portIndex + " 19200 8N1");
         return port;
     }
 
