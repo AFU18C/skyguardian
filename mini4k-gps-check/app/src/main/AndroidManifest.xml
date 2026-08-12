@@ -9,19 +9,16 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".FinalActivity"
-            android:exported="true"
-            android:screenOrientation="portrait"
-            android:label="Mini 4K GPS Tool">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:screenOrientation="portrait" />
         <activity
             android:name=".GnssScanActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".HomeActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
-            android:label="Mini 4K GNSS Scan">
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
