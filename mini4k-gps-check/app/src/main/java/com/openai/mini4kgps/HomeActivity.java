@@ -18,15 +18,21 @@ public class HomeActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v1.5");
+        title.setText("Mini 4K GPS Tool v1.6");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button prop = new Button(this);
+        prop.setText("MOTOR / PROPELLER TEST — READ ONLY");
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, -2);
+        pp.topMargin = pad;
+        root.addView(prop, pp);
+
         Button live = new Button(this);
         live.setText("PASSIVE LIVE FC STATUS — READ ONLY");
         LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(-1, -2);
-        pl.topMargin = pad;
+        pl.topMargin = Math.round(8 * getResources().getDisplayMetrics().density);
         root.addView(live, pl);
 
         Button atti = new Button(this);
@@ -54,7 +60,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, p3);
 
         TextView note = new TextView(this);
-        note.setText("PASSIVE LIVE FC STATUS теперь не запрашивает 0x43, а слушает штатные push-пакеты FC. Показывает FC State / GPS Used / satellites / Non-GPS Cause и диагностирует другие FLYC push, если 0x43 не приходит. Ничего в FC не записывает. Для проверки ATTI: моторы не запускать, сначала N, затем S. DJI Fly полностью закрыть; телефон — в верхний порт RC-N1.");
+        note.setText("MOTOR / PROPELLER TEST: пассивный 20-секундный тест с моторами на холостых на земле. Приложение само моторы НЕ запускает и параметры FC не записывает. Проверяет штатные ESC/motor/propeller/vibration флаги и raw motor revolution. DJI Fly полностью закрыть; телефон — в верхний порт RC-N1.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -62,6 +68,7 @@ public class HomeActivity extends Activity {
 
         setContentView(root);
 
+        prop.setOnClickListener(v -> startActivity(new Intent(this, PropellerTestActivity.class)));
         live.setOnClickListener(v -> startActivity(new Intent(this, LiveFcStatusActivity.class)));
         atti.setOnClickListener(v -> startActivity(new Intent(this, AttiControlActivity.class)));
         control.setOnClickListener(v -> startActivity(new Intent(this, FinalActivity.class)));
