@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-feature android:name="android.hardware.usb.host" android:required="true" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.accessory" android:required="false" />
 
     <application
         android:allowBackup="false"
-        android:label="Mini 4K GPS Check"
+        android:label="Mini 4K GPS Tool"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".V5Activity"
+            android:name=".V1Activity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
