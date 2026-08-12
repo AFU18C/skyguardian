@@ -9,8 +9,13 @@ import java.util.Arrays;
 import java.util.List;
 
 final class DumlV2 {
+    static final int DEV_ANY = 0;
+    static final int DEV_CAMERA = 1;
     static final int DEV_MOBILE_APP = 2;
     static final int DEV_FLYCONTROLLER = 3;
+    static final int DEV_GIMBAL = 4;
+    static final int DEV_REMOTE_RADIO = 6;
+    static final int DEV_LB_MCU_SKY = 9;
     static final int DEV_PC = 10;
     static final int DEV_AIRCRAFT_PROXY = 31;
     static final int CMDSET_GENERAL = 0;
@@ -18,6 +23,10 @@ final class DumlV2 {
 
     private static final int[] CRC8_TABLE = new int[256];
     private static final int[] CRC16_TABLE = new int[256];
+    private static final byte[] SIMPLE_KEY = new byte[]{
+            0x78, 0x4F, 0x24, 0x33, 0x28, 0x2D, 0x32, 0x40, 0x23, 0x6C, 0x64,
+            0x2A, 0x76, 0x69, 0x41, 0x51, 0x7E, 0x69, 0x78, 0x46, 0x45, 0x00
+    };
 
     static {
         for (int i = 0; i < 256; i++) {
@@ -63,6 +72,11 @@ final class DumlV2 {
 
     static byte[] packet(int senderType, int senderIndex, int receiverType, int receiverIndex,
                          int seq, int cmdSet, int cmdId, byte[] payload) {
+        return packet(senderType, senderIndex, receiverType, receiverIndex, seq, cmdSet, cmdId, payload, false);
+    }
+
+    static byte[] packet(int senderType, int senderIndex, int receiverType, int receiverIndex,
+                         int seq, int cmdSet, int cmdId, byte[] payload, boolean simpleEncrypt) {
         int length = 11 + payload.length + 2;
         byte[] p = new byte[length];
         ByteBuffer bb = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN);
@@ -72,7 +86,7 @@ final class DumlV2 {
         bb.put((byte) ((senderType & 0x1F) | ((senderIndex & 0x07) << 5)));
         bb.put((byte) ((receiverType & 0x1F) | ((receiverIndex & 0x07) << 5)));
         bb.putShort((short) (seq & 0xFFFF));
-        bb.put((byte) 0x40);
+        bb.put((byte) 0x40); // request + ACK_AFTER_EXEC + no encryption initially
         bb.put((byte) (cmdSet & 0xFF));
         bb.put((byte) (cmdId & 0xFF));
         bb.put(payload);
@@ -80,7 +94,54 @@ final class DumlV2 {
         int crc = crc16(p, length - 2);
         p[length - 2] = (byte) (crc & 0xFF);
         p[length - 1] = (byte) ((crc >>> 8) & 0xFF);
-        return p;
+        return simpleEncrypt ? encryptSimpleFrame(p) : p;
+    }
+
+    static byte[] simpleFilter(byte[] buf, int seq) {
+        byte[] out = new byte[buf.length];
+        int keyIdx = 1;
+        int slo = seq & 0xFF;
+        int shi = (seq >>> 8) & 0xFF;
+        for (int i = 0; i < buf.length; i++) {
+            if (keyIdx >= 22) keyIdx = 0;
+            int seqByte = ((i & 1) != 0) ? shi : slo;
+            out[i] = (byte) ((SIMPLE_KEY[keyIdx] & 0xFF) ^ (buf[i] & 0xFF) ^ seqByte);
+            keyIdx = ((i + 1) & 0x0F) ^ (keyIdx + 1);
+        }
+        return out;
+    }
+
+    static byte[] encryptSimpleFrame(byte[] plaintext) {
+        byte[] f = Arrays.copyOf(plaintext, plaintext.length);
+        if (f.length < 13) return f;
+        int seq = u16(f, 6);
+        byte[] region = Arrays.copyOfRange(f, 9, f.length - 2);
+        byte[] enc = simpleFilter(region, seq);
+        System.arraycopy(enc, 0, f, 9, enc.length);
+        f[8] = (byte) ((f[8] & 0xF8) | 0x03);
+        int crc = crc16(f, f.length - 2);
+        f[f.length - 2] = (byte) (crc & 0xFF);
+        f[f.length - 1] = (byte) ((crc >>> 8) & 0xFF);
+        return f;
+    }
+
+    static byte[] decryptSimpleFrame(byte[] encrypted) {
+        byte[] f = Arrays.copyOf(encrypted, encrypted.length);
+        if (f.length < 13 || ((f[8] & 0x07) != 0x03)) return f;
+        int seq = u16(f, 6);
+        byte[] region = Arrays.copyOfRange(f, 9, f.length - 2);
+        byte[] dec = simpleFilter(region, seq);
+        System.arraycopy(dec, 0, f, 9, dec.length);
+        f[8] = (byte) (f[8] & 0xF8);
+        int crc = crc16(f, f.length - 2);
+        f[f.length - 2] = (byte) (crc & 0xFF);
+        f[f.length - 1] = (byte) ((crc >>> 8) & 0xFF);
+        return f;
+    }
+
+    static boolean selfTest() {
+        byte[] worked = simpleFilter(new byte[]{0x03, (byte) 0xF9, 0x78, 0x56, 0x34, 0x12, (byte) 0xF4, 0x01}, 7);
+        return "4B CA 4D 7E 7C 52 B2 22".equals(hex(worked));
     }
 
     static int crc8(byte[] p, int len) {
@@ -106,10 +167,12 @@ final class DumlV2 {
             int tag = (all[off + 1] & 0xFF) | ((all[off + 2] & 0xFF) << 8);
             int len = tag & 0x03FF;
             if (len < 13 || off + len > all.length) continue;
-            byte[] f = Arrays.copyOfRange(all, off, off + len);
-            if ((f[3] & 0xFF) != crc8(f, 3)) continue;
-            int gotCrc = (f[len - 2] & 0xFF) | ((f[len - 1] & 0xFF) << 8);
-            if (gotCrc != crc16(f, len - 2)) continue;
+            byte[] raw = Arrays.copyOfRange(all, off, off + len);
+            if ((raw[3] & 0xFF) != crc8(raw, 3)) continue;
+            int gotCrc = (raw[len - 2] & 0xFF) | ((raw[len - 1] & 0xFF) << 8);
+            if (gotCrc != crc16(raw, len - 2)) continue;
+
+            byte[] f = ((raw[8] & 0x07) == 0x03) ? decryptSimpleFrame(raw) : raw;
             int sender = f[4] & 0xFF;
             int receiver = f[5] & 0xFF;
             int seq = (f[6] & 0xFF) | ((f[7] & 0xFF) << 8);
@@ -119,7 +182,7 @@ final class DumlV2 {
             out.add(new Frame(sender & 0x1F, (sender >>> 5) & 7,
                     receiver & 0x1F, (receiver >>> 5) & 7,
                     seq, response, cmdSet, cmdId,
-                    Arrays.copyOfRange(f, 11, len - 2), f));
+                    Arrays.copyOfRange(f, 11, len - 2), raw));
             off += len - 1;
         }
         return out;
