@@ -7,7 +7,7 @@
         android:label="Mini 4K GPS Check"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".V4Activity"
+            android:name=".V5Activity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
