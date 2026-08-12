@@ -18,7 +18,7 @@ public class HomeActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v1.1");
+        title.setText("Mini 4K GPS Tool v1.2");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -29,14 +29,20 @@ public class HomeActivity extends Activity {
         p1.topMargin = pad;
         root.addView(control, p1);
 
-        Button scan = new Button(this);
-        scan.setText("GNSS SCAN — READ ONLY");
+        Button gnssScan = new Button(this);
+        gnssScan.setText("GNSS SCAN — READ ONLY");
         LinearLayout.LayoutParams p2 = new LinearLayout.LayoutParams(-1, -2);
         p2.topMargin = Math.round(8 * getResources().getDisplayMetrics().density);
-        root.addView(scan, p2);
+        root.addView(gnssScan, p2);
+
+        Button modeScan = new Button(this);
+        modeScan.setText("FLIGHT MODE SCAN — READ ONLY");
+        LinearLayout.LayoutParams p3 = new LinearLayout.LayoutParams(-1, -2);
+        p3.topMargin = Math.round(8 * getResources().getDisplayMetrics().density);
+        root.addView(modeScan, p3);
 
         TextView note = new TextView(this);
-        note.setText("GNSS SCAN ничего не записывает в параметры полётного контроллера. Для подключения полностью закройте DJI Fly и используйте верхний телефонный порт RC-N1.");
+        note.setText("Оба SCAN-режима только читают параметры полётного контроллера. FLIGHT MODE SCAN ищет fswitch/control_mode/ATTI/manual/failsafe/without_gps. Для подключения полностью закройте DJI Fly и используйте верхний телефонный порт RC-N1.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -45,6 +51,7 @@ public class HomeActivity extends Activity {
         setContentView(root);
 
         control.setOnClickListener(v -> startActivity(new Intent(this, FinalActivity.class)));
-        scan.setOnClickListener(v -> startActivity(new Intent(this, GnssScanActivity.class)));
+        gnssScan.setOnClickListener(v -> startActivity(new Intent(this, GnssScanActivity.class)));
+        modeScan.setOnClickListener(v -> startActivity(new Intent(this, FlightModeScanActivity.class)));
     }
 }
