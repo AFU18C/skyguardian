@@ -18,15 +18,21 @@ public class HomeActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v1.6");
+        title.setText("Mini 4K GPS Tool v1.7");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button full = new Button(this);
+        full.setText("FULL GROUND DIAGNOSTICS — READ ONLY");
+        LinearLayout.LayoutParams pf = new LinearLayout.LayoutParams(-1, -2);
+        pf.topMargin = pad;
+        root.addView(full, pf);
+
         Button prop = new Button(this);
         prop.setText("MOTOR / PROPELLER TEST — READ ONLY");
         LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(-1, -2);
-        pp.topMargin = pad;
+        pp.topMargin = Math.round(8 * getResources().getDisplayMetrics().density);
         root.addView(prop, pp);
 
         Button live = new Button(this);
@@ -60,7 +66,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, p3);
 
         TextView note = new TextView(this);
-        note.setText("MOTOR / PROPELLER TEST: пассивный 20-секундный тест с моторами на холостых на земле. Приложение само моторы НЕ запускает и параметры FC не записывает. Проверяет штатные ESC/motor/propeller/vibration флаги и raw motor revolution. DJI Fly полностью закрыть; телефон — в верхний порт RC-N1.");
+        note.setText("FULL GROUND DIAGNOSTICS: все этапы только на земле. 30 сек Motors=OFF, затем приложение попросит вручную запустить моторы и ещё 20 сек на холостых. Само моторы не запускает, параметры FC не записывает. Проверяет доступные FC/GNSS/IMU/компас/барометр/ESC/мотор/пропеллер/батарея/RC/Home и GPS jamming/spoofing флаги. DJI Fly полностью закрыть; телефон — в верхний порт RC-N1.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -68,6 +74,7 @@ public class HomeActivity extends Activity {
 
         setContentView(root);
 
+        full.setOnClickListener(v -> startActivity(new Intent(this, FullGroundDiagnosticsActivity.class)));
         prop.setOnClickListener(v -> startActivity(new Intent(this, PropellerTestActivity.class)));
         live.setOnClickListener(v -> startActivity(new Intent(this, LiveFcStatusActivity.class)));
         atti.setOnClickListener(v -> startActivity(new Intent(this, AttiControlActivity.class)));
