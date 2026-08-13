@@ -7,38 +7,15 @@
         android:allowBackup="false"
         android:label="Mini 4K GPS Tool"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
-        <activity
-            android:name=".FinalActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".GnssScanActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".FlightModeScanActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".AttiControlActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".LiveFcStatusActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".PropellerTestActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".FullGroundDiagnosticsActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name=".GnssSignalAnalyzerActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
+        <activity android:name=".FinalActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".GnssScanActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".GnssReceiverConfigScanActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".FlightModeScanActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".AttiControlActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".LiveFcStatusActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".PropellerTestActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".FullGroundDiagnosticsActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".GnssSignalAnalyzerActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity
             android:name=".HomeActivity"
             android:exported="true"
