@@ -21,24 +21,28 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v3.0");
+        title.setText("Mini 4K GPS Tool v3.1");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button settings = new Button(this);
+        settings.setText("GPS SETTINGS / ACCESS MAP v3.1");
+        LinearLayout.LayoutParams ps = new LinearLayout.LayoutParams(-1, -2);
+        ps.topMargin = pad;
+        root.addView(settings, ps);
+
+        TextView settingsNote = new TextView(this);
+        settingsNote.setText("v3.1 читает только уже подтверждённые на этом Mini 4K GPS-параметры и показывает CURRENT/MIN/MAX/DEFAULT/ATTR + фактический тип доступа. Без угадывания названий. Подтверждённый gps_enable редактор открывается отдельной кнопкой.");
+        settingsNote.setTextSize(14);
+        LinearLayout.LayoutParams psn = new LinearLayout.LayoutParams(-1, -2);
+        psn.topMargin = pad;
+        psn.bottomMargin = pad;
+        root.addView(settingsNote, psn);
+
         Button boot = new Button(this);
         boot.setText("GNSS BOOT SIGNATURE CAPTURE v3.0 — PASSIVE");
-        LinearLayout.LayoutParams pb = new LinearLayout.LayoutParams(-1, -2);
-        pb.topMargin = pad;
-        root.addView(boot, pb);
-
-        TextView bootNote = new TextView(this);
-        bootNote.setText("v3.0 не перебирает параметры. Он пассивно ловит boot/log payloads и ищет буквальную сигнатуру приёмника: m8 / m10 / M8030 / M10050 / u-blox / MGA / DBD / uniqid. Для лучшего результата: дрон OFF, RC-N1 ON, нажать RUN и затем включить дрон. GNSS write/config commands=0.");
-        bootNote.setTextSize(14);
-        LinearLayout.LayoutParams pbn = new LinearLayout.LayoutParams(-1, -2);
-        pbn.topMargin = pad;
-        pbn.bottomMargin = pad;
-        root.addView(bootNote, pbn);
+        root.addView(boot, top(8));
 
         Button identity = new Button(this);
         identity.setText("GNSS DEVICE ID / VERSION INVENTORY v2.9 — READ ONLY");
@@ -69,7 +73,7 @@ public class HomeActivity extends Activity {
         root.addView(signal, top(8));
 
         TextView manual = new TextView(this);
-        manual.setText("MANUAL CONTROLS — не запускать для диагностики");
+        manual.setText("MANUAL CONTROLS");
         manual.setTextSize(15);
         LinearLayout.LayoutParams pm = new LinearLayout.LayoutParams(-1, -2);
         pm.topMargin = pad;
@@ -85,6 +89,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        settings.setOnClickListener(v -> startActivity(new Intent(this, GpsSettingsActivity.class)));
         boot.setOnClickListener(v -> startActivity(new Intent(this, GnssBootLogProbeActivity.class)));
         identity.setOnClickListener(v -> startActivity(new Intent(this, GnssIdentityProbeActivity.class)));
         integrity.setOnClickListener(v -> startActivity(new Intent(this, GnssIntegritySourceProbeActivity.class)));
