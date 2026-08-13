@@ -21,24 +21,28 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v2.8");
+        title.setText("Mini 4K GPS Tool v2.9");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button identity = new Button(this);
+        identity.setText("GNSS DEVICE ID / VERSION INVENTORY v2.9 — READ ONLY");
+        LinearLayout.LayoutParams pid = new LinearLayout.LayoutParams(-1, -2);
+        pid.topMargin = pad;
+        root.addView(identity, pid);
+
+        TextView identityNote = new TextView(this);
+        identityNote.setText("v2.9 не угадывает gps_* имена. Он использует только документированные General 0x01 Version Inquiry и 0xFF Query Device Info, чтобы получить реальный hardware/version string доступных модулей и отдельно проверить GPS/RTK endpoint type 26. WRITE/CONFIG=0.");
+        identityNote.setTextSize(14);
+        LinearLayout.LayoutParams pIdentityNote = new LinearLayout.LayoutParams(-1, -2);
+        pIdentityNote.topMargin = pad;
+        pIdentityNote.bottomMargin = pad;
+        root.addView(identityNote, pIdentityNote);
+
         Button integrity = new Button(this);
         integrity.setText("GNSS INTEGRITY / SOURCE PROBE v2.8");
-        LinearLayout.LayoutParams pi = new LinearLayout.LayoutParams(-1, -2);
-        pi.topMargin = pad;
-        root.addView(integrity, pi);
-
-        TextView note = new TextView(this);
-        note.setText("v2.8 проверяет GPS FDI/integrity, source-mode/SingleBD aliases, tail 1368..1383 и RAW 160-byte SNR blocks. Постоянные параметры не меняются; 0x46 только временно включает и выключает SNR stream.");
-        note.setTextSize(14);
-        LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
-        pn.topMargin = pad;
-        pn.bottomMargin = pad;
-        root.addView(note, pn);
+        root.addView(integrity, top(8));
 
         Button constellation = new Button(this);
         constellation.setText("CONSTELLATION / DISABLE_BD PROBE v2.7");
@@ -77,6 +81,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        identity.setOnClickListener(v -> startActivity(new Intent(this, GnssIdentityProbeActivity.class)));
         integrity.setOnClickListener(v -> startActivity(new Intent(this, GnssIntegritySourceProbeActivity.class)));
         constellation.setOnClickListener(v -> startActivity(new Intent(this, GnssConstellationProbeActivity.class)));
         neighbor.setOnClickListener(v -> startActivity(new Intent(this, GnssNeighborhoodDumpActivity.class)));
