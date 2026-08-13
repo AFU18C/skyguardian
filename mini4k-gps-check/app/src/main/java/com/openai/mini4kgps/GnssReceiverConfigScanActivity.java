@@ -3,6 +3,8 @@ package com.openai.mini4kgps;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -33,8 +35,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Deep read-only scan for GNSS receiver/config related parameters.
- * It reads E0/E1/E2 only. No E3/F9 writes, no 0xDF unlock, no receiver reconfiguration.
+ * One-shot, read-only map of the FC parameter store with GNSS/RF classification.
+ *
+ * Reads only:
+ *  - FLYC E0 table attributes
+ *  - FLYC E1 item attributes/names
+ *  - FLYC E2 current values for GNSS/RF candidates
+ *  - a small set of known read-only FLYC GET commands for context
+ *
+ * Never sends E3/F9 writes, 0xDF unlock, E9 positive/exec selectors, or receiver SET commands.
  */
 public class GnssReceiverConfigScanActivity extends Activity {
     private static final String ACTION_USB_PERMISSION = "com.openai.mini4kgps.GNSS_RX_SCAN_PERMISSION";
@@ -45,13 +54,17 @@ public class GnssReceiverConfigScanActivity extends Activity {
     private UsbManager usbManager;
     private TextView log;
     private Button scan;
+    private Button copy;
     private volatile boolean pendingPermission;
+    private volatile String lastReport = "";
 
     private static final class Route {
         final int st, si, rt, ri;
         Route(int st, int si, int rt, int ri) { this.st = st; this.si = si; this.rt = rt; this.ri = ri; }
     }
-    private static final Route APP_FLYC = new Route(DumlV2.DEV_MOBILE_APP, 0, DumlV2.DEV_FLYCONTROLLER, 0);
+
+    private static final Route APP_FLYC = new Route(
+            DumlV2.DEV_MOBILE_APP, 0, DumlV2.DEV_FLYCONTROLLER, 0);
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -73,19 +86,24 @@ public class GnssReceiverConfigScanActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GNSS RECEIVER CONFIG SCAN v1.9");
+        title.setText("Mini 4K ONE-SHOT GNSS PARAM MAP v2.4");
         title.setTextSize(20);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         scan = new Button(this);
-        scan.setText("DEEP GNSS RECEIVER SCAN — READ ONLY");
+        scan.setText("RUN ONE BIG READ-ONLY TEST");
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, -2);
         bp.topMargin = dp(12);
         root.addView(scan, bp);
 
+        copy = new Button(this);
+        copy.setText("COPY FULL REPORT");
+        copy.setEnabled(false);
+        root.addView(copy, top(8));
+
         log = new TextView(this);
-        log.setTextSize(13);
+        log.setTextSize(12);
         log.setTextIsSelectable(true);
         log.setPadding(0, dp(12), 0, dp(12));
         ScrollView sc = new ScrollView(this);
@@ -93,15 +111,34 @@ public class GnssReceiverConfigScanActivity extends Activity {
         root.addView(sc, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(root);
 
-        append("ТОЛЬКО ЧТЕНИЕ. Моторы OFF.");
-        append("Ищу receiver/RF/antenna/LNA/AGC/sensitivity, GPS/GNSS/GLONASS/Galileo/BeiDou, acquisition/A-GPS, ephemeris/almanac, clock/frequency и GNSS integrity/FDI параметры.");
-        append("Команды записи E3/F9 и config-unlock 0xDF НЕ используются.");
-        append("DJI Fly полностью закрыть; телефон — в верхний порт RC-N1.");
+        append("ОДИН ТЕСТ. ТОЛЬКО ЧТЕНИЕ. Моторы OFF.");
+        append("Сканирует ВСЕ доступные FLYC config tables и ВСЕ имена параметров, а не только заранее придуманные индексы.");
+        append("Для GNSS/RF-кандидатов читает текущее значение и показывает: table/index, name, назначение по имени, range/default, hash, read path и возможный paired write path.");
+        append("E3/F9/0xDF/E9 EXEC/RTK SET: НЕ ОТПРАВЛЯЮТСЯ.");
+        append("После теста нажми COPY FULL REPORT и пришли текст — больше скриншоты по кускам не нужны.");
         append("");
+
         scan.setOnClickListener(v -> begin());
+        copy.setOnClickListener(v -> copyReport());
+    }
+
+    private LinearLayout.LayoutParams top(int d) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+        p.topMargin = dp(d);
+        return p;
     }
 
     private int dp(int x) { return Math.round(x * getResources().getDisplayMetrics().density); }
+
+    private void copyReport() {
+        String r = lastReport;
+        if (r == null || r.isEmpty()) return;
+        ClipboardManager cm = (ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(ClipData.newPlainText("Mini4K GNSS full map", r));
+            append("FULL REPORT COPIED TO CLIPBOARD (" + r.length() + " chars)");
+        }
+    }
 
     private void registerUsbReceiver() {
         IntentFilter f = new IntentFilter();
@@ -152,6 +189,8 @@ public class GnssReceiverConfigScanActivity extends Activity {
             return;
         }
         scan.setEnabled(false);
+        copy.setEnabled(false);
+        lastReport = "";
         io.submit(() -> {
             try { performScan(a); }
             catch (Throwable t) { append("SCAN ERROR: " + t.getClass().getSimpleName() + ": " + t.getMessage()); }
@@ -164,142 +203,170 @@ public class GnssReceiverConfigScanActivity extends Activity {
 
     private void performScan(UsbAccessory a) throws Exception {
         runOnUiThread(() -> log.setText(""));
-        append("=== DEEP GNSS RECEIVER CONFIG SCAN v1.9 ===");
-        append("WRITE COMMANDS SENT: 0");
-        append("DUML self-test: " + (DumlV2.selfTest() ? "PASS" : "FAIL"));
-        if (!DumlV2.selfTest()) return;
+        StringBuilder report = new StringBuilder(256 * 1024);
+        line(report, "MINI 4K ONE-SHOT GNSS PARAM MAP v2.4");
+        line(report, "READ-ONLY: E0/E1/E2 + known GET commands only");
+        line(report, "WRITE/EXEC SENT: E3=0 F9=0 0xDF=0 E9-positive=0 RTK-SET=0");
+        line(report, "");
+
+        append("=== ONE-SHOT FULL GNSS PARAM MAP v2.4 ===");
+        append("WRITE/EXEC COMMANDS SENT: 0");
+        boolean self = DumlV2.selfTest();
+        append("DUML self-test: " + (self ? "PASS" : "FAIL"));
+        line(report, "DUML self-test=" + (self ? "PASS" : "FAIL"));
+        if (!self) {
+            finishReport(report);
+            return;
+        }
 
         AoaSession s = AoaSession.open(usbManager, a, seq);
-        if (s == null) { append("AOA pipe не открылся."); return; }
+        if (s == null) {
+            append("AOA pipe не открылся.");
+            line(report, "AOA=FAILED");
+            finishReport(report);
+            return;
+        }
+
         try {
             s.startProtocol();
             sleep(350);
             append("AOA OPEN route=" + s.routeString());
+            line(report, "AOA route=" + s.routeString());
 
-            Boolean enc = establishReadOnlyMode(s);
+            Boolean enc = establishReadOnlyMode(s, report);
             if (enc == null) {
-                append("E0 READ не ответил. Скан остановлен; ничего не изменено.");
+                append("E0 READ не ответил. Ничего не изменено.");
+                line(report, "FATAL: FLYC E0 config table read did not respond");
+                finishReport(report);
                 return;
             }
-            append("READ transport=" + (enc ? "SIMPLE encrypted" : "plaintext"));
+            append("READ transport=" + (enc ? "SIMPLE encrypted" : "PLAINTEXT"));
+            line(report, "FLYC config transport=" + (enc ? "SIMPLE encrypted" : "PLAINTEXT"));
 
-            List<DumlV2.TableAttr2017> tables = readTables(s, enc);
-            if (tables.isEmpty()) { append("Таблицы параметров не прочитаны."); return; }
+            List<DumlV2.TableAttr2017> tables = readTables(s, enc, report);
+            if (tables.isEmpty()) {
+                append("Таблицы параметров не прочитаны.");
+                line(report, "FATAL: no readable FLYC config tables");
+                finishReport(report);
+                return;
+            }
 
-            int scanned = 0, matches = 0, high = 0, timeouts = 0;
-            int rf = 0, constellation = 0, acquisition = 0, clock = 0, integrity = 0, other = 0;
-            append("");
-            append("--- CANDIDATES ---");
+            int scanned = 0;
+            int valid = 0;
+            int matches = 0;
+            int valueReads = 0;
+            int timeouts = 0;
+            int high = 0;
+            List<String> mapLines = new ArrayList<>();
+
+            line(report, "");
+            line(report, "=== COMPLETE PARAMETER INDEX (ALL READABLE NAMES) ===");
+            append("Сканирую полный индекс параметров. Это один проход; может занять несколько минут...");
 
             for (DumlV2.TableAttr2017 table : tables) {
-                int total = (int)Math.min(table.entriesNum, 10000);
-                append("SCAN table=" + table.tableNo + " indexes=0.." + (total - 1));
+                int total = (int)Math.min(table.entriesNum, 20000);
+                append("TABLE " + table.tableNo + ": " + total + " entries");
                 int noReply = 0;
+
                 for (int index = 0; index < total; index++) {
                     byte[] q = DumlV2.concat(DumlV2.le16(table.tableNo), DumlV2.le16(index));
                     DumlV2.Frame r = transact(s, APP_FLYC, DumlV2.CMDSET_FLYC, 0xE1, q, enc, 380);
                     scanned++;
                     if (r == null) {
-                        timeouts++; noReply++;
-                        if (noReply >= 20) { append("table=" + table.tableNo + ": stop after 20 E1 timeouts"); break; }
+                        timeouts++;
+                        noReply++;
+                        if (noReply >= 24) {
+                            line(report, "INDEX-STOP|table=" + table.tableNo + "|reason=24 consecutive E1 timeouts|at=" + index);
+                            break;
+                        }
                         continue;
                     }
                     noReply = 0;
                     DumlV2.ParamInfo2017 info = DumlV2.ParamInfo2017.parse(r.payload);
-                    if (info == null || info.status != 0) continue;
-                    String category = classify(info.name);
-                    if (category == null) {
-                        if (index > 0 && index % 100 == 0) append("  progress " + index + "/" + total);
-                        continue;
-                    }
-                    matches++;
-                    if ("RF/ANTENNA".equals(category)) rf++;
-                    else if ("CONSTELLATION".equals(category)) constellation++;
-                    else if ("ACQUISITION/A-GPS".equals(category)) acquisition++;
-                    else if ("CLOCK/FREQUENCY".equals(category)) clock++;
-                    else if ("INTEGRITY/FDI".equals(category)) integrity++;
-                    else other++;
+                    if (info == null || info.status != 0 || info.name == null || info.name.isEmpty()) continue;
+                    valid++;
 
-                    boolean hv = highValue(info.name);
-                    if (hv) high++;
-                    byte[] value = readIndexRaw(s, enc, info.tableNo, info.paramIndex, info.size);
-                    append((hv ? "*** HIGH-VALUE " : "") + category + " | " + format(info, value));
-                    if (index > 0 && index % 100 == 0) append("  progress " + index + "/" + total);
+                    long hash = DumlV2.parameterHash(info.name);
+                    line(report, "INDEX|table=" + info.tableNo + "|index=" + info.paramIndex +
+                            "|name=" + safe(info.name) + "|hash=0x" + hex8(hash) +
+                            "|type=" + info.typeId + "|size=" + info.size +
+                            "|default=" + info.def + "|min=" + info.min + "|max=" + info.max);
+
+                    String category = classify(info.name);
+                    if (category != null) {
+                        matches++;
+                        if (highValue(info.name, category)) high++;
+                        byte[] value = readIndexRaw(s, enc, info.tableNo, info.paramIndex, info.size);
+                        if (value != null) valueReads++;
+                        String purpose = purpose(info.name, category);
+                        String map = "MAP|category=" + category +
+                                "|storage=FLYC_CONFIG table=" + info.tableNo + " index=" + info.paramIndex +
+                                "|name=" + safe(info.name) +
+                                "|purpose=" + purpose +
+                                "|confidence=NAME_BASED" +
+                                "|current=" + decodeValue(value) +
+                                "|type=" + info.typeId + "|size=" + info.size +
+                                "|default=" + info.def + "|range=" + info.min + ".." + info.max +
+                                "|hash=0x" + hex8(hash) +
+                                "|read=FLYC E2(table,index)" +
+                                "|paired_write_candidate=FLYC E3(table,index) NOT_SENT";
+                        mapLines.add(map);
+                        append((highValue(info.name, category) ? "*** " : "") + map);
+                    }
+
+                    if (index > 0 && index % 100 == 0) {
+                        append("progress table=" + table.tableNo + " " + index + "/" + total +
+                                " | readable=" + valid + " candidates=" + matches);
+                    }
                 }
             }
 
+            line(report, "");
+            line(report, "=== GNSS / RF PARAMETER MAP ===");
+            if (mapLines.isEmpty()) line(report, "NO NAME-BASED GNSS/RF MATCHES IN E1 TABLE NAMES");
+            else for (String m : mapLines) line(report, m);
+
+            line(report, "");
+            line(report, "=== KNOWN READ-ONLY FLYC INTERFACES ===");
+            readKnownInterface(s, enc, 0x45, "GPS_SNR_GET", report);
+            readKnownInterface(s, enc, 0x57, "GPS_GLNS_INFO", report);
+            readKnownInterface(s, enc, 0xA1, "AGPS_STATUS_GET", report);
+            readKnownInterface(s, enc, 0x37, "DEVICE_INFO_GET", report);
+            readKnownInterface(s, enc, 0xFD, "PRODUCT_TYPE_GET", report);
+
+            line(report, "");
+            line(report, "=== SUMMARY ===");
+            line(report, "tables=" + tables.size() + " scanned_E1=" + scanned + " readable_names=" + valid +
+                    " GNSS_RF_candidates=" + matches + " high_value=" + high +
+                    " E2_value_reads=" + valueReads + " E1_timeouts=" + timeouts);
+            line(report, "RX_DUML=" + s.dumlFrames() + " route=" + s.routeString());
+            line(report, "WRITE/EXEC SENT: E3=0 F9=0 0xDF=0 E9-positive=0 RTK-SET=0");
+
             append("");
-            append("=== SCAN COMPLETE ===");
-            append("Scanned=" + scanned + " matches=" + matches + " high-value=" + high + " E1 timeouts=" + timeouts);
-            append("RF/antenna=" + rf + " constellation=" + constellation + " acquisition/A-GPS=" + acquisition +
-                    " clock/freq=" + clock + " integrity/FDI=" + integrity + " other=" + other);
-            append("RX DUML=" + s.dumlFrames() + " route=" + s.routeString());
-            append("WRITE COMMANDS SENT: 0");
-            append("Ничего не менять по найденным значениям до разбора результата.");
+            append("=== ГОТОВО ===");
+            append("Tables=" + tables.size() + " | readable params=" + valid + " | GNSS/RF candidates=" + matches + " | high-value=" + high);
+            append("Полный индекс ВСЕХ имён тоже сохранён в отчёте.");
+            append("Нажми COPY FULL REPORT и пришли сюда текст. По нему уже разбираем без следующих поисковых APK.");
+            append("WRITE/EXEC COMMANDS SENT: 0");
+            finishReport(report);
         } finally {
             s.close();
-            append("AOA CLOSED; WRITE COMMANDS SENT: 0");
+            append("AOA CLOSED; WRITE/EXEC COMMANDS SENT: 0");
         }
     }
 
-    private String classify(String name) {
-        if (name == null) return null;
-        String n = name.toLowerCase(Locale.US);
-        boolean gnssCtx = containsAny(n, "gps", "gnss", "glonass", "galileo", "beidou", "bds", "sat", "nav");
-
-        if (containsAny(n, "antenna", "ant_gain", "antgain", "lna", "agc", "sensitivity", "sensi", "noise_floor", "rf_gain", "rf_front", "receiver_gain") ||
-                (gnssCtx && containsAny(n, "gain", "signal", "snr", "cn0", "cno", "receiver", "_rx", ".rx"))) return "RF/ANTENNA";
-
-        if (containsAny(n, "agps", "a_gps", "ephemer", "almanac", "hot_start", "hotstart", "warm_start", "warmstart",
-                "cold_start", "coldstart", "acquisition", "acquire", "acq_", "ttff", "assist_data", "assistdata")) return "ACQUISITION/A-GPS";
-
-        if (gnssCtx && containsAny(n, "clock", "clk", "freq", "frequency", "osc", "tcxo", "pps", "drift")) return "CLOCK/FREQUENCY";
-
-        if (gnssCtx && containsAny(n, "spoof", "jam", "fdi", "disagree", "abrupt", "stuck", "conform", "signature",
-                "invalid", "mismatch", "disconnect", "range", "height_drift")) return "INTEGRITY/FDI";
-
-        if (containsAny(n, "glonass", "galileo", "beidou", "bds", "constellation", "satellite", "sat_num", "satnum", "sat_count") ||
-                (gnssCtx && containsAny(n, "enable", "mask", "select", "mode", "cfg", "config"))) return "CONSTELLATION";
-
-        if (gnssCtx) return "GNSS/OTHER";
-        return null;
+    private void finishReport(StringBuilder report) {
+        lastReport = report.toString();
+        runOnUiThread(() -> copy.setEnabled(!lastReport.isEmpty()));
     }
 
-    private boolean highValue(String name) {
-        if (name == null) return false;
-        String n = name.toLowerCase(Locale.US);
-        return containsAny(n, "antenna", "lna", "agc", "sensitivity", "rf_gain", "receiver_gain", "constellation",
-                "galileo", "beidou", "glonass", "agps", "ephemer", "almanac", "hotstart", "warmstart", "coldstart",
-                "acquisition", "ttff", "gps_clk", "gnss_clk", "tcxo");
-    }
-
-    private static boolean containsAny(String n, String... keys) {
-        for (String k : keys) if (n.contains(k)) return true;
-        return false;
-    }
-
-    private String format(DumlV2.ParamInfo2017 i, byte[] v) {
-        StringBuilder s = new StringBuilder();
-        s.append("table=").append(i.tableNo).append(" index=").append(i.paramIndex)
-                .append(" name='").append(i.name).append("' type=").append(i.typeId)
-                .append(" size=").append(i.size).append(" def=").append(i.def)
-                .append(" range=").append(i.min).append("..").append(i.max);
-        if (v == null) return s.append(" current=<no E2 read>").toString();
-        s.append(" currentRaw=").append(DumlV2.hex(v));
-        if (v.length > 0 && v.length <= 4) {
-            long u = 0;
-            for (int x = 0; x < v.length; x++) u |= ((long)v[x] & 0xFFL) << (8*x);
-            s.append(" uLE=").append(u);
-            if (v.length == 4) s.append(" f32LE=").append(Float.intBitsToFloat((int)u));
-        }
-        return s.toString();
-    }
-
-    private Boolean establishReadOnlyMode(AoaSession s) throws Exception {
+    private Boolean establishReadOnlyMode(AoaSession s, StringBuilder report) throws Exception {
         for (boolean enc : new boolean[]{false, true}) {
-            DumlV2.Frame r = transact(s, APP_FLYC, DumlV2.CMDSET_FLYC, 0xE0, DumlV2.le16(0), enc, 1000);
+            DumlV2.Frame r = transact(s, APP_FLYC, DumlV2.CMDSET_FLYC, 0xE0,
+                    DumlV2.le16(0), enc, 1000);
             if (r == null) continue;
             DumlV2.TableAttr2017 a = DumlV2.TableAttr2017.parse(r.payload);
+            line(report, "E0-probe|transport=" + (enc ? "SIMPLE" : "PLAIN") + "|raw=" + DumlV2.hex(r.payload));
             if (a != null && a.status == 0 && a.entriesNum > 0 && a.entriesNum < 20000) {
                 append("E0 table0 entries=" + a.entriesNum + " crc=0x" + Long.toHexString(a.entriesCrc));
                 return enc;
@@ -308,17 +375,47 @@ public class GnssReceiverConfigScanActivity extends Activity {
         return null;
     }
 
-    private List<DumlV2.TableAttr2017> readTables(AoaSession s, boolean enc) throws Exception {
+    private List<DumlV2.TableAttr2017> readTables(AoaSession s, boolean enc, StringBuilder report) throws Exception {
         List<DumlV2.TableAttr2017> out = new ArrayList<>();
+        int misses = 0;
         for (int t = 0; t < 32; t++) {
-            DumlV2.Frame r = transact(s, APP_FLYC, DumlV2.CMDSET_FLYC, 0xE0, DumlV2.le16(t), enc, 800);
-            if (r == null || r.payload.length <= 2) break;
+            DumlV2.Frame r = transact(s, APP_FLYC, DumlV2.CMDSET_FLYC, 0xE0,
+                    DumlV2.le16(t), enc, 650);
+            if (r == null) {
+                misses++;
+                if (!out.isEmpty() && misses >= 5) break;
+                continue;
+            }
             DumlV2.TableAttr2017 a = DumlV2.TableAttr2017.parse(r.payload);
-            if (a == null || a.status != 0 || a.entriesNum <= 0 || a.entriesNum > 20000) break;
+            if (a == null || a.status != 0 || a.entriesNum <= 0 || a.entriesNum > 20000) {
+                misses++;
+                line(report, "TABLE-PROBE|requested=" + t + "|raw=" + DumlV2.hex(r.payload));
+                if (!out.isEmpty() && misses >= 5) break;
+                continue;
+            }
+            misses = 0;
             out.add(a);
             append("TABLE " + a.tableNo + " entries=" + a.entriesNum + " crc=0x" + Long.toHexString(a.entriesCrc));
+            line(report, "TABLE|no=" + a.tableNo + "|entries=" + a.entriesNum + "|crc=0x" + Long.toHexString(a.entriesCrc));
         }
         return out;
+    }
+
+    private void readKnownInterface(AoaSession s, boolean preferredEnc, int cmd, String label,
+                                    StringBuilder report) throws Exception {
+        DumlV2.Frame r = transact(s, APP_FLYC, DumlV2.CMDSET_FLYC, cmd, new byte[0], preferredEnc, 800);
+        boolean used = preferredEnc;
+        if (r == null) {
+            used = !preferredEnc;
+            r = transact(s, APP_FLYC, DumlV2.CMDSET_FLYC, cmd, new byte[0], used, 800);
+        }
+        if (r == null) {
+            line(report, "GET|" + label + "|cmd=0x" + hex2(cmd) + "|response=NO_RESPONSE");
+        } else {
+            line(report, "GET|" + label + "|cmd=0x" + hex2(cmd) +
+                    "|transport=" + (used ? "SIMPLE" : "PLAIN") +
+                    "|len=" + r.payload.length + "|raw=" + DumlV2.hex(r.payload));
+        }
     }
 
     private byte[] readIndexRaw(AoaSession s, boolean enc, int table, int index, int size) throws Exception {
@@ -327,17 +424,109 @@ public class GnssReceiverConfigScanActivity extends Activity {
         if (r == null || r.payload.length < 6) return null;
         int st = DumlV2.u16(r.payload, 0), got = DumlV2.u16(r.payload, 4);
         if (st != 0 || got != index) return null;
-        int available = r.payload.length - 6, n = size > 0 ? Math.min(size, available) : available;
+        int available = r.payload.length - 6;
+        int n = size > 0 ? Math.min(size, available) : available;
         if (n <= 0) return new byte[0];
         byte[] v = new byte[n];
         System.arraycopy(r.payload, 6, v, 0, n);
         return v;
     }
 
-    private DumlV2.Frame transact(AoaSession s, Route route, int set, int id, byte[] payload, boolean encrypted, int timeoutMs) throws Exception {
+    private String classify(String name) {
+        if (name == null) return null;
+        String n = name.toLowerCase(Locale.US);
+        boolean gnss = containsAny(n, "gps", "gnss", "glonass", "galileo", "beidou", "bds", "satellite", "sat_num", "satnum");
+
+        if (containsAny(n, "lna", "agc", "antenna", "ant_gain", "antgain", "rf_gain", "receiver_gain",
+                "noise_floor", "sensitivity", "sensi") ||
+                (gnss && containsAny(n, "gain", "receiver", "signal", "cn0", "cno"))) return "RF/FRONTEND";
+
+        if (containsAny(n, "agps", "a_gps", "ephemer", "almanac", "assist_data", "assistdata")) return "A-GPS/ASSIST";
+
+        if ((gnss && containsAny(n, "acquisition", "acquire", "acq_", "tracking", "track_", "ttff",
+                "hot_start", "hotstart", "warm_start", "warmstart", "cold_start", "coldstart")) ||
+                containsAny(n, "gps_acq", "gps_track", "gnss_acq", "gnss_track")) return "ACQUISITION/TRACKING";
+
+        if (containsAny(n, "galileo", "glonass", "beidou", "bds", "constellation") ||
+                (gnss && containsAny(n, "mask", "select", "enable", "mode", "cfg", "config"))) return "CONSTELLATION/ENABLE";
+
+        if (gnss && containsAny(n, "fdi", "spoof", "jam", "disagree", "abrupt", "stuck", "conform",
+                "invalid", "mismatch", "disconnect", "integrity", "fault")) return "INTEGRITY/FDI";
+
+        if (gnss && containsAny(n, "clock", "clk", "freq", "frequency", "osc", "tcxo", "pps", "drift")) return "CLOCK/TIMING";
+
+        if (gnss && containsAny(n, "weight", "fusion", "position", "pos_", "velocity", "vel_", "accuracy",
+                "hacc", "vacc", "dop", "hdop", "vdop")) return "NAV/FUSION";
+
+        if (gnss && containsAny(n, "snr", "signal", "sat", "quality")) return "SIGNAL/SATELLITES";
+
+        if (gnss) return "GNSS/OTHER";
+
+        // Broad RF candidates are included even when the name does not say GPS,
+        // because receiver front-end controls may be shared or generically named.
+        if (containsAny(n, "rf_", ".rf", "receiver", "frontend", "front_end")) return "RF-CANDIDATE/GENERIC";
+        return null;
+    }
+
+    private boolean highValue(String name, String category) {
+        if (name == null) return false;
+        String n = name.toLowerCase(Locale.US);
+        return category.startsWith("RF/") || category.startsWith("CONSTELLATION") ||
+                category.startsWith("ACQUISITION") || category.startsWith("A-GPS") ||
+                containsAny(n, "gps_enable", "gnss_enable", "lna", "agc", "sensitivity", "rf_gain",
+                        "constellation", "galileo", "beidou", "glonass", "ephemer", "almanac", "ttff", "tcxo");
+    }
+
+    private String purpose(String name, String category) {
+        String n = name == null ? "" : name.toLowerCase(Locale.US);
+        if (containsAny(n, "gps_enable", "gnss_enable")) return "GNSS enable/use gate";
+        if (containsAny(n, "fdi_open") && containsAny(n, "gps", "gnss")) return "GNSS fault-detection/integrity enable";
+        if (containsAny(n, "pos_weight", "position_weight")) return "GPS position weight in navigation fusion";
+        if (containsAny(n, "vel_weight", "velocity_weight")) return "GPS velocity weight in navigation fusion";
+        if (containsAny(n, "lna")) return "receiver low-noise-amplifier control/gain";
+        if (containsAny(n, "agc")) return "receiver automatic-gain-control setting";
+        if (containsAny(n, "sensitivity", "sensi", "noise_floor")) return "receiver sensitivity/noise threshold";
+        if (containsAny(n, "rf_gain", "receiver_gain", "ant_gain", "antgain")) return "receiver RF/antenna gain";
+        if (containsAny(n, "galileo", "glonass", "beidou", "bds", "constellation")) return "satellite constellation selection/configuration";
+        if (containsAny(n, "acquisition", "acquire", "acq_", "ttff")) return "satellite acquisition/TTFF behavior";
+        if (containsAny(n, "tracking", "track_")) return "satellite tracking behavior";
+        if (containsAny(n, "agps", "a_gps", "ephemer", "almanac")) return "assistance/ephemeris/almanac handling";
+        if (containsAny(n, "spoof", "jam", "fdi", "integrity", "fault")) return "GNSS integrity/fault/jam/spoof detection";
+        if (containsAny(n, "clock", "clk", "tcxo", "pps", "freq")) return "GNSS timing/oscillator/frequency behavior";
+        if (containsAny(n, "snr", "cn0", "cno", "signal")) return "GNSS signal-quality threshold/telemetry";
+        if (category.startsWith("NAV/FUSION")) return "GNSS position/velocity accuracy or fusion behavior";
+        if (category.startsWith("RF-CANDIDATE")) return "generic RF/receiver setting; GNSS relation requires code/firmware correlation";
+        return "GNSS-related FC configuration; exact semantics require name/code correlation";
+    }
+
+    private static boolean containsAny(String n, String... keys) {
+        for (String k : keys) if (n.contains(k)) return true;
+        return false;
+    }
+
+    private String decodeValue(byte[] v) {
+        if (v == null) return "NO_E2_VALUE";
+        if (v.length == 0) return "EMPTY";
+        StringBuilder s = new StringBuilder();
+        s.append("raw[").append(DumlV2.hex(v)).append(']');
+        if (v.length <= 4) {
+            long u = 0;
+            for (int i = 0; i < v.length; i++) u |= ((long)v[i] & 0xFFL) << (8 * i);
+            long signed = u;
+            int bits = v.length * 8;
+            if (bits < 64 && (u & (1L << (bits - 1))) != 0) signed = u - (1L << bits);
+            s.append(" uLE=").append(u).append(" sLE=").append(signed);
+            if (v.length == 4) s.append(" f32LE=").append(Float.intBitsToFloat((int)u));
+        }
+        return s.toString();
+    }
+
+    private DumlV2.Frame transact(AoaSession s, Route route, int set, int id, byte[] payload,
+                                  boolean encrypted, int timeoutMs) throws Exception {
         int qseq = seq.getAndIncrement() & 0xFFFF;
         s.clearQueue();
-        s.sendDuml(DumlV2.packet(route.st, route.si, route.rt, route.ri, qseq, set, id, payload, encrypted));
+        s.sendDuml(DumlV2.packet(route.st, route.si, route.rt, route.ri,
+                qseq, set, id, payload, encrypted));
         long end = System.currentTimeMillis() + timeoutMs;
         DumlV2.Frame fallback = null;
         while (System.currentTimeMillis() < end) {
@@ -351,6 +540,21 @@ public class GnssReceiverConfigScanActivity extends Activity {
         return fallback;
     }
 
+    private static String safe(String x) {
+        if (x == null) return "";
+        return x.replace('|', '/').replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private static String hex8(long v) {
+        return String.format(Locale.US, "%08X", v & 0xFFFFFFFFL);
+    }
+
+    private static String hex2(int v) {
+        return String.format(Locale.US, "%02X", v & 0xFF);
+    }
+
+    private static void line(StringBuilder r, String x) { r.append(x).append('\n'); }
+
     private void append(String s) {
         runOnUiThread(() -> {
             log.append(s + "\n");
@@ -359,7 +563,10 @@ public class GnssReceiverConfigScanActivity extends Activity {
         });
     }
 
-    private static void sleep(long ms) { try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); } }
+    private static void sleep(long ms) {
+        try { Thread.sleep(ms); }
+        catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
 
     private static final class AoaSession {
         private final ParcelFileDescriptor pfd;
@@ -387,18 +594,22 @@ public class GnssReceiverConfigScanActivity extends Activity {
         }
 
         private AoaSession(ParcelFileDescriptor p, AtomicInteger sequence) {
-            pfd = p; seq = sequence;
+            pfd = p;
+            seq = sequence;
             in = new FileInputStream(p.getFileDescriptor());
             out = new FileOutputStream(p.getFileDescriptor());
-            reader = new Thread(this::readLoop, "mini4k-gnss-rxcfg-rx");
-            reader.setDaemon(true); reader.start();
+            reader = new Thread(this::readLoop, "mini4k-one-shot-gnss-rx");
+            reader.setDaemon(true);
+            reader.start();
         }
 
         void startProtocol() throws IOException {
             byte[] boot = new byte[]{0,0,1};
-            sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,DumlV2.DEV_AIRCRAFT_PROXY,0,seq.getAndIncrement()&0xFFFF,DumlV2.CMDSET_GENERAL,0x00,boot,false));
+            sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,DumlV2.DEV_AIRCRAFT_PROXY,0,
+                    seq.getAndIncrement()&0xFFFF,DumlV2.CMDSET_GENERAL,0x00,boot,false));
             sleep(4);
-            sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,DumlV2.DEV_ANY,0,seq.getAndIncrement()&0xFFFF,DumlV2.CMDSET_GENERAL,0x00,boot,false));
+            sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,DumlV2.DEV_ANY,0,
+                    seq.getAndIncrement()&0xFFFF,DumlV2.CMDSET_GENERAL,0x00,boot,false));
             sleep(8);
             startKeepalive();
         }
@@ -409,14 +620,17 @@ public class GnssReceiverConfigScanActivity extends Activity {
                 byte[] p = new byte[]{1,1,0,(byte)0xFF,(byte)0xFF,0x20,0,0};
                 while (running.get()) {
                     try {
-                        sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,DumlV2.DEV_REMOTE_RADIO,0,seq.getAndIncrement()&0xFFFF,0x06,0x77,p,false));
+                        sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,DumlV2.DEV_REMOTE_RADIO,0,
+                                seq.getAndIncrement()&0xFFFF,0x06,0x77,p,false));
                         sleep(4);
-                        sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,14,0,seq.getAndIncrement()&0xFFFF,0x06,0x77,p,false));
+                        sendDuml(DumlV2.packet(DumlV2.DEV_MOBILE_APP,0,14,0,
+                                seq.getAndIncrement()&0xFFFF,0x06,0x77,p,false));
                     } catch (Exception e) { break; }
                     sleep(2500);
                 }
-            }, "mini4k-gnss-rxcfg-keepalive");
-            keepalive.setDaemon(true); keepalive.start();
+            }, "mini4k-one-shot-keepalive");
+            keepalive.setDaemon(true);
+            keepalive.start();
         }
 
         void clearQueue() { rx.clear(); }
@@ -429,7 +643,8 @@ public class GnssReceiverConfigScanActivity extends Activity {
             byte[] w = new byte[8+n];
             w[0]=0x55; w[1]=(byte)0xCC;
             w[2]=(byte)(route&0xFF); w[3]=(byte)((route>>>8)&0xFF);
-            w[4]=(byte)(n&0xFF); w[5]=(byte)((n>>>8)&0xFF); w[6]=(byte)((n>>>16)&0xFF); w[7]=(byte)((n>>>24)&0xFF);
+            w[4]=(byte)(n&0xFF); w[5]=(byte)((n>>>8)&0xFF);
+            w[6]=(byte)((n>>>16)&0xFF); w[7]=(byte)((n>>>24)&0xFF);
             System.arraycopy(duml,0,w,8,n);
             synchronized (writeLock) { out.write(w); out.flush(); }
             sleep(3);
@@ -455,7 +670,10 @@ public class GnssReceiverConfigScanActivity extends Activity {
                     if (bodyLeft==0) finishUnit();
                     continue;
                 }
-                if (headerPos==0) { if (x==0x55) { header[0]=0x55; headerPos=1; } continue; }
+                if (headerPos==0) {
+                    if (x==0x55) { header[0]=0x55; headerPos=1; }
+                    continue;
+                }
                 if (headerPos==1) {
                     if (x==0xCC) { header[1]=(byte)0xCC; headerPos=2; }
                     else if (x==0x55) { header[0]=0x55; headerPos=1; }
@@ -465,12 +683,18 @@ public class GnssReceiverConfigScanActivity extends Activity {
                 header[headerPos++]=(byte)x;
                 if (headerPos==8) {
                     int type=(header[2]&0xFF)|((header[3]&0xFF)<<8);
-                    long len=((long)header[4]&0xFF)|(((long)header[5]&0xFF)<<8)|(((long)header[6]&0xFF)<<16)|(((long)header[7]&0xFF)<<24);
+                    long len=((long)header[4]&0xFF)|(((long)header[5]&0xFF)<<8)|
+                            (((long)header[6]&0xFF)<<16)|(((long)header[7]&0xFF)<<24);
                     headerPos=0;
-                    if (len<0 || len>0x200000L) { bodyLeft=0; body=null; bodyType=-1; continue; }
-                    bodyType=type; bodyLeft=len;
-                    if (type==0x5749 || type==0x7530) { route=type; body=new ByteArrayOutputStream((int)Math.min(len,16384)); }
-                    else body=null;
+                    if (len<0 || len>0x200000L) {
+                        bodyLeft=0; body=null; bodyType=-1; continue;
+                    }
+                    bodyType=type;
+                    bodyLeft=len;
+                    if (type==0x5749 || type==0x7530) {
+                        route=type;
+                        body=new ByteArrayOutputStream((int)Math.min(len,16384));
+                    } else body=null;
                     if (bodyLeft==0) finishUnit();
                 }
             }
@@ -483,7 +707,9 @@ public class GnssReceiverConfigScanActivity extends Activity {
                     if (!rx.offer(f)) { rx.poll(); rx.offer(f); }
                 }
             }
-            bodyType=-1; body=null; bodyLeft=0;
+            bodyType=-1;
+            body=null;
+            bodyLeft=0;
         }
 
         void close() {
