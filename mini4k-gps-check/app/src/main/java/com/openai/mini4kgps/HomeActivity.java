@@ -21,24 +21,28 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v2.9");
+        title.setText("Mini 4K GPS Tool v3.0");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button boot = new Button(this);
+        boot.setText("GNSS BOOT SIGNATURE CAPTURE v3.0 — PASSIVE");
+        LinearLayout.LayoutParams pb = new LinearLayout.LayoutParams(-1, -2);
+        pb.topMargin = pad;
+        root.addView(boot, pb);
+
+        TextView bootNote = new TextView(this);
+        bootNote.setText("v3.0 не перебирает параметры. Он пассивно ловит boot/log payloads и ищет буквальную сигнатуру приёмника: m8 / m10 / M8030 / M10050 / u-blox / MGA / DBD / uniqid. Для лучшего результата: дрон OFF, RC-N1 ON, нажать RUN и затем включить дрон. GNSS write/config commands=0.");
+        bootNote.setTextSize(14);
+        LinearLayout.LayoutParams pbn = new LinearLayout.LayoutParams(-1, -2);
+        pbn.topMargin = pad;
+        pbn.bottomMargin = pad;
+        root.addView(bootNote, pbn);
+
         Button identity = new Button(this);
         identity.setText("GNSS DEVICE ID / VERSION INVENTORY v2.9 — READ ONLY");
-        LinearLayout.LayoutParams pid = new LinearLayout.LayoutParams(-1, -2);
-        pid.topMargin = pad;
-        root.addView(identity, pid);
-
-        TextView identityNote = new TextView(this);
-        identityNote.setText("v2.9 не угадывает gps_* имена. Он использует только документированные General 0x01 Version Inquiry и 0xFF Query Device Info, чтобы получить реальный hardware/version string доступных модулей и отдельно проверить GPS/RTK endpoint type 26. WRITE/CONFIG=0.");
-        identityNote.setTextSize(14);
-        LinearLayout.LayoutParams pIdentityNote = new LinearLayout.LayoutParams(-1, -2);
-        pIdentityNote.topMargin = pad;
-        pIdentityNote.bottomMargin = pad;
-        root.addView(identityNote, pIdentityNote);
+        root.addView(identity, top(8));
 
         Button integrity = new Button(this);
         integrity.setText("GNSS INTEGRITY / SOURCE PROBE v2.8");
@@ -81,6 +85,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        boot.setOnClickListener(v -> startActivity(new Intent(this, GnssBootLogProbeActivity.class)));
         identity.setOnClickListener(v -> startActivity(new Intent(this, GnssIdentityProbeActivity.class)));
         integrity.setOnClickListener(v -> startActivity(new Intent(this, GnssIntegritySourceProbeActivity.class)));
         constellation.setOnClickListener(v -> startActivity(new Intent(this, GnssConstellationProbeActivity.class)));
