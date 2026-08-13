@@ -27,15 +27,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * v3.1 factual GPS settings inventory for the user's Mini 4K.
+ * v3.1 factual GPS settings inventory.
  *
- * This page does not guess parameter names. It re-reads only indices that were already
- * observed live on this aircraft, prints current/min/max/default/type/attribute, and maps
- * DJI's published Attribute values to read/write semantics.
- *
- * The only edit control exposed here is the already-existing, separately verified
- * gps_enable editor in FinalActivity. Integrity/FDI and unknown service parameters are
- * deliberately not writable from this page.
+ * E1/E2 provide the confirmed table/index identity and current value.
+ * F7 metadata is used only for the same already-confirmed name in order to read DJI's
+ * attribute/access flags. No parameter writes are sent by this activity.
  */
 public class GpsSettingsActivity extends Activity {
     private static final String ACTION_USB_PERMISSION = "com.openai.mini4kgps.GPS_SETTINGS_PERMISSION";
@@ -80,7 +76,7 @@ public class GpsSettingsActivity extends Activity {
         root.addView(title,new LinearLayout.LayoutParams(-1,-2));
 
         TextView note=new TextView(this);
-        note.setText("Только уже подтверждённые на этом Mini 4K GPS-параметры. Показывает реальный CURRENT/MIN/MAX/DEFAULT/ATTR и тип доступа. Никаких угадываний имён.");
+        note.setText("Только уже подтверждённые на этом Mini 4K GPS-параметры. Показывает CURRENT/MIN/MAX/DEFAULT и реальный ATTR из F7 metadata. Имена не угадываются.");
         note.setTextSize(14);
         root.addView(note,top(12));
 
@@ -106,8 +102,8 @@ public class GpsSettingsActivity extends Activity {
         root.addView(sc,new LinearLayout.LayoutParams(-1,0,1f));
         setContentView(root);
 
-        append("ATTR legend from DJI code: 0=READ_ONLY, 1=READ_WRITE, 2=EEPROM_WRITE, 3=EEPROM_RW, 4=EEPROM_SPECIFIC, 8=IMPORT_EXPORT.");
-        append("gps_enable editor is the only write control on this page. FDI/integrity/unknown service settings stay locked.");
+        append("DJI Attribute: 0=READ_ONLY, 1=READ_WRITE, 2=EEPROM_WRITE, 3=EEPROM_RW, 4=EEPROM_SPECIFIC, 8=IMPORT_EXPORT.");
+        append("Этот экран не пишет параметры. Подтверждённый gps_enable editor открывается отдельной кнопкой.");
 
         scan.setOnClickListener(v -> begin());
         openEditor.setOnClickListener(v -> startActivity(new Intent(this,FinalActivity.class)));
@@ -173,6 +169,7 @@ public class GpsSettingsActivity extends Activity {
         StringBuilder r=new StringBuilder(64*1024);
         line(r,"MINI 4K GPS SETTINGS v3.1");
         line(r,"FACTUAL LIVE INVENTORY OF PREVIOUSLY CONFIRMED INDICES");
+        line(r,"ACCESS SOURCE=F7 metadata for the exact E1-confirmed parameter name");
         line(r,"WRITES_SENT_BY_THIS_SCAN=0");
         line(r,"ATTR: 0=READ_ONLY 1=READ_WRITE 2=EEPROM_WRITE 3=EEPROM_RW 4=EEPROM_SPECIFIC 8=IMPORT_EXPORT");
         line(r,"");
@@ -183,13 +180,13 @@ public class GpsSettingsActivity extends Activity {
         try {
             s.startProtocol(); sleep(350);
             line(r,"AOA="+s.routeString());
-            Mode m=detectMode(s,r);
+            Mode m=detectMode(s);
             if(m==null) { line(r,"FLYC_PARAM_TRANSPORT=NO_RESPONSE"); finish(r); return; }
             line(r,"FLYC_MODE="+(m.enc?"SIMPLE":"PLAIN")+" TABLE0_ENTRIES="+m.entries);
             line(r,"");
             line(r,"=== CONFIRMED GPS SETTINGS ===");
 
-            int ok=0;
+            int ok=0, attrHits=0;
             for(int idx:INDICES) {
                 if(idx<0 || idx>=m.entries) continue;
                 DumlV2.ParamInfo2017 p=readInfo(s,m.enc,idx);
@@ -198,10 +195,14 @@ public class GpsSettingsActivity extends Activity {
                     continue;
                 }
                 byte[] v=readValue(s,m.enc,idx,p.size);
-                String access=attrName(p.attribute);
-                String control=controlState(p.name,p.attribute);
+                DumlV2.ParamInfo2015 meta=readF7Meta(s,m.enc,p.name);
+                int attr=meta==null?-1:meta.attribute;
+                if(meta!=null) attrHits++;
+                String access=attr<0?"F7_NO_METADATA":attrName(attr);
+                String control=controlState(p.name,attr);
+                String attrText=attr<0?"NA":"0x"+Integer.toHexString(attr).toUpperCase(Locale.US);
                 String row="INDEX="+idx+"|NAME="+safe(p.name)+"|TYPE="+p.typeId+"|SIZE="+p.size+
-                        "|ATTR=0x"+Integer.toHexString(p.attribute).toUpperCase(Locale.US)+"("+access+")"+
+                        "|ATTR="+attrText+"("+access+")"+
                         "|MIN="+formatLimit(p.min,p.typeId)+"|MAX="+formatLimit(p.max,p.typeId)+
                         "|DEFAULT="+formatLimit(p.def,p.typeId)+"|CURRENT="+decode(v,p.typeId)+
                         "|CONTROL="+control;
@@ -211,11 +212,11 @@ public class GpsSettingsActivity extends Activity {
             }
             line(r,"");
             line(r,"=== RESULT ===");
-            line(r,"VALID_SETTINGS="+ok);
+            line(r,"VALID_SETTINGS="+ok+" F7_ATTR_HITS="+attrHits);
             line(r,"EDITABLE_UI_CONFIRMED=gps_enable via existing strict read-identify-write-readback editor");
-            line(r,"FDI/INTEGRITY_AND_UNKNOWN_SERVICE_WRITES=LOCKED_IN_THIS_PAGE");
+            line(r,"UNKNOWN_SEMANTICS_AND_FDI_INTEGRITY_WRITES=NOT_EXPOSED_ON_THIS_PAGE");
             line(r,"WRITES_SENT_BY_THIS_SCAN=0");
-            append("=== DONE === valid="+ok);
+            append("=== DONE === valid="+ok+" attr="+attrHits);
             finish(r);
         } finally {
             s.close();
@@ -225,7 +226,7 @@ public class GpsSettingsActivity extends Activity {
 
     private static final class Mode { final boolean enc; final int entries; Mode(boolean e,int n){enc=e;entries=n;} }
 
-    private Mode detectMode(ProbeAoaSession s,StringBuilder r) throws Exception {
+    private Mode detectMode(ProbeAoaSession s) throws Exception {
         for(boolean enc:new boolean[]{false,true}) {
             DumlV2.Frame f=transact(s,0xE0,DumlV2.le16(0),enc,1000);
             if(f==null) continue;
@@ -250,6 +251,23 @@ public class GpsSettingsActivity extends Activity {
         byte[] out=new byte[n];
         System.arraycopy(f.payload,6,out,0,n);
         return out;
+    }
+
+    private DumlV2.ParamInfo2015 readF7Meta(ProbeAoaSession s,boolean enc,String rawName) throws Exception {
+        String[] candidates=new String[]{rawName+"_0",rawName};
+        for(String q:candidates) {
+            long h=DumlV2.parameterHash(q);
+            DumlV2.Frame f=transact(s,0xF7,DumlV2.le32(h),enc,420);
+            if(f==null) continue;
+            DumlV2.ParamInfo2015 p=DumlV2.ParamInfo2015.parse(f.payload);
+            if(p==null || p.status!=0 || p.name==null || p.name.isEmpty()) continue;
+            String returned=p.name;
+            String base=rawName;
+            int slash=base.indexOf('/');
+            if(slash>=0) base=base.substring(0,slash);
+            if(returned.equals(base) || returned.equals(rawName) || rawName.contains(returned)) return p;
+        }
+        return null;
     }
 
     private DumlV2.Frame transact(ProbeAoaSession s,int id,byte[] payload,boolean enc,int timeoutMs) throws Exception {
@@ -285,8 +303,8 @@ public class GpsSettingsActivity extends Activity {
         String n=name.toLowerCase(Locale.US);
         if(n.contains("gps_enable")) return "EDIT_UI_AVAILABLE";
         if(n.contains("fdi") || n.contains("without_gps")) return "LOCKED_SAFETY_INTEGRITY";
-        if((attr&1)!=0 || (attr&2)!=0) return "PROTOCOL_WRITE_CAPABILITY_PRESENT_BUT_NOT_EXPOSED";
-        return "READ_ONLY";
+        if(attr>=0 && (((attr&1)!=0) || ((attr&2)!=0))) return "PROTOCOL_WRITE_FLAG_PRESENT_NO_UI";
+        return "READ_ONLY_OR_UNPROVEN";
     }
 
     private static String decode(byte[] v,int type) {
@@ -333,5 +351,5 @@ public class GpsSettingsActivity extends Activity {
         ClipboardManager cm=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
         if(cm!=null){ cm.setPrimaryClip(ClipData.newPlainText("Mini4K GPS settings",lastReport)); append("FULL SETTINGS REPORT COPIED ("+lastReport.length()+" chars)"); }
     }
-    private void append(String s){ runOnUiThread(() -> { log.append(s+"\n"); }); }
+    private void append(String s){ runOnUiThread(() -> log.append(s+"\n")); }
 }
