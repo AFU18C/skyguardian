@@ -21,16 +21,20 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v1.9");
+        title.setText("Mini 4K GPS Tool v2.0");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button chipProbe = new Button(this);
+        chipProbe.setText("GNSS CHIP / BUS PROBE — READ ONLY");
+        LinearLayout.LayoutParams pc = new LinearLayout.LayoutParams(-1, -2);
+        pc.topMargin = pad;
+        root.addView(chipProbe, pc);
+
         Button deepGnss = new Button(this);
         deepGnss.setText("DEEP GNSS RECEIVER CONFIG SCAN — READ ONLY");
-        LinearLayout.LayoutParams pd = new LinearLayout.LayoutParams(-1, -2);
-        pd.topMargin = pad;
-        root.addView(deepGnss, pd);
+        root.addView(deepGnss, top(8));
 
         Button gnssSignal = new Button(this);
         gnssSignal.setText("GNSS SIGNAL / SNR ANALYZER");
@@ -65,7 +69,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, top(8));
 
         TextView note = new TextView(this);
-        note.setText("DEEP GNSS RECEIVER CONFIG SCAN читает всю таблицу FC и отдельно ищет потенциальные параметры receiver/RF/antenna/LNA/AGC/sensitivity, созвездий GPS/GLONASS/Galileo/BeiDou, acquisition/A-GPS, ephemeris/almanac, clock/frequency и integrity/FDI. Только E0/E1/E2 чтение: E3/F9/0xDF не используются, ничего не меняется. После скана сначала анализируем найденные кандидаты.");
+        note.setText("GNSS CHIP / BUS PROBE пытается определить, существует ли отдельный DUML GPS endpoint (DeviceType 26) и отдаёт ли он firmware/hardware identity. Только COMMON/Version read к GPS[0..2] + пассивный FLYC 0x57 GPS/GLNS и 0xA1 A-GPS status. Никаких receiver-config, E3/F9 или 0xDF команд записи.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -74,6 +78,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        chipProbe.setOnClickListener(v -> startActivity(new Intent(this, GnssChipProbeActivity.class)));
         deepGnss.setOnClickListener(v -> startActivity(new Intent(this, GnssReceiverConfigScanActivity.class)));
         gnssSignal.setOnClickListener(v -> startActivity(new Intent(this, GnssSignalAnalyzerActivity.class)));
         full.setOnClickListener(v -> startActivity(new Intent(this, FullGroundDiagnosticsActivity.class)));
