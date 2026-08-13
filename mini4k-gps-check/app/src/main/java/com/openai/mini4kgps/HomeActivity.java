@@ -21,16 +21,20 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v1.8");
+        title.setText("Mini 4K GPS Tool v1.9");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button deepGnss = new Button(this);
+        deepGnss.setText("DEEP GNSS RECEIVER CONFIG SCAN — READ ONLY");
+        LinearLayout.LayoutParams pd = new LinearLayout.LayoutParams(-1, -2);
+        pd.topMargin = pad;
+        root.addView(deepGnss, pd);
+
         Button gnssSignal = new Button(this);
         gnssSignal.setText("GNSS SIGNAL / SNR ANALYZER");
-        LinearLayout.LayoutParams pg = new LinearLayout.LayoutParams(-1, -2);
-        pg.topMargin = pad;
-        root.addView(gnssSignal, pg);
+        root.addView(gnssSignal, top(8));
 
         Button full = new Button(this);
         full.setText("FULL GROUND DIAGNOSTICS — READ ONLY");
@@ -61,7 +65,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, top(8));
 
         TextView note = new TextView(this);
-        note.setText("GNSS SIGNAL / SNR ANALYZER включает только временную штатную выдачу SNR (FLYC 0x46 → push 0x45), а не усиливает RF-приёмник. Постоянные параметры FC/GNSS не меняет. Показывает GPS/GLONASS SNR, used channels, satellites/GPS level и доступные jamming/spoofing flags. Для анализа лучше открытое небо, моторы OFF. DJI Fly полностью закрыть; телефон — в верхний порт RC-N1.");
+        note.setText("DEEP GNSS RECEIVER CONFIG SCAN читает всю таблицу FC и отдельно ищет потенциальные параметры receiver/RF/antenna/LNA/AGC/sensitivity, созвездий GPS/GLONASS/Galileo/BeiDou, acquisition/A-GPS, ephemeris/almanac, clock/frequency и integrity/FDI. Только E0/E1/E2 чтение: E3/F9/0xDF не используются, ничего не меняется. После скана сначала анализируем найденные кандидаты.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -70,6 +74,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        deepGnss.setOnClickListener(v -> startActivity(new Intent(this, GnssReceiverConfigScanActivity.class)));
         gnssSignal.setOnClickListener(v -> startActivity(new Intent(this, GnssSignalAnalyzerActivity.class)));
         full.setOnClickListener(v -> startActivity(new Intent(this, FullGroundDiagnosticsActivity.class)));
         prop.setOnClickListener(v -> startActivity(new Intent(this, PropellerTestActivity.class)));
