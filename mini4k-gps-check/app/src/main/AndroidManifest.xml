@@ -16,6 +16,7 @@
         <activity android:name=".GnssIntegritySourceProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssIdentityProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssBootLogProbeActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".GpsSettingsActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssChipProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".DeepGnssBusProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".E9CommandDiscoveryActivity" android:exported="false" android:screenOrientation="portrait" />
