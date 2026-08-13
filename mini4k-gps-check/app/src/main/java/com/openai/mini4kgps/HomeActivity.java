@@ -21,29 +21,39 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v2.4");
+        title.setText("Mini 4K GPS Tool v2.5");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        Button oneShot = new Button(this);
-        oneShot.setText("ONE-SHOT FULL GNSS PARAM MAP — READ ONLY");
-        LinearLayout.LayoutParams p0 = new LinearLayout.LayoutParams(-1, -2);
-        p0.topMargin = pad;
-        root.addView(oneShot, p0);
+        Button hidden = new Button(this);
+        hidden.setText("DEEP HIDDEN GPS PARAM SCAN — READ ONLY");
+        LinearLayout.LayoutParams ph = new LinearLayout.LayoutParams(-1, -2);
+        ph.topMargin = pad;
+        root.addView(hidden, ph);
 
         TextView note = new TextView(this);
-        note.setText("v2.4: один большой тест вместо серии проб. Он проходит все доступные FLYC config tables, читает все имена параметров, строит карту GNSS/RF-кандидатов с table/index/current/range/default/hash и сохраняет полный индекс в отчёт. После завершения нажми COPY FULL REPORT. Записи/exec не отправляются.");
+        note.setText("v2.5: новый проход по скрытым GPS/GNSS параметрам. Использует второй DJI metadata path F0 и F7/F8 hash lookup для GPS fix/HDOP, FDI thresholds, constellation/channel, RF/LNA/AGC, acquisition/tracking, clock и A-GPS. Никаких write/exec команд.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
         pn.bottomMargin = pad;
         root.addView(note, pn);
 
+        Button oneShot = new Button(this);
+        oneShot.setText("ONE-SHOT FULL GNSS PARAM MAP v2.4 — READ ONLY");
+        root.addView(oneShot, top(8));
+
+        Button signal = new Button(this);
+        signal.setText("GNSS SIGNAL / JAMMING / SPOOF ANALYZER — READ ONLY");
+        root.addView(signal, top(8));
+
         TextView manual = new TextView(this);
         manual.setText("MANUAL CONTROLS — не запускать для диагностики");
         manual.setTextSize(15);
-        root.addView(manual, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams pm = new LinearLayout.LayoutParams(-1, -2);
+        pm.topMargin = pad;
+        root.addView(manual, pm);
 
         Button atti = new Button(this);
         atti.setText("ATTI ON SPORT / RESTORE");
@@ -55,7 +65,9 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        hidden.setOnClickListener(v -> startActivity(new Intent(this, HiddenGnssParamActivity.class)));
         oneShot.setOnClickListener(v -> startActivity(new Intent(this, GnssReceiverConfigScanActivity.class)));
+        signal.setOnClickListener(v -> startActivity(new Intent(this, GnssSignalAnalyzerActivity.class)));
         atti.setOnClickListener(v -> startActivity(new Intent(this, AttiControlActivity.class)));
         control.setOnClickListener(v -> startActivity(new Intent(this, FinalActivity.class)));
     }
