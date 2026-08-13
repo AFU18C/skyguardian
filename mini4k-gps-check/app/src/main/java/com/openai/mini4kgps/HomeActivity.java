@@ -21,16 +21,20 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v2.0");
+        title.setText("Mini 4K GPS Tool v2.1");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
+        Button deepBus = new Button(this);
+        deepBus.setText("DEEP GNSS BUS / ENDPOINT DISCOVERY — READ ONLY");
+        LinearLayout.LayoutParams p0 = new LinearLayout.LayoutParams(-1, -2);
+        p0.topMargin = pad;
+        root.addView(deepBus, p0);
+
         Button chipProbe = new Button(this);
         chipProbe.setText("GNSS CHIP / BUS PROBE — READ ONLY");
-        LinearLayout.LayoutParams pc = new LinearLayout.LayoutParams(-1, -2);
-        pc.topMargin = pad;
-        root.addView(chipProbe, pc);
+        root.addView(chipProbe, top(8));
 
         Button deepGnss = new Button(this);
         deepGnss.setText("DEEP GNSS RECEIVER CONFIG SCAN — READ ONLY");
@@ -69,7 +73,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, top(8));
 
         TextView note = new TextView(this);
-        note.setText("GNSS CHIP / BUS PROBE пытается определить, существует ли отдельный DUML GPS endpoint (DeviceType 26) и отдаёт ли он firmware/hardware identity. Только COMMON/Version read к GPS[0..2] + пассивный FLYC 0x57 GPS/GLNS и 0xA1 A-GPS status. Никаких receiver-config, E3/F9 или 0xDF команд записи.");
+        note.setText("v2.1 глубоко перебирает DUML device types 1..31 и indices 0..7, повторно проверяет GPS type26 с длинным timeout, читает FLYC GNSS/A-GPS/DeviceInfo/ProductType и ищет UBX/NMEA/vendor fingerprints. Постоянных записей нет. 0x46 используется только временно для SNR telemetry и выключается при завершении.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -78,6 +82,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        deepBus.setOnClickListener(v -> startActivity(new Intent(this, DeepGnssBusProbeActivity.class)));
         chipProbe.setOnClickListener(v -> startActivity(new Intent(this, GnssChipProbeActivity.class)));
         deepGnss.setOnClickListener(v -> startActivity(new Intent(this, GnssReceiverConfigScanActivity.class)));
         gnssSignal.setOnClickListener(v -> startActivity(new Intent(this, GnssSignalAnalyzerActivity.class)));
