@@ -21,19 +21,23 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v2.2");
+        title.setText("Mini 4K GPS Tool v2.3");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        Button e9 = new Button(this);
-        e9.setText("FLYC E9 INTERNAL COMMAND DISCOVERY — READ ONLY");
+        Button rtkParam = new Button(this);
+        rtkParam.setText("GPS(26) RTK PARAM ACCESS PROBE — READ ONLY");
         LinearLayout.LayoutParams p0 = new LinearLayout.LayoutParams(-1, -2);
         p0.topMargin = pad;
-        root.addView(e9, p0);
+        root.addView(rtkParam, p0);
+
+        Button e9 = new Button(this);
+        e9.setText("FLYC E9 INTERNAL COMMAND DISCOVERY — READ ONLY");
+        root.addView(e9, top(8));
 
         Button deepBus = new Button(this);
-        deepBus.setText("DEEP GNSS BUS / ENDPOINT DISCOVERY — READ ONLY");
+        deepBus.setText("LEGACY DUML BUS / ENDPOINT DISCOVERY — READ ONLY");
         root.addView(deepBus, top(8));
 
         Button chipProbe = new Button(this);
@@ -77,7 +81,7 @@ public class HomeActivity extends Activity {
         root.addView(modeScan, top(8));
 
         TextView note = new TextView(this);
-        note.setText("v2.2 добавляет FLYC 0xE9 Config Command Table discovery: только selector=-1 (count) и отрицательные selector (get command name). Положительные selector, которые исполняют внутренние команды, жёстко заблокированы. Цель — найти реальные GPS/GNSS/RF service/config команды FC без случайных write/exec проб.");
+        note.setText("v2.3 проверяет подтверждённый DJI путь к DeviceType GPS=26: receiverId=5, RTK cmdset 0x0F, GetMultiParam 0xF5. Сначала ищется живой GPS endpoint, затем GET-only перебираются parameter IDs 0..255. Парная команда SetMultiParam 0xF4 известна, но этим тестом не отправляется. Старый 0x57 probe оставлен только как legacy и не считается подтверждённой GNSS-командой.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
@@ -86,6 +90,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        rtkParam.setOnClickListener(v -> startActivity(new Intent(this, GpsRtkParamProbeActivity.class)));
         e9.setOnClickListener(v -> startActivity(new Intent(this, E9CommandDiscoveryActivity.class)));
         deepBus.setOnClickListener(v -> startActivity(new Intent(this, DeepGnssBusProbeActivity.class)));
         chipProbe.setOnClickListener(v -> startActivity(new Intent(this, GnssChipProbeActivity.class)));
