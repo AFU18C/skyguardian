@@ -13,6 +13,7 @@
         <activity android:name=".HiddenGnssParamActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssNeighborhoodDumpActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssConstellationProbeActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".GnssIntegritySourceProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssChipProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".DeepGnssBusProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".E9CommandDiscoveryActivity" android:exported="false" android:screenOrientation="portrait" />
