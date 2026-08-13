@@ -10,6 +10,7 @@
         <activity android:name=".FinalActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssScanActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".GnssReceiverConfigScanActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity android:name=".GnssChipProbeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".FlightModeScanActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".AttiControlActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".LiveFcStatusActivity" android:exported="false" android:screenOrientation="portrait" />
