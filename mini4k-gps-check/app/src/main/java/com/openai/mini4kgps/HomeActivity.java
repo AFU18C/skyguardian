@@ -21,24 +21,28 @@ public class HomeActivity extends Activity {
         scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         TextView title = new TextView(this);
-        title.setText("Mini 4K GPS Tool v2.6");
+        title.setText("Mini 4K GPS Tool v2.7");
         title.setTextSize(22);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        Button neighbor = new Button(this);
-        neighbor.setText("GNSS DEEP NEIGHBOR MAP v2.6 — READ ONLY");
-        LinearLayout.LayoutParams p0 = new LinearLayout.LayoutParams(-1, -2);
-        p0.topMargin = pad;
-        root.addView(neighbor, p0);
+        Button constellation = new Button(this);
+        constellation.setText("CONSTELLATION / DISABLE_BD PROBE v2.7");
+        LinearLayout.LayoutParams pc = new LinearLayout.LayoutParams(-1, -2);
+        pc.topMargin = pad;
+        root.addView(constellation, pc);
 
         TextView note = new TextView(this);
-        note.setText("v2.6 не угадывает имена. Читает все E1/E2 параметры вокруг подтверждённых GPS/FDI/service блоков Mini 4K и проверяет F7/F8 aliases. Никаких write/exec команд.");
+        note.setText("v2.7 проверяет найденный disable_bd, ищет скрытые GPS/GLONASS/Galileo/BeiDou aliases и снимает реальные SNR blocks. Постоянные параметры не изменяются; 0x46 только временно включает поток SNR и затем выключает его.");
         note.setTextSize(14);
         LinearLayout.LayoutParams pn = new LinearLayout.LayoutParams(-1, -2);
         pn.topMargin = pad;
         pn.bottomMargin = pad;
         root.addView(note, pn);
+
+        Button neighbor = new Button(this);
+        neighbor.setText("GNSS DEEP NEIGHBOR MAP v2.6 — READ ONLY");
+        root.addView(neighbor, top(8));
 
         Button hidden = new Button(this);
         hidden.setText("HIDDEN GPS HASH SCAN v2.5 — READ ONLY");
@@ -69,6 +73,7 @@ public class HomeActivity extends Activity {
 
         setContentView(scroll);
 
+        constellation.setOnClickListener(v -> startActivity(new Intent(this, GnssConstellationProbeActivity.class)));
         neighbor.setOnClickListener(v -> startActivity(new Intent(this, GnssNeighborhoodDumpActivity.class)));
         hidden.setOnClickListener(v -> startActivity(new Intent(this, HiddenGnssParamActivity.class)));
         oneShot.setOnClickListener(v -> startActivity(new Intent(this, GnssReceiverConfigScanActivity.class)));
