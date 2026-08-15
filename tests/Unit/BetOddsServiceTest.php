@@ -3,8 +3,11 @@
 namespace Tests\Unit;
 
 use App\Services\BetOddsService;
+use App\Services\BettingBrowserClient;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -61,5 +64,66 @@ class BetOddsServiceTest extends TestCase
 
         $this->assertFalse($result['event_found']);
         $this->assertStringContainsString('ограничил доступ', $result['error']);
+    }
+
+    #[Test]
+    public function it_finds_a_live_event_market_and_odds_in_the_rendered_beton_line(): void
+    {
+        Http::fake(['https://beton.ua/*' => Http::response('<html>sportsbook</html>', 200)]);
+        $browser = Mockery::mock(BettingBrowserClient::class);
+        $browser->shouldReceive('inspect')->once()->andReturn([
+            'body' => 'LIVE Sao Bernardo Botafogo Тотал менше 3.5 1.84',
+            'http_status' => 200,
+        ]);
+
+        $result = (new BetOddsService($browser))->inspect('https://beton.ua/sportsbook', [
+            'home_team' => 'Сан-Бернарду',
+            'away_team' => 'Ботафого',
+            'market' => 'ТМ 3.5',
+        ]);
+
+        $this->assertTrue($result['event_found']);
+        $this->assertFalse($result['finished']);
+        $this->assertSame(1.84, $result['odds']);
+    }
+
+    #[Test]
+    public function it_marks_a_completed_beton_event_as_finished(): void
+    {
+        Http::fake(['https://beton.ua/*' => Http::response('<html>sportsbook</html>', 200)]);
+        $browser = Mockery::mock(BettingBrowserClient::class);
+        $browser->shouldReceive('inspect')->once()->andReturn([
+            'body' => 'Sao Bernardo Botafogo Finished Тотал менше 3.5 1.84',
+            'http_status' => 200,
+        ]);
+
+        $result = (new BetOddsService($browser))->inspect('https://beton.ua/sportsbook', [
+            'home_team' => 'Сан-Бернарду',
+            'away_team' => 'Ботафого',
+            'market' => 'ТМ 3.5',
+        ]);
+
+        $this->assertTrue($result['event_found']);
+        $this->assertTrue($result['finished']);
+    }
+
+    #[Test]
+    public function it_rejects_a_stale_dated_event_even_without_a_finished_label(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-16 00:20:00', 'Europe/Kyiv'));
+
+        $result = (new BetOddsService)->extract(
+            'Бразильська Серія В 14/08 • 15:30 Сан-Бернарду Ботафого Тотал менше 3.5 1.84',
+            [
+                'home_team' => 'Сан-Бернарду',
+                'away_team' => 'Ботафого',
+                'market' => 'ТМ 3.5',
+            ],
+        );
+        CarbonImmutable::setTestNow();
+
+        $this->assertTrue($result['event_found']);
+        $this->assertTrue($result['finished']);
+        $this->assertSame('2026-08-14T15:30:00+03:00', $result['starts_at']);
     }
 }

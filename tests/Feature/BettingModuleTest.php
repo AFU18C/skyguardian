@@ -6,6 +6,9 @@ use App\Models\Bet;
 use App\Models\BetSearchRun;
 use App\Models\BettingSetting;
 use App\Models\User;
+use App\Services\BetOddsService;
+use App\Services\BetSearchService;
+use App\Services\WebsiteBetSearchService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -136,5 +139,133 @@ class BettingModuleTest extends TestCase
 
         $this->assertDatabaseHas('bets', ['event_name' => 'Матч 1', 'result' => 'pending']);
         $this->assertDatabaseMissing('bets', ['event_name' => 'Матч 2']);
+    }
+
+    #[Test]
+    public function search_stores_only_a_bet_verified_as_available_on_beton(): void
+    {
+        $settings = $this->websiteBettingSettings();
+        $this->mockWebsitePrediction();
+        $this->mock(BetOddsService::class, function ($mock): void {
+            $mock->shouldReceive('lookup')->once()->andReturn($this->oddsResult(eventFound: true));
+        });
+
+        $run = app(BetSearchService::class)->run($settings, 'websites');
+
+        $this->assertSame(1, (int) $run->bets_found);
+        $this->assertDatabaseHas('bets', [
+            'event_name' => 'Сан-Бернарду — Ботафого',
+            'status' => Bet::STATUS_FOUND,
+            'primary_odds' => 1.84,
+        ]);
+    }
+
+    #[Test]
+    public function search_rejects_an_event_absent_from_beton(): void
+    {
+        $settings = $this->websiteBettingSettings();
+        $this->mockWebsitePrediction();
+        $this->mock(BetOddsService::class, function ($mock): void {
+            $mock->shouldReceive('lookup')->once()->andReturn($this->oddsResult(eventFound: false, odds: null));
+        });
+
+        $run = app(BetSearchService::class)->run($settings, 'websites');
+
+        $this->assertSame(0, (int) $run->bets_found);
+        $this->assertDatabaseCount('bets', 0);
+    }
+
+    #[Test]
+    public function search_rejects_a_finished_beton_event(): void
+    {
+        $settings = $this->websiteBettingSettings();
+        $this->mockWebsitePrediction();
+        $this->mock(BetOddsService::class, function ($mock): void {
+            $mock->shouldReceive('lookup')->once()->andReturn($this->oddsResult(eventFound: true, finished: true));
+        });
+
+        $run = app(BetSearchService::class)->run($settings, 'websites');
+
+        $this->assertSame(0, (int) $run->bets_found);
+        $this->assertDatabaseCount('bets', 0);
+    }
+
+    #[Test]
+    public function background_recheck_removes_a_bet_after_the_event_finishes(): void
+    {
+        $settings = $this->websiteBettingSettings();
+        $bet = Bet::query()->create(array_merge([
+            'fingerprint' => hash('sha256', 'active-beton-event'),
+            'status' => Bet::STATUS_FOUND,
+            'event_name' => 'Сан-Бернарду — Ботафого',
+            'home_team' => 'Сан-Бернарду',
+            'away_team' => 'Ботафого',
+            'market' => 'ТМ 3.5',
+            'ai_score' => 82,
+        ], $this->oddsResult(eventFound: true)));
+        $bet->update(['odds_checked_at' => now()->subMinutes(6)]);
+        $this->mock(BetOddsService::class, function ($mock): void {
+            $mock->shouldReceive('lookup')->once()->andReturn($this->oddsResult(eventFound: true, finished: true));
+        });
+
+        app(BetSearchService::class)->revalidateFoundBets($settings);
+
+        $this->assertModelMissing($bet);
+    }
+
+    private function websiteBettingSettings(): BettingSetting
+    {
+        $settings = BettingSetting::current();
+        $settings->update([
+            'website_sources' => [[
+                'name' => 'Sports Tips',
+                'url' => 'https://93.184.216.34/predictions',
+                'enabled' => true,
+            ]],
+            'primary_source_name' => 'BETON',
+            'primary_source_url' => 'https://beton.ua/sportsbook',
+            'minimum_ai_score' => 80,
+        ]);
+
+        return $settings->fresh();
+    }
+
+    private function mockWebsitePrediction(): void
+    {
+        $this->mock(WebsiteBetSearchService::class, function ($mock): void {
+            $mock->shouldReceive('search')->once()->andReturn([
+                'messages' => [[
+                    'id' => 'prediction-1',
+                    'date' => now()->toIso8601String(),
+                    'text' => "Сан-Бернарду — Ботафого\nТМ 3.5",
+                    'source_type' => 'website',
+                    'source_name' => 'Sports Tips',
+                    'url' => 'https://93.184.216.34/predictions',
+                ]],
+                'source_errors' => [],
+            ]);
+        });
+    }
+
+    /** @return array<string, mixed> */
+    private function oddsResult(bool $eventFound, bool $finished = false, ?float $odds = 1.84): array
+    {
+        return [
+            'primary_odds' => $odds,
+            'reserve_odds' => null,
+            'selected_odds' => $odds,
+            'selected_odds_source' => $odds ? 'BETON' : null,
+            'odds_snapshot' => [
+                'primary' => [
+                    'name' => 'BETON',
+                    'url' => 'https://beton.ua/sportsbook',
+                    'event_found' => $eventFound,
+                    'finished' => $finished,
+                    'odds' => $odds,
+                ],
+                'reserve' => [],
+            ],
+            'odds_checked_at' => now(),
+        ];
     }
 }
