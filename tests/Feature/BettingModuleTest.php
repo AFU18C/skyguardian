@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RunBetSearch;
 use App\Models\Bet;
+use App\Models\BetSearchRun;
 use App\Models\BettingSetting;
 use App\Models\User;
+use App\Services\PublicUrlGuard;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -24,7 +28,9 @@ class BettingModuleTest extends TestCase
             ->assertSee('Ставки')
             ->assertSee('Проверить ставки')
             ->assertSee('Сайты-источники')
-            ->assertSee('Telegram + сайты');
+            ->assertSee('Telegram + сайты')
+            ->assertSee('оценка качества')
+            ->assertDontSee('ИИ-оценка');
 
         $this->assertDatabaseCount('betting_settings', 1);
     }
@@ -33,6 +39,7 @@ class BettingModuleTest extends TestCase
     public function admin_can_save_compact_betting_settings(): void
     {
         $user = User::factory()->create();
+        $this->app->instance(PublicUrlGuard::class, $this->publicGuard());
 
         $this->actingAs($user)->put(route('admin.betting.settings.update'), [
             'keywords_text' => "ставка дня\nтотал больше",
@@ -61,6 +68,29 @@ class BettingModuleTest extends TestCase
             ['name' => 'Sports Tips', 'url' => 'https://tips.example/predictions', 'enabled' => true],
             ['name' => 'Reserve Tips', 'url' => 'https://reserve.example/bets', 'enabled' => false],
         ], $settings->website_sources);
+    }
+
+    #[Test]
+    public function website_search_is_dispatched_to_the_dedicated_queue_and_returns_immediately(): void
+    {
+        Queue::fake();
+        $user = User::factory()->create();
+        BettingSetting::current()->update([
+            'website_sources' => [[
+                'name' => 'Sports Tips',
+                'url' => 'https://tips.example/predictions',
+                'enabled' => true,
+            ]],
+        ]);
+
+        $this->actingAs($user)->post(route('admin.betting.search'), [
+            'search_mode' => 'websites',
+        ])->assertRedirect(route('admin.betting.index', ['tab' => 'search']));
+
+        $run = BetSearchRun::query()->firstOrFail();
+        $this->assertSame('queued', $run->status);
+        $this->assertSame('websites', $run->search_mode);
+        Queue::assertPushedOn('betting', RunBetSearch::class, fn (RunBetSearch $job): bool => $job->runId === $run->id);
     }
 
     #[Test]
@@ -112,5 +142,10 @@ class BettingModuleTest extends TestCase
 
         $this->assertDatabaseHas('bets', ['event_name' => 'Матч 1', 'result' => 'pending']);
         $this->assertDatabaseMissing('bets', ['event_name' => 'Матч 2']);
+    }
+
+    private function publicGuard(): PublicUrlGuard
+    {
+        return new PublicUrlGuard(fn (string $host): array => ['93.184.216.34']);
     }
 }

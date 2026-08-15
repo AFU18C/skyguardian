@@ -14,7 +14,7 @@ class SitePageController extends Controller
     public function home(SiteContentService $siteContent): View
     {
         if (! $this->contentTablesAvailable()) {
-            return view('public.home');
+            return view('public.home', ['siteSettings' => $siteContent->settings()]);
         }
 
         $page = SitePage::query()
@@ -22,7 +22,9 @@ class SitePageController extends Controller
             ->where('system_key', 'home')
             ->first();
 
-        return $page ? $this->render($page, $siteContent) : view('public.home');
+        return $page
+            ? $this->render($page, $siteContent)
+            : view('public.home', ['siteSettings' => $siteContent->settings()]);
     }
 
     public function show(string $slug, SiteContentService $siteContent): View|Response
@@ -34,6 +36,9 @@ class SitePageController extends Controller
         $page = SitePage::query()
             ->visible()
             ->where('slug', $slug)
+            ->where(function ($query): void {
+                $query->whereNull('system_key')->orWhere('system_key', '!=', '404');
+            })
             ->first();
 
         if ($page) {
@@ -54,6 +59,7 @@ class SitePageController extends Controller
                 'siteSettings' => $siteContent->settings(),
                 'siteMenu' => $siteContent->menu(),
                 'isPreview' => false,
+                'isNotFound' => true,
             ], 404);
     }
 
@@ -64,6 +70,7 @@ class SitePageController extends Controller
             'siteSettings' => $siteContent->settings(),
             'siteMenu' => $siteContent->menu(),
             'isPreview' => false,
+            'isNotFound' => false,
         ]);
     }
 

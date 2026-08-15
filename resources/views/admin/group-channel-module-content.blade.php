@@ -84,10 +84,25 @@
                         @if($publication->last_error)<div class="sg-inline-error">{{ $publication->last_error }}</div>@endif
                     </div>
                     <div class="sg-record-actions">
+                        @if($publication->status === \App\Models\GroupChannelPublication::STATUS_UNCERTAIN)
+                            <form method="POST" action="{{ route('admin.group-channel.publications.resolve', [$bot, $publication]) }}">
+                                @csrf
+                                <input type="hidden" name="resolution" value="sent">
+                                <input type="number" name="telegram_message_id" min="1" value="{{ $publication->telegram_message_id }}" placeholder="ID сообщения" @required(empty($publication->telegram_message_ids))>
+                                <button class="sg-button sg-button-small sg-button-primary" type="submit">Подтвердить отправку</button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.group-channel.publications.resolve', [$bot, $publication]) }}" data-confirm="Вы проверили канал и уверены, что сообщение не опубликовано?">
+                                @csrf
+                                <input type="hidden" name="resolution" value="retry">
+                                <button class="sg-button sg-button-small sg-button-secondary" type="submit">Разрешить повтор</button>
+                            </form>
+                        @endif
                         @if(in_array($publication->status, ['draft', 'error'], true))
                             <form method="POST" action="{{ route('admin.group-channel.publications.send', [$bot, $publication]) }}">@csrf<button class="sg-button sg-button-small sg-button-secondary" type="submit">Отправить</button></form>
                         @endif
-                        <form method="POST" action="{{ route('admin.group-channel.publications.destroy', [$bot, $publication]) }}" data-confirm="Удалить публикацию из SkyGuardian?">@csrf @method('DELETE')<button class="sg-button sg-button-small sg-button-danger" type="submit">Удалить</button></form>
+                        @if(!in_array($publication->status, [\App\Models\GroupChannelPublication::STATUS_SENDING, \App\Models\GroupChannelPublication::STATUS_UNCERTAIN], true))
+                            <form method="POST" action="{{ route('admin.group-channel.publications.destroy', [$bot, $publication]) }}" data-confirm="Удалить публикацию из SkyGuardian?">@csrf @method('DELETE')<button class="sg-button sg-button-small sg-button-danger" type="submit">Удалить</button></form>
+                        @endif
                     </div>
                 </div>
             @endforeach

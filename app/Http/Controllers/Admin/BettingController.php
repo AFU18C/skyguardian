@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\TelegramDeliveryUncertainException;
 use App\Http\Controllers\Controller;
+use App\Jobs\RunBetSearch;
 use App\Models\Bet;
 use App\Models\BetSearchRun;
 use App\Models\BettingSetting;
 use App\Models\GroupChannelBot;
 use App\Models\TechnicalAccount;
 use App\Services\BetPublicationService;
-use App\Services\BetResultService;
 use App\Services\BetSearchService;
+use App\Services\PublicUrlGuard;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,7 +41,7 @@ class BettingController extends Controller
             'tab' => $tab,
             'settings' => $settings,
             'statistics' => $statistics,
-            'foundBets' => Bet::query()->where('status', Bet::STATUS_FOUND)->latest()->paginate(10, ['*'], 'found_page'),
+            'foundBets' => Bet::query()->whereIn('status', [Bet::STATUS_FOUND, Bet::STATUS_PUBLICATION_UNCERTAIN])->latest()->paginate(10, ['*'], 'found_page'),
             'publishedBets' => Bet::query()->where('status', Bet::STATUS_PUBLISHED)->latest('published_at')->paginate(10, ['*'], 'published_page'),
             'latestRun' => BetSearchRun::query()->latest()->first(),
             'technicalAccounts' => TechnicalAccount::query()->where('is_active', true)->orderBy('name')->get(),
@@ -52,16 +54,30 @@ class BettingController extends Controller
         $mode = $request->validate([
             'search_mode' => ['required', Rule::in(['telegram', 'websites', 'all'])],
         ])['search_mode'];
+        $run = null;
 
         try {
-            $run = $service->run(BettingSetting::current(), $mode);
+            $service->validateConfiguration(BettingSetting::current(), $mode);
+            $run = BetSearchRun::query()->create([
+                'status' => 'queued',
+                'search_mode' => $mode,
+                'progress_percent' => 0,
+                'status_message' => 'Ожидает запуска',
+            ]);
+            RunBetSearch::dispatch($run->id);
 
             return redirect()->route('admin.betting.index', ['tab' => 'search'])->with('toast', [
-                'type' => 'success', 'title' => 'Проверка завершена',
-                'message' => "Найдено сообщений: {$run->messages_found}; подходящих ставок: {$run->bets_found}.",
+                'type' => 'success', 'title' => 'Поиск запущен',
+                'message' => 'Источники проверяются в фоне. Страница покажет прогресс и результат.',
             ]);
         } catch (Throwable $e) {
             report($e);
+            $run?->update([
+                'status' => 'error',
+                'status_message' => 'Не удалось поставить поиск в очередь',
+                'last_error' => mb_substr($e->getMessage(), 0, 2000),
+                'finished_at' => now(),
+            ]);
 
             return redirect()->route('admin.betting.index', ['tab' => 'search'])->with('toast', [
                 'type' => 'error', 'title' => 'Поиск не выполнен', 'message' => $e->getMessage(),
@@ -69,7 +85,11 @@ class BettingController extends Controller
         }
     }
 
-    public function updateSettings(Request $request, BetSearchService $service): RedirectResponse
+    public function updateSettings(
+        Request $request,
+        BetSearchService $service,
+        PublicUrlGuard $urlGuard,
+    ): RedirectResponse
     {
         $data = $request->validate([
             'technical_account_id' => ['nullable', 'exists:technical_accounts,id'],
@@ -80,8 +100,8 @@ class BettingController extends Controller
             'freshness_hours' => ['required', 'integer', 'min:1', 'max:720'],
             'minimum_ai_score' => ['required', 'integer', 'min:1', 'max:100'],
             'maximum_results' => ['required', 'integer', 'min:1', 'max:100'],
-            'primary_source_name' => ['required', 'string', 'max:100'],
-            'primary_source_url' => ['required', 'url:http,https', 'max:2048'],
+            'primary_source_name' => ['nullable', 'string', 'max:100'],
+            'primary_source_url' => ['nullable', 'url:http,https', 'max:2048'],
             'reserve_source_name' => ['nullable', 'string', 'max:100'],
             'reserve_source_url' => ['nullable', 'url:http,https', 'max:2048'],
             'found_retention_days' => ['required', 'integer', 'min:1', 'max:3650'],
@@ -149,6 +169,28 @@ class BettingController extends Controller
             ->values()
             ->all();
         unset($data['website_sources_text']);
+        foreach ($data['website_sources'] as $websiteSource) {
+            try {
+                $urlGuard->inspect((string) $websiteSource['url']);
+            } catch (Throwable $e) {
+                return back()->withErrors([
+                    'website_sources_text' => ($websiteSource['name'] ?: 'Сайт').': '.$e->getMessage(),
+                ])->withInput();
+            }
+        }
+        foreach (['primary_source_url', 'reserve_source_url'] as $sourceField) {
+            $sourceUrl = $data[$sourceField] ?? null;
+            if (! $sourceUrl) {
+                continue;
+            }
+
+            try {
+                $urlGuard->inspect((string) $sourceUrl);
+            } catch (Throwable $e) {
+                return back()->withErrors([$sourceField => $e->getMessage()])->withInput();
+            }
+        }
+        $data['primary_source_name'] = trim((string) ($data['primary_source_name'] ?? '')) ?: 'Основной источник';
         $settings = BettingSetting::current();
         $settings->update($data);
         $service->cleanup($settings->fresh());
@@ -204,15 +246,83 @@ class BettingController extends Controller
         $bet->refresh();
         try {
             $messageId = $publisher->publish($bet, $bot);
-            $bet->update(['status' => Bet::STATUS_PUBLISHED, 'telegram_message_id' => $messageId, 'published_at' => now(), 'result' => 'pending']);
+        } catch (TelegramDeliveryUncertainException $e) {
+            $bet->update([
+                'status' => Bet::STATUS_PUBLICATION_UNCERTAIN,
+                'publication_error' => $e->getMessage(),
+            ]);
+            report($e);
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Ставка опубликована', 'message' => 'Бот отправил одобренную ставку в выбранный канал.']);
+            return back()->with('toast', [
+                'type' => 'warning',
+                'title' => 'Нужно проверить канал',
+                'message' => $e->getMessage(),
+            ]);
         } catch (Throwable $e) {
-            $bet->update(['status' => Bet::STATUS_FOUND]);
+            $bet->update(['status' => Bet::STATUS_FOUND, 'publication_error' => $e->getMessage()]);
             report($e);
 
             return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка публикации', 'message' => $e->getMessage()]);
         }
+
+        try {
+            $bet->update([
+                'status' => Bet::STATUS_PUBLISHED,
+                'telegram_message_id' => $messageId,
+                'published_at' => now(),
+                'publication_error' => null,
+                'result' => 'pending',
+            ]);
+        } catch (Throwable $e) {
+            $bet->update([
+                'status' => Bet::STATUS_PUBLICATION_UNCERTAIN,
+                'telegram_message_id' => $messageId,
+                'publication_error' => 'Telegram подтвердил отправку, но состояние не удалось сохранить: '.$e->getMessage(),
+            ]);
+            report($e);
+
+            return back()->with('toast', [
+                'type' => 'warning',
+                'title' => 'Нужно проверить канал',
+                'message' => 'Telegram подтвердил публикацию, но SkyGuardian не смог сохранить её состояние. Автоматический повтор заблокирован.',
+            ]);
+        }
+
+        return back()->with('toast', ['type' => 'success', 'title' => 'Ставка опубликована', 'message' => 'Бот отправил одобренную ставку в выбранный канал.']);
+    }
+
+    public function resolvePublication(Request $request, Bet $bet): RedirectResponse
+    {
+        abort_unless($bet->status === Bet::STATUS_PUBLICATION_UNCERTAIN, 409);
+        $data = $request->validate([
+            'resolution' => ['required', Rule::in(['published', 'retry'])],
+            'telegram_message_id' => ['nullable', 'required_if:resolution,published', 'integer', 'min:1'],
+        ]);
+
+        if ($data['resolution'] === 'published') {
+            $bet->update([
+                'status' => Bet::STATUS_PUBLISHED,
+                'telegram_message_id' => (string) $data['telegram_message_id'],
+                'published_at' => now(),
+                'publication_error' => null,
+                'result' => 'pending',
+            ]);
+        } else {
+            $bet->update([
+                'status' => Bet::STATUS_FOUND,
+                'telegram_message_id' => null,
+                'published_at' => null,
+                'publication_error' => 'Повтор разрешён администратором после проверки канала.',
+            ]);
+        }
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => 'Статус публикации обновлён',
+            'message' => $data['resolution'] === 'published'
+                ? 'Ставка отмечена опубликованной.'
+                : 'Ставка возвращена в найденные и доступна для ручного повтора.',
+        ]);
     }
 
     public function reject(Bet $bet): RedirectResponse
@@ -257,30 +367,120 @@ class BettingController extends Controller
         $data = $request->validate(['publication_bot_id' => ['nullable', 'exists:group_channel_bots,id'], 'text' => ['nullable', 'string', 'max:4096']]);
         $bot = GroupChannelBot::query()->where('is_active', true)->find($data['publication_bot_id'] ?? $bet->publication_bot_id);
         abort_unless($bot, 422, 'Канал публикации не найден.');
+
+        $claimed = Bet::query()
+            ->whereKey($bet->id)
+            ->where('status', Bet::STATUS_PUBLISHED)
+            ->whereNull('result_sent_at')
+            ->where(function ($query): void {
+                $query->whereNull('result_publication_status')
+                    ->orWhere('result_publication_status', Bet::RESULT_PUBLICATION_ERROR);
+            })
+            ->update([
+                'result_publication_status' => Bet::RESULT_PUBLICATION_SENDING,
+                'result_publication_error' => null,
+                'updated_at' => now(),
+            ]);
+        if ($claimed !== 1) {
+            return back()->with('toast', [
+                'type' => 'warning',
+                'title' => 'Результат уже обрабатывается',
+                'message' => $bet->fresh()->result_publication_status === Bet::RESULT_PUBLICATION_UNCERTAIN
+                    ? 'Сначала проверьте канал и обработайте неопределённую отправку.'
+                    : 'Повторная отправка результата заблокирована.',
+            ]);
+        }
+
         try {
             $messageId = $publisher->sendResult($bet, $bot, $data['text'] ?? null);
-            $bet->update(['result_message_id' => $messageId, 'result_sent_at' => now()]);
+        } catch (TelegramDeliveryUncertainException $e) {
+            $bet->update([
+                'result_publication_status' => Bet::RESULT_PUBLICATION_UNCERTAIN,
+                'result_publication_error' => $e->getMessage(),
+            ]);
+            report($e);
 
-            return back()->with('toast', ['type' => 'success', 'title' => 'Результат отправлен', 'message' => 'Бот опубликовал результат ставки.']);
+            return back()->with('toast', [
+                'type' => 'warning',
+                'title' => 'Нужно проверить канал',
+                'message' => $e->getMessage(),
+            ]);
         } catch (Throwable $e) {
+            $bet->update([
+                'result_publication_status' => Bet::RESULT_PUBLICATION_ERROR,
+                'result_publication_error' => $e->getMessage(),
+            ]);
             report($e);
 
             return back()->with('toast', ['type' => 'error', 'title' => 'Ошибка отправки', 'message' => $e->getMessage()]);
         }
+
+        try {
+            $bet->update([
+                'result_message_id' => $messageId,
+                'result_sent_at' => now(),
+                'result_publication_status' => Bet::RESULT_PUBLICATION_SENT,
+                'result_publication_error' => null,
+            ]);
+        } catch (Throwable $e) {
+            $bet->update([
+                'result_message_id' => $messageId,
+                'result_publication_status' => Bet::RESULT_PUBLICATION_UNCERTAIN,
+                'result_publication_error' => 'Telegram подтвердил отправку, но состояние не удалось сохранить: '.$e->getMessage(),
+            ]);
+            report($e);
+
+            return back()->with('toast', [
+                'type' => 'warning',
+                'title' => 'Нужно проверить канал',
+                'message' => 'Telegram подтвердил результат, но SkyGuardian не смог сохранить его состояние. Автоматический повтор заблокирован.',
+            ]);
+        }
+
+        return back()->with('toast', ['type' => 'success', 'title' => 'Результат отправлен', 'message' => 'Бот опубликовал результат ставки.']);
     }
 
-    public function checkResult(Bet $bet, BetResultService $service): RedirectResponse
+    public function resolveResultPublication(Request $request, Bet $bet): RedirectResponse
     {
-        abort_unless($bet->status === Bet::STATUS_PUBLISHED, 404);
-        $bet->update($service->check($bet, BettingSetting::current()));
-        $message = $bet->fresh()->result === 'pending'
-            ? 'Событие не завершено или официальный результат ещё не опубликован.'
-            : 'Результат ставки определён автоматически.';
+        abort_unless($bet->result_publication_status === Bet::RESULT_PUBLICATION_UNCERTAIN, 409);
+        $data = $request->validate([
+            'resolution' => ['required', Rule::in(['sent', 'retry'])],
+            'telegram_message_id' => ['nullable', 'required_if:resolution,sent', 'integer', 'min:1'],
+        ]);
+
+        if ($data['resolution'] === 'sent') {
+            $bet->update([
+                'result_message_id' => (string) $data['telegram_message_id'],
+                'result_sent_at' => now(),
+                'result_publication_status' => Bet::RESULT_PUBLICATION_SENT,
+                'result_publication_error' => null,
+            ]);
+        } else {
+            $bet->update([
+                'result_message_id' => null,
+                'result_sent_at' => null,
+                'result_publication_status' => Bet::RESULT_PUBLICATION_ERROR,
+                'result_publication_error' => 'Повтор разрешён администратором после проверки канала.',
+            ]);
+        }
 
         return back()->with('toast', [
-            'type' => $bet->fresh()->result === 'pending' ? 'warning' : 'success',
-            'title' => $bet->fresh()->result === 'pending' ? 'Результат ещё недоступен' : 'Результат проверен',
-            'message' => $message,
+            'type' => 'success',
+            'title' => 'Статус результата обновлён',
+            'message' => $data['resolution'] === 'sent'
+                ? 'Публикация результата подтверждена.'
+                : 'Разрешён ручной повтор результата.',
+        ]);
+    }
+
+    public function checkResult(Bet $bet): RedirectResponse
+    {
+        abort_unless($bet->status === Bet::STATUS_PUBLISHED, 404);
+
+        return back()->with('toast', [
+            'type' => 'warning',
+            'title' => 'Автопроверка отключена',
+            'message' => 'Установите результат вручную после проверки официального источника.',
         ]);
     }
 

@@ -35,7 +35,7 @@ class WorkerCopyTest(unittest.TestCase):
 
     def test_web_preview_is_copied_as_clean_text_without_link(self) -> None:
         client = SimpleNamespace(
-            send_message=AsyncMock(),
+            send_message=AsyncMock(return_value=SimpleNamespace(id=110)),
             send_file=AsyncMock(),
         )
         message = SimpleNamespace(
@@ -53,7 +53,7 @@ class WorkerCopyTest(unittest.TestCase):
             {"strip_links": True, "copy_mode": "original"},
         ))
 
-        self.assertEqual(1, copied)
+        self.assertEqual((1, [110]), copied)
         client.send_file.assert_not_awaited()
         client.send_message.assert_awaited_once_with(
             "@destination",
@@ -63,7 +63,10 @@ class WorkerCopyTest(unittest.TestCase):
         )
 
     def test_post_with_blocked_keyword_is_skipped_case_insensitively(self) -> None:
-        client = SimpleNamespace(send_message=AsyncMock(), send_file=AsyncMock())
+        client = SimpleNamespace(
+            send_message=AsyncMock(return_value=SimpleNamespace(id=111)),
+            send_file=AsyncMock(),
+        )
         messages = [
             SimpleNamespace(id=10, message="Лучшее КАЗИНО города", media=None, grouped_id=None),
             SimpleNamespace(id=11, message="Обычная новость", media=None, grouped_id=None),
@@ -78,6 +81,8 @@ class WorkerCopyTest(unittest.TestCase):
 
         self.assertEqual(1, result["copied_count"])
         self.assertEqual(11, result["last_processed_id"])
+        self.assertEqual([111], result["destination_message_ids"])
+        self.assertEqual([11], result["copied_groups"][0]["source_message_ids"])
         client.send_message.assert_awaited_once_with(
             "@destination",
             "Обычная новость",
@@ -87,7 +92,10 @@ class WorkerCopyTest(unittest.TestCase):
         client.send_file.assert_not_awaited()
 
     def test_disabled_blocked_keyword_filter_does_not_change_copying(self) -> None:
-        client = SimpleNamespace(send_message=AsyncMock(), send_file=AsyncMock())
+        client = SimpleNamespace(
+            send_message=AsyncMock(return_value=SimpleNamespace(id=112)),
+            send_file=AsyncMock(),
+        )
         message = SimpleNamespace(id=10, message="Казино", media=None)
 
         copied = asyncio.run(worker.copy_message_group(
@@ -97,7 +105,7 @@ class WorkerCopyTest(unittest.TestCase):
             {"blocked_keywords": [], "copy_mode": "original"},
         ))
 
-        self.assertEqual(1, copied)
+        self.assertEqual((1, [112]), copied)
         client.send_message.assert_awaited_once()
 
     def test_failed_group_returns_checkpoint_without_recopying_previous_groups(self) -> None:
@@ -110,7 +118,7 @@ class WorkerCopyTest(unittest.TestCase):
         with patch.object(
             worker,
             "copy_message_group",
-            AsyncMock(side_effect=[1, RuntimeError("broken media"), 1]),
+            AsyncMock(side_effect=[(1, [210]), RuntimeError("broken media"), (1, [212])]),
         ) as copy_group:
             result = asyncio.run(worker.copy_message_groups(
                 SimpleNamespace(),
@@ -123,6 +131,7 @@ class WorkerCopyTest(unittest.TestCase):
         self.assertEqual(1, result["copied_count"])
         self.assertEqual(1, result["failed_count"])
         self.assertEqual(10, result["last_processed_id"])
+        self.assertEqual([210], result["destination_message_ids"])
         self.assertEqual([11], result["failed"][0]["message_ids"])
         self.assertEqual("broken media", result["failed"][0]["error"])
 
@@ -134,7 +143,7 @@ class WorkerCopyTest(unittest.TestCase):
             media=Mock(spec=MessageMediaPhoto),
         )
         first_client = SimpleNamespace(
-            send_file=AsyncMock(),
+            send_file=AsyncMock(return_value=SimpleNamespace(id=220)),
             send_message=AsyncMock(side_effect=RuntimeError("temporary text failure")),
         )
 
@@ -145,10 +154,17 @@ class WorkerCopyTest(unittest.TestCase):
             {"copy_mode": "original"},
         ))
 
-        self.assertEqual({"message_ids": [20], "stage": "text_after_media"}, first["partial_delivery"])
+        self.assertEqual({
+            "message_ids": [20],
+            "stage": "text_after_media",
+            "destination_message_ids": [220],
+        }, first["partial_delivery"])
         first_client.send_file.assert_awaited_once()
 
-        resume_client = SimpleNamespace(send_file=AsyncMock(), send_message=AsyncMock())
+        resume_client = SimpleNamespace(
+            send_file=AsyncMock(),
+            send_message=AsyncMock(return_value=SimpleNamespace(id=221)),
+        )
         second = asyncio.run(worker.copy_message_groups(
             resume_client,
             "@destination",
@@ -161,6 +177,7 @@ class WorkerCopyTest(unittest.TestCase):
 
         self.assertEqual(20, second["last_processed_id"])
         self.assertIsNone(second["partial_delivery"])
+        self.assertEqual([220, 221], second["destination_message_ids"])
         resume_client.send_file.assert_not_awaited()
         resume_client.send_message.assert_awaited_once()
 
@@ -217,6 +234,111 @@ class WorkerAuthenticationTest(unittest.TestCase):
             self.assertEqual(77, result["user"]["id"])
             self.assertEqual("saved-session", result["session"])
             client.disconnect.assert_awaited_once()
+
+        asyncio.run(scenario())
+
+
+class WorkerIdempotencyTest(unittest.TestCase):
+    def tearDown(self) -> None:
+        worker.request_tasks.clear()
+        worker.request_results.clear()
+
+    def test_copy_request_result_is_reused_after_the_caller_loses_the_response(self) -> None:
+        request = {
+            "action": "copy_messages",
+            "account_key": "17",
+            "payload": {"request_id": "a" * 64},
+        }
+
+        async def scenario() -> None:
+            with patch.object(
+                worker,
+                "process_request",
+                AsyncMock(return_value={"ok": True, "destination_message_ids": [901]}),
+            ) as process:
+                first = await worker.process_request_idempotently(request)
+                second = await worker.process_request_idempotently(request)
+
+                self.assertEqual(first, second)
+                self.assertEqual(1, process.await_count)
+
+        asyncio.run(scenario())
+
+    def test_concurrent_copy_requests_share_one_in_flight_operation(self) -> None:
+        request = {
+            "action": "copy_messages",
+            "account_key": "18",
+            "payload": {"request_id": "b" * 64},
+        }
+
+        async def delayed_result(_request: dict[str, object]) -> dict[str, object]:
+            await asyncio.sleep(0)
+            return {"ok": True, "destination_message_ids": [902]}
+
+        async def scenario() -> None:
+            with patch.object(
+                worker,
+                "process_request",
+                AsyncMock(side_effect=delayed_result),
+            ) as process:
+                first, second = await asyncio.gather(
+                    worker.process_request_idempotently(request),
+                    worker.process_request_idempotently(request),
+                )
+
+                self.assertEqual(first, second)
+                self.assertEqual(1, process.await_count)
+
+        asyncio.run(scenario())
+
+    def test_failed_request_without_delivery_checkpoint_is_not_cached(self) -> None:
+        request = {
+            "action": "copy_messages",
+            "account_key": "19",
+            "payload": {"request_id": "c" * 64},
+        }
+
+        async def scenario() -> None:
+            with patch.object(
+                worker,
+                "process_request",
+                AsyncMock(return_value={"ok": False, "error": "temporary"}),
+            ) as process:
+                await worker.process_request_idempotently(request)
+                await worker.process_request_idempotently(request)
+
+                self.assertEqual(2, process.await_count)
+
+        asyncio.run(scenario())
+
+    def test_partial_media_delivery_is_cached_before_text_resume(self) -> None:
+        request = {
+            "action": "copy_messages",
+            "account_key": "17",
+            "payload": {"request_id": "d" * 64},
+        }
+        response = {
+            "ok": True,
+            "last_processed_id": None,
+            "destination_message_ids": [],
+            "partial_delivery": {
+                "message_ids": [44],
+                "stage": "text_after_media",
+                "destination_message_ids": [944],
+            },
+        }
+
+        async def scenario() -> None:
+            with patch.object(
+                worker,
+                "process_request",
+                AsyncMock(return_value=response),
+            ) as process:
+                first = await worker.process_request_idempotently(request)
+                second = await worker.process_request_idempotently(request)
+
+                self.assertEqual(first, second)
+                self.assertEqual(1, process.await_count)
 
         asyncio.run(scenario())
 

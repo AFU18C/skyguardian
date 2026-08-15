@@ -1,7 +1,7 @@
 @php
     $pageTitle = $page->seo_title ?: $page->title;
     $description = $page->seo_description ?: $page->excerpt;
-    $socialImage = $page->social_image_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($page->social_image_path) : null;
+    $socialImage = $page->social_image_path ? url(\Illuminate\Support\Facades\Storage::disk('public')->url($page->social_image_path)) : null;
     $logoUrl = !empty($siteSettings['logo_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($siteSettings['logo_path']) : null;
     $faviconUrl = !empty($siteSettings['favicon_path']) ? \Illuminate\Support\Facades\Storage::disk('public')->url($siteSettings['favicon_path']) : null;
     $visibleBlocks = collect($page->blocks ?? [])
@@ -22,6 +22,10 @@
     :language="$siteSettings['language'] ?? 'ru'"
     :favicon="$faviconUrl"
     :theme="$siteSettings['theme'] ?? 'classic'"
+    :site-name="$siteSettings['site_name'] ?? 'SkyGuardian'"
+    :canonical="($isNotFound ?? false) ? request()->url() : $page->publicUrl()"
+    :robots="($isPreview ?? false) || ($isNotFound ?? false) ? 'noindex,nofollow' : 'index,follow,max-image-preview:large'"
+    :public-page="!($isPreview ?? false)"
 >
     <div class="site-shell">
         @if($isPreview ?? false)

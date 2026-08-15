@@ -20,7 +20,6 @@ class GroupChannelChannelPostTest extends TestCase
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 100,
                 'channel_post' => [
@@ -53,6 +52,7 @@ class GroupChannelChannelPostTest extends TestCase
     {
         $user = User::factory()->create();
         $bot = $this->botWithModules([]);
+        $oldSecret = $bot->webhook_secret;
 
         Http::fake([
             '*' => Http::response(['ok' => true, 'result' => true]),
@@ -63,7 +63,8 @@ class GroupChannelChannelPostTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('toast.type', 'success');
 
-        Http::assertSent(function (Request $request): bool {
+        $bot->refresh();
+        Http::assertSent(function (Request $request) use ($bot, $oldSecret): bool {
             if (! str_ends_with($request->url(), '/setWebhook')) {
                 return false;
             }
@@ -71,8 +72,12 @@ class GroupChannelChannelPostTest extends TestCase
             $updates = json_decode((string) $request['allowed_updates'], true);
 
             return in_array('channel_post', $updates, true)
-                && in_array('edited_channel_post', $updates, true);
+                && in_array('edited_channel_post', $updates, true)
+                && $request['url'] === route('group-channel.webhook', ['fingerprint' => $bot->token_fingerprint])
+                && ! str_contains((string) $request['url'], $oldSecret)
+                && $request['secret_token'] === $bot->webhook_secret;
         });
+        $this->assertNotSame($oldSecret, $bot->webhook_secret);
         $this->assertNotNull($bot->fresh()->webhook_registered_at);
     }
 

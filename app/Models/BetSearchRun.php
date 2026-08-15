@@ -6,10 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class BetSearchRun extends Model
 {
-    protected $fillable = ['status', 'search_mode', 'messages_found', 'bets_found', 'last_error', 'finished_at'];
+    protected $fillable = [
+        'status', 'search_mode', 'progress_percent', 'status_message', 'started_at',
+        'messages_found', 'bets_found', 'last_error', 'finished_at',
+    ];
 
     protected function casts(): array
     {
-        return ['finished_at' => 'datetime'];
+        return [
+            'progress_percent' => 'integer',
+            'started_at' => 'datetime',
+            'finished_at' => 'datetime',
+        ];
     }
 }

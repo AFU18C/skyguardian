@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\TelegramDeliveryUncertainException;
 use App\Models\Bet;
 use App\Models\GroupChannelBot;
 use RuntimeException;
@@ -23,7 +24,7 @@ class BetPublicationService
         }
         $result = $this->telegram->request($bot, 'sendMessage', $payload);
         if (empty($result['message_id'])) {
-            throw new RuntimeException('Telegram не вернул ID опубликованной ставки.');
+            throw new TelegramDeliveryUncertainException('Telegram принял ставку, но не вернул ID сообщения. Автоматический повтор заблокирован.');
         }
 
         return (string) $result['message_id'];
@@ -43,7 +44,7 @@ class BetPublicationService
         }
         $result = $this->telegram->request($bot, 'sendMessage', $payload);
         if (empty($result['message_id'])) {
-            throw new RuntimeException('Telegram не вернул ID сообщения с результатом.');
+            throw new TelegramDeliveryUncertainException('Telegram принял результат, но не вернул ID сообщения. Автоматический повтор заблокирован.');
         }
 
         return (string) $result['message_id'];
@@ -58,7 +59,7 @@ class BetPublicationService
             '',
             '🎯 <b>Прогноз:</b> '.$this->e($bet->market),
             '💰 <b>Коэффициент:</b> '.number_format((float) $bet->selected_odds, 2, '.', ''),
-            '🤖 <b>Оценка:</b> '.$bet->ai_score.'%',
+            '📊 <b>Качество данных:</b> '.$bet->ai_score.'%',
             '',
             '⏳ <b>Ожидает результата</b>',
         ];

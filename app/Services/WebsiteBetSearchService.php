@@ -2,61 +2,104 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
-use RuntimeException;
+use Carbon\CarbonImmutable;
 
 class WebsiteBetSearchService
 {
+    private readonly WebsiteBrowserClient $browser;
+
+    private readonly PublicUrlGuard $urlGuard;
+
+    public function __construct(
+        ?WebsiteBrowserClient $browser = null,
+        ?PublicUrlGuard $urlGuard = null,
+    ) {
+        $this->browser = $browser ?? app(WebsiteBrowserClient::class);
+        $this->urlGuard = $urlGuard ?? app(PublicUrlGuard::class);
+    }
+
     /**
      * @param  array<int, array{name:string,url:string,enabled?:bool}>  $sources
      * @param  array<int, string>  $keywords
      * @return array{messages: array<int, array<string, mixed>>, source_errors: array<int, array{source:string,error:string}>}
      */
-    public function search(array $sources, array $keywords, int $limit): array
+    public function search(array $sources, array $keywords, int $limit, int $freshnessHours = 24): array
     {
         $messages = [];
         $errors = [];
+        $maximumSources = max(1, min(50, (int) config('skyguardian.betting.maximum_website_sources_per_run', 20)));
+        $enabled = collect($sources)
+            ->filter(fn (mixed $source): bool => is_array($source)
+                && ($source['enabled'] ?? true) === true
+                && trim((string) ($source['url'] ?? '')) !== '')
+            ->take($maximumSources)
+            ->values();
 
-        foreach ($sources as $source) {
-            if (($source['enabled'] ?? true) !== true || count($messages) >= $limit) {
+        $safeSources = $enabled->filter(function (array $source) use (&$errors): bool {
+            try {
+                $this->urlGuard->inspect((string) $source['url']);
+
+                return true;
+            } catch (\Throwable $e) {
+                $errors[] = [
+                    'source' => trim((string) ($source['name'] ?? '')) ?: (string) $source['url'],
+                    'error' => $e->getMessage(),
+                ];
+
+                return false;
+            }
+        })->all();
+
+        if ($safeSources === []) {
+            return ['messages' => [], 'source_errors' => $errors];
+        }
+
+        try {
+            $result = $this->browser->fetch($safeSources, $keywords, $freshnessHours);
+        } catch (\Throwable $e) {
+            foreach ($safeSources as $source) {
+                $errors[] = [
+                    'source' => trim((string) ($source['name'] ?? '')) ?: (string) $source['url'],
+                    'error' => $e->getMessage(),
+                ];
+            }
+
+            return ['messages' => [], 'source_errors' => $errors];
+        }
+
+        $errors = array_merge($errors, $result['errors']);
+        $cutoff = CarbonImmutable::now()->subHours(max(1, min(720, $freshnessHours)));
+
+        foreach ($result['documents'] as $document) {
+            $publishedAt = $this->publishedAt($document['published_at'] ?? null);
+            if ($publishedAt !== null && $publishedAt->lt($cutoff)) {
                 continue;
             }
 
-            $name = trim((string) ($source['name'] ?? ''));
-            $url = trim((string) ($source['url'] ?? ''));
+            $sourceUrl = $this->safeDocumentUrl($document);
+            if ($sourceUrl === '') {
+                continue;
+            }
+            $sourceName = trim((string) ($document['name'] ?? '')) ?: (parse_url($sourceUrl, PHP_URL_HOST) ?: 'Сайт');
+            $documentText = trim(implode("\n", array_filter([
+                trim((string) ($document['title'] ?? '')),
+                trim((string) ($document['text'] ?? '')),
+            ])));
 
-            try {
-                $this->guardPublicUrl($url);
-                $response = Http::timeout(20)->retry(1, 250, throw: false)->withHeaders([
-                    'User-Agent' => 'SkyGuardian/1.0 (+manual betting search)',
-                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8',
-                ])->get($url);
-
-                if (! $response->successful()) {
-                    throw new RuntimeException('HTTP '.$response->status());
+            foreach ($this->candidateTexts($documentText, $keywords) as $text) {
+                if (count($messages) >= $limit) {
+                    break 2;
                 }
 
-                $body = $response->body();
-                if (strlen($body) > 2_000_000) {
-                    $body = substr($body, 0, 2_000_000);
-                }
-
-                foreach ($this->candidateTexts($body, $keywords) as $index => $text) {
-                    if (count($messages) >= $limit) {
-                        break 2;
-                    }
-
-                    $messages[] = [
-                        'id' => hash('sha256', $url.'|'.$index.'|'.$text),
-                        'date' => now()->toIso8601String(),
-                        'text' => $text,
-                        'source_type' => 'website',
-                        'source_name' => $name !== '' ? $name : (parse_url($url, PHP_URL_HOST) ?: 'Сайт'),
-                        'url' => $url,
-                    ];
-                }
-            } catch (\Throwable $e) {
-                $errors[] = ['source' => $name !== '' ? $name : $url, 'error' => $e->getMessage()];
+                $messages[] = [
+                    'id' => hash('sha256', mb_strtolower($sourceUrl.'|'.$text)),
+                    'date' => $publishedAt?->toIso8601String(),
+                    'fetched_at' => $document['fetched_at'] ?? now()->toIso8601String(),
+                    'text' => $text,
+                    'source_type' => 'website',
+                    'source_name' => $sourceName,
+                    'url' => $sourceUrl,
+                ];
             }
         }
 
@@ -64,11 +107,8 @@ class WebsiteBetSearchService
     }
 
     /** @return array<int, string> */
-    private function candidateTexts(string $body, array $keywords): array
+    private function candidateTexts(string $text, array $keywords): array
     {
-        $body = preg_replace('~<(script|style|noscript|svg)\b[^>]*>.*?</\1>~isu', ' ', $body) ?? $body;
-        $body = preg_replace('~<(?:br|/p|/div|/article|/section|/li|/h[1-6]|/tr)\b[^>]*>~iu', "\n", $body) ?? $body;
-        $text = html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $lines = collect(preg_split('/\R+/u', $text))
             ->map(fn (string $line): string => trim(preg_replace('/\s+/u', ' ', $line) ?? $line))
             ->filter(fn (string $line): bool => mb_strlen($line) >= 3)
@@ -82,7 +122,8 @@ class WebsiteBetSearchService
 
         foreach ($lines as $index => $line) {
             $lower = mb_strtolower($line);
-            $matchesKeyword = $needles->isEmpty() || $needles->contains(fn (string $keyword): bool => str_contains($lower, $keyword));
+            $matchesKeyword = $needles->isEmpty()
+                || $needles->contains(fn (string $keyword): bool => str_contains($lower, $keyword));
             if (! $matchesKeyword) {
                 continue;
             }
@@ -98,20 +139,36 @@ class WebsiteBetSearchService
         return array_values(array_slice($candidates, 0, 100, true));
     }
 
-    private function guardPublicUrl(string $url): void
+    private function publishedAt(mixed $value): ?CarbonImmutable
     {
-        if (filter_var($url, FILTER_VALIDATE_URL) === false || ! in_array(parse_url($url, PHP_URL_SCHEME), ['http', 'https'], true)) {
-            throw new RuntimeException('Некорректный адрес сайта.');
+        if (! is_string($value) || trim($value) === '') {
+            return null;
         }
 
-        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
-        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.local')) {
-            throw new RuntimeException('Локальные адреса запрещены.');
+        try {
+            $date = CarbonImmutable::parse($value);
+
+            return $date->gt(now()->addDay()) ? null : $date;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function safeDocumentUrl(array $document): string
+    {
+        foreach (['canonical_url', 'final_url', 'requested_url'] as $key) {
+            $candidate = trim((string) ($document[$key] ?? ''));
+            if ($candidate === '') {
+                continue;
+            }
+
+            try {
+                return $this->urlGuard->inspect($candidate)['url'];
+            } catch (\Throwable) {
+                // Try the next browser-confirmed URL.
+            }
         }
 
-        if (filter_var($host, FILTER_VALIDATE_IP)
-            && filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-            throw new RuntimeException('Локальные адреса запрещены.');
-        }
+        return '';
     }
 }

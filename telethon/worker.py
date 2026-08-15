@@ -20,6 +20,8 @@ from telethon.tl.types import MessageMediaDocument, MessageMediaPhoto
 HOST = os.getenv("SKYGUARDIAN_TELETHON_HOST", "127.0.0.1")
 PORT = int(os.getenv("SKYGUARDIAN_TELETHON_PORT", "8787"))
 QR_TTL_SECONDS = int(os.getenv("SKYGUARDIAN_QR_TTL", "120"))
+REQUEST_CACHE_TTL_SECONDS = int(os.getenv("SKYGUARDIAN_REQUEST_CACHE_TTL", "21600"))
+REQUEST_CACHE_LIMIT = int(os.getenv("SKYGUARDIAN_REQUEST_CACHE_LIMIT", "1000"))
 
 URL_PATTERN = re.compile(
     r"(?i)(?:https?://|www\.)\S+|(?:t\.me|telegram\.me)/\S+"
@@ -37,6 +39,8 @@ class QrFlow:
 
 
 qr_flows: dict[str, QrFlow] = {}
+request_tasks: dict[str, asyncio.Task[dict[str, Any]]] = {}
+request_results: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
 def normalize_phone(value: Any) -> str:
@@ -77,10 +81,17 @@ def public_error_message(exc: Exception) -> str:
 
 
 class PartialCopyError(RuntimeError):
-    def __init__(self, message: str, message_ids: list[int], stage: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        message_ids: list[int],
+        stage: str,
+        destination_message_ids: list[int] | None = None,
+    ) -> None:
         super().__init__(message)
         self.message_ids = message_ids
         self.stage = stage
+        self.destination_message_ids = destination_message_ids or []
 
 
 async def search_bet_messages(
@@ -295,11 +306,20 @@ def group_messages(messages: list[Any]) -> list[list[Any]]:
     return grouped
 
 
-async def send_text(client: TelegramClient, destination_peer: Any, text: str) -> bool:
+def sent_message_ids(result: Any) -> list[int]:
+    values = result if isinstance(result, (list, tuple)) else [result]
+    return [
+        int(message_id)
+        for item in values
+        if (message_id := getattr(item, "id", None)) is not None
+    ]
+
+
+async def send_text(client: TelegramClient, destination_peer: Any, text: str) -> list[int]:
     if not text:
-        return False
-    await client.send_message(destination_peer, text, parse_mode="html", link_preview=False)
-    return True
+        return []
+    result = await client.send_message(destination_peer, text, parse_mode="html", link_preview=False)
+    return sent_message_ids(result)
 
 
 async def send_text_with_retry(
@@ -307,7 +327,7 @@ async def send_text_with_retry(
     destination_peer: Any,
     text: str,
     attempts: int = 3,
-) -> bool:
+) -> list[int]:
     last_error: Exception | None = None
     for attempt in range(attempts):
         try:
@@ -318,7 +338,7 @@ async def send_text_with_retry(
                 await asyncio.sleep(0.25 * (attempt + 1))
     if last_error is not None:
         raise last_error
-    return False
+    return []
 
 
 async def copy_message_group(
@@ -326,40 +346,57 @@ async def copy_message_group(
     destination_peer: Any,
     messages: list[Any],
     settings: dict[str, Any],
-) -> int:
+) -> tuple[int, list[int]]:
     if contains_blocked_keyword(messages, settings):
-        return 0
+        return 0, []
 
     text = build_html_text(messages, settings)
     message_ids = [int(message.id) for message in messages]
     resume = settings.get("resume_partial") or {}
     resume_ids = [int(value) for value in resume.get("message_ids") or []]
+    resume_destination_ids = [
+        int(value) for value in resume.get("destination_message_ids") or []
+    ]
     if resume.get("stage") == "text_after_media" and resume_ids == message_ids:
         try:
-            return len(messages) if await send_text_with_retry(client, destination_peer, text) else 0
+            text_ids = await send_text_with_retry(client, destination_peer, text)
+            return (len(messages), [*resume_destination_ids, *text_ids]) if text_ids else (0, resume_destination_ids)
         except Exception as exc:
-            raise PartialCopyError(str(exc), message_ids, "text_after_media") from exc
+            raise PartialCopyError(
+                str(exc),
+                message_ids,
+                "text_after_media",
+                resume_destination_ids,
+            ) from exc
 
     if settings.get("copy_mode") == "text_only":
-        return len(messages) if await send_text(client, destination_peer, text) else 0
+        destination_ids = await send_text(client, destination_peer, text)
+        return (len(messages), destination_ids) if destination_ids else (0, [])
 
     media = [message.media for message in messages if has_file_media(message)]
     if not media:
-        return len(messages) if await send_text(client, destination_peer, text) else 0
+        destination_ids = await send_text(client, destination_peer, text)
+        return (len(messages), destination_ids) if destination_ids else (0, [])
 
     caption = text if text and visible_text_length(text) <= 1000 else None
-    await client.send_file(
+    sent_media = await client.send_file(
         destination_peer,
         media if len(media) > 1 else media[0],
         caption=caption,
         parse_mode="html",
     )
+    destination_ids = sent_message_ids(sent_media)
     if text and caption is None:
         try:
-            await send_text_with_retry(client, destination_peer, text)
+            destination_ids.extend(await send_text_with_retry(client, destination_peer, text))
         except Exception as exc:
-            raise PartialCopyError(str(exc), message_ids, "text_after_media") from exc
-    return len(messages)
+            raise PartialCopyError(
+                str(exc),
+                message_ids,
+                "text_after_media",
+                destination_ids,
+            ) from exc
+    return len(messages), destination_ids
 
 
 async def copy_message_groups(
@@ -372,15 +409,22 @@ async def copy_message_groups(
     failed: list[dict[str, Any]] = []
     last_processed_id: int | None = None
     partial_delivery: dict[str, Any] | None = None
+    copied_groups: list[dict[str, Any]] = []
 
     for message_group in group_messages(messages):
         try:
-            copied_count += await copy_message_group(
+            group_count, destination_ids = await copy_message_group(
                 client,
                 destination_peer,
                 message_group,
                 settings,
             )
+            copied_count += group_count
+            if destination_ids:
+                copied_groups.append({
+                    "source_message_ids": [int(message.id) for message in message_group],
+                    "destination_message_ids": destination_ids,
+                })
             last_processed_id = max(int(message.id) for message in message_group)
         except PartialCopyError as exc:
             failed.append({
@@ -390,6 +434,7 @@ async def copy_message_groups(
             partial_delivery = {
                 "message_ids": exc.message_ids,
                 "stage": exc.stage,
+                "destination_message_ids": exc.destination_message_ids,
             }
             break
         except Exception as exc:
@@ -407,6 +452,12 @@ async def copy_message_groups(
         "failed": failed,
         "last_processed_id": last_processed_id,
         "partial_delivery": partial_delivery,
+        "copied_groups": copied_groups,
+        "destination_message_ids": [
+            message_id
+            for group in copied_groups
+            for message_id in group["destination_message_ids"]
+        ],
     }
 
 
@@ -665,6 +716,81 @@ async def process_request(request: dict[str, Any]) -> dict[str, Any]:
             await client.disconnect()
 
 
+def request_cache_key(request: dict[str, Any]) -> str | None:
+    if request.get("action") != "copy_messages":
+        return None
+
+    payload = request.get("payload") or {}
+    request_id = str(payload.get("request_id") or "")
+    if not re.fullmatch(r"[a-f0-9]{64}", request_id):
+        return None
+
+    return f"{request.get('account_key')}:{request_id}"
+
+
+def prune_request_results(now: float | None = None) -> None:
+    current = time.monotonic() if now is None else now
+    expired = [key for key, (expires_at, _) in request_results.items() if expires_at <= current]
+    for key in expired:
+        request_results.pop(key, None)
+
+    limit = max(1, REQUEST_CACHE_LIMIT)
+    while len(request_results) >= limit:
+        oldest_key = min(request_results, key=lambda key: request_results[key][0])
+        request_results.pop(oldest_key, None)
+
+
+async def execute_request(request: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return await process_request(request)
+    except Exception as exc:
+        return {"ok": False, "error": public_error_message(exc)}
+
+
+def should_cache_request_result(response: dict[str, Any]) -> bool:
+    if not response.get("ok"):
+        return False
+
+    partial_delivery = response.get("partial_delivery") or {}
+
+    return (
+        bool(response.get("destination_message_ids"))
+        or bool(partial_delivery.get("destination_message_ids"))
+        or response.get("last_processed_id") is not None
+    )
+
+
+async def process_request_idempotently(request: dict[str, Any]) -> dict[str, Any]:
+    cache_key = request_cache_key(request)
+    if cache_key is None:
+        return await execute_request(request)
+
+    now = time.monotonic()
+    prune_request_results(now)
+    cached = request_results.get(cache_key)
+    if cached is not None:
+        return cached[1]
+
+    task = request_tasks.get(cache_key)
+    if task is None:
+        task = asyncio.create_task(execute_request(request))
+        request_tasks[cache_key] = task
+
+    try:
+        response = await asyncio.shield(task)
+    finally:
+        if task.done() and not task.cancelled():
+            request_tasks.pop(cache_key, None)
+            result = task.result()
+            if should_cache_request_result(result):
+                request_results[cache_key] = (
+                    time.monotonic() + max(1, REQUEST_CACHE_TTL_SECONDS),
+                    result,
+                )
+
+    return response
+
+
 async def cleanup_qr_flows() -> None:
     while True:
         await asyncio.sleep(15)
@@ -680,7 +806,7 @@ async def handle_connection(reader: asyncio.StreamReader, writer: asyncio.Stream
         if not raw:
             return
         request = json.loads(raw.decode("utf-8"))
-        response = await process_request(request)
+        response = await process_request_idempotently(request)
     except Exception as exc:
         response = {"ok": False, "error": public_error_message(exc)}
 

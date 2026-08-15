@@ -3,12 +3,21 @@
 namespace App\Services;
 
 use App\Models\BettingSetting;
+use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 class BetOddsService
 {
     /** @var array<string, array{body:?string,http_status:?int,error:?string}> */
     private array $responses = [];
+
+    private readonly PublicUrlGuard $urlGuard;
+
+    public function __construct(?PublicUrlGuard $urlGuard = null)
+    {
+        $this->urlGuard = $urlGuard ?? new PublicUrlGuard;
+    }
 
     public function lookup(array $bet, BettingSetting $settings): array
     {
@@ -44,18 +53,7 @@ class BetOddsService
 
     public function inspect(?string $url, array $bet): array
     {
-        $empty = [
-            'odds' => null,
-            'event_found' => false,
-            'event_id' => null,
-            'tournament' => null,
-            'starts_at' => null,
-            'score' => null,
-            'finished' => false,
-            'http_status' => null,
-            'error' => null,
-        ];
-
+        $empty = $this->emptyResult();
         if (! $url) {
             return $empty;
         }
@@ -75,9 +73,131 @@ class BetOddsService
             ]);
         }
 
-        return array_replace($empty, $this->extract($source['body'], $bet), [
-            'http_status' => $source['http_status'],
-        ]);
+        $extracted = $this->extract($source['body'], $bet);
+        if ($extracted === []) {
+            $extracted['error'] = 'Источник не предоставил структурированные данные для точного сопоставления события.';
+        }
+
+        return array_replace($empty, $extracted, ['http_status' => $source['http_status']]);
+    }
+
+    /** @return array<string, mixed> */
+    public function extract(string $body, array $bet): array
+    {
+        $home = trim((string) ($bet['home_team'] ?? ''));
+        $away = trim((string) ($bet['away_team'] ?? ''));
+        if ($home === '' || $away === '') {
+            return [];
+        }
+
+        $matches = [];
+        foreach ($this->jsonDocuments($body) as $document) {
+            foreach ($this->objects($document) as $object) {
+                if ($this->matchesTeams($object, $home, $away)) {
+                    $identity = $this->stringOrNull($this->first($object, [
+                        'event_id', 'eventId', 'id', 'matchId',
+                    ]));
+                    $key = $identity !== null
+                        ? 'id:'.$identity
+                        : 'object:'.hash('sha256', json_encode($object, JSON_THROW_ON_ERROR));
+                    $matches[$key] = $object;
+                }
+            }
+        }
+
+        $matches = $this->narrowMatches(array_values($matches), $bet);
+        if (count($matches) !== 1) {
+            return [];
+        }
+
+        $object = $matches[0];
+        $status = mb_strtolower(trim((string) $this->first($object, [
+            'status', 'state', 'eventStatus', 'match_status',
+        ])));
+        $finished = in_array($status, [
+            'finished', 'final', 'full_time', 'full time', 'ended', 'complete', 'completed', 'ft',
+        ], true);
+        $score = $finished ? $this->structuredScore($object) : null;
+
+        return [
+            'event_found' => true,
+            'odds' => $this->structuredOdds($object, (string) ($bet['market'] ?? '')),
+            'event_id' => $this->stringOrNull($this->first($object, ['event_id', 'eventId', 'id', 'matchId'])),
+            'tournament' => $this->nestedString($object, ['tournament', 'league', 'leagueName', 'competition']),
+            'starts_at' => $this->stringOrNull($this->first($object, [
+                'starts_at', 'startsAt', 'startTime', 'start_time', 'date', 'scheduled',
+            ])),
+            'score' => $score,
+            'finished' => $finished && $score !== null,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $matches
+     * @param  array<string, mixed>  $bet
+     * @return array<int, array<string, mixed>>
+     */
+    private function narrowMatches(array $matches, array $bet): array
+    {
+        $externalId = $this->stringOrNull($bet['external_event_id'] ?? null);
+        if ($externalId !== null) {
+            $matches = array_values(array_filter(
+                $matches,
+                fn (array $object): bool => $this->stringOrNull($this->first(
+                    $object,
+                    ['event_id', 'eventId', 'id', 'matchId'],
+                )) === $externalId,
+            ));
+        }
+
+        $startsAt = $this->stringOrNull($bet['starts_at'] ?? null);
+        if ($startsAt !== null) {
+            $hasDatedMatch = false;
+            $dated = array_values(array_filter($matches, function (array $object) use ($startsAt, &$hasDatedMatch): bool {
+                $candidate = $this->stringOrNull($this->first($object, [
+                    'starts_at', 'startsAt', 'startTime', 'start_time', 'date', 'scheduled',
+                ]));
+                $hasDatedMatch = $hasDatedMatch || $candidate !== null;
+
+                return $candidate !== null && $this->sameInstant($candidate, $startsAt);
+            }));
+            if ($hasDatedMatch) {
+                $matches = $dated;
+            }
+        }
+
+        $tournament = $this->stringOrNull($bet['tournament'] ?? null);
+        if ($tournament !== null) {
+            $hasTournamentMatch = false;
+            $tournaments = array_values(array_filter($matches, function (array $object) use ($tournament, &$hasTournamentMatch): bool {
+                $candidate = $this->nestedString(
+                    $object,
+                    ['tournament', 'league', 'leagueName', 'competition'],
+                );
+                $hasTournamentMatch = $hasTournamentMatch || $candidate !== null;
+
+                return $candidate !== null
+                    && $this->normalize($candidate) === $this->normalize($tournament);
+            }));
+            if ($hasTournamentMatch) {
+                $matches = $tournaments;
+            }
+        }
+
+        return $matches;
+    }
+
+    private function sameInstant(string $left, string $right): bool
+    {
+        try {
+            return abs(
+                CarbonImmutable::parse($left)->getTimestamp()
+                - CarbonImmutable::parse($right)->getTimestamp(),
+            ) <= 300;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function accessBlocked(string $body): bool
@@ -92,16 +212,91 @@ class BetOddsService
             return $this->responses[$url];
         }
 
+        $current = $url;
         try {
-            $response = Http::timeout(20)->retry(1, 250, throw: false)->withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (compatible; SkyGuardian/1.0)',
-                'Accept' => 'text/html,application/json;q=0.9,*/*;q=0.8',
-                'Accept-Language' => 'uk,ru;q=0.9,en;q=0.8',
-            ])->get($url);
+            for ($redirect = 0; $redirect <= 3; $redirect++) {
+                $target = $this->urlGuard->inspect($current);
+                if (! defined('CURLOPT_RESOLVE')) {
+                    throw new \RuntimeException('Безопасная загрузка внешнего источника требует PHP cURL.');
+                }
+                $request = Http::connectTimeout(4)
+                    ->timeout(12)
+                    ->withoutRedirecting()
+                    ->withHeaders([
+                        'User-Agent' => 'SkyGuardian/1.0 (+structured odds lookup)',
+                        'Accept' => 'application/json,text/html;q=0.8,*/*;q=0.5',
+                        'Accept-Language' => 'uk,ru;q=0.9,en;q=0.8',
+                    ]);
 
-            return $this->responses[$url] = $response->successful()
-                ? ['body' => $response->body(), 'http_status' => $response->status(), 'error' => null]
-                : ['body' => null, 'http_status' => $response->status(), 'error' => 'Источник вернул HTTP '.$response->status().'.'];
+                $pinnedIp = str_contains($target['ips'][0], ':')
+                    ? '['.$target['ips'][0].']'
+                    : $target['ips'][0];
+                $curlOptions = [];
+                if (filter_var($target['host'], FILTER_VALIDATE_IP) === false) {
+                    $curlOptions[constant('CURLOPT_RESOLVE')] = [
+                        $target['host'].':'.$target['port'].':'.$pinnedIp,
+                    ];
+                }
+                if (defined('CURLOPT_NOPROGRESS') && defined('CURLOPT_XFERINFOFUNCTION')) {
+                    $curlOptions[constant('CURLOPT_NOPROGRESS')] = false;
+                    $curlOptions[constant('CURLOPT_XFERINFOFUNCTION')] = static function (
+                        mixed $handle,
+                        mixed $downloadTotal,
+                        mixed $downloaded,
+                    ): int {
+                        return (int) $downloaded > 2_000_000 || (int) $downloadTotal > 2_000_000 ? 1 : 0;
+                    };
+                }
+                $request = $request->withOptions([
+                    'curl' => $curlOptions,
+                ]);
+
+                $response = $request->get($current);
+                if ($response->redirect()) {
+                    $location = $response->header('Location');
+                    if (! is_string($location) || trim($location) === '') {
+                        break;
+                    }
+                    $current = $this->redirectUrl($current, $location);
+
+                    continue;
+                }
+
+                if (! $response->successful()) {
+                    return $this->responses[$url] = [
+                        'body' => null,
+                        'http_status' => $response->status(),
+                        'error' => 'Источник вернул HTTP '.$response->status().'.',
+                    ];
+                }
+
+                $body = $response->body();
+                if (strlen($body) > 2_000_000) {
+                    return $this->responses[$url] = [
+                        'body' => null,
+                        'http_status' => $response->status(),
+                        'error' => 'Ответ источника превышает допустимые 2 МБ.',
+                    ];
+                }
+
+                return $this->responses[$url] = [
+                    'body' => $body,
+                    'http_status' => $response->status(),
+                    'error' => null,
+                ];
+            }
+
+            return $this->responses[$url] = [
+                'body' => null,
+                'http_status' => null,
+                'error' => 'Источник выполнил слишком много перенаправлений.',
+            ];
+        } catch (ConnectionException $e) {
+            return $this->responses[$url] = [
+                'body' => null,
+                'http_status' => null,
+                'error' => 'Не удалось подключиться к источнику: '.mb_substr($e->getMessage(), 0, 300),
+            ];
         } catch (\Throwable $e) {
             return $this->responses[$url] = [
                 'body' => null,
@@ -111,57 +306,117 @@ class BetOddsService
         }
     }
 
-    /** @return array<string, mixed> */
-    public function extract(string $body, array $bet): array
+    /** @return array<int, mixed> */
+    private function jsonDocuments(string $body): array
     {
-        $text = preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($body))) ?? '';
-        $window = $this->eventWindow($text, (string) ($bet['home_team'] ?? ''), (string) ($bet['away_team'] ?? ''));
-        if ($window === null) {
-            return [];
-        }
-
-        $odds = null;
-        foreach ($this->marketLabels((string) ($bet['market'] ?? '')) as $label) {
-            $quoted = preg_quote($label, '/');
-            $quoted = str_replace(['\\ ', '\\.'], ['\\s*', '[.,]'], $quoted);
-            if (preg_match('/'.$quoted.'.{0,100}?([1-9]\d?[.,]\d{1,3})/iu', $window, $match)) {
-                $odds = (float) str_replace(',', '.', $match[1]);
-                break;
+        $documents = [];
+        $trimmed = trim($body);
+        if ($trimmed !== '' && in_array($trimmed[0], ['{', '['], true)) {
+            $decoded = json_decode($trimmed, true);
+            if (is_array($decoded)) {
+                $documents[] = $decoded;
             }
         }
 
-        $finished = preg_match('/(?:завершен(?:о|ий)?|окончен(?:о)?|finished|full\s*time|\bFT\b|final)/iu', $window) === 1;
-        $score = $finished ? $this->score($window, (string) $bet['home_team'], (string) $bet['away_team']) : null;
+        if (preg_match_all('~<script\b[^>]*type=["\']application/(?:ld\+)?json["\'][^>]*>(.*?)</script>~isu', $body, $matches)) {
+            foreach ($matches[1] as $json) {
+                $decoded = json_decode(html_entity_decode(trim($json), ENT_QUOTES | ENT_HTML5, 'UTF-8'), true);
+                if (is_array($decoded)) {
+                    $documents[] = $decoded;
+                }
+            }
+        }
 
-        preg_match('/(?:event[_-]?id|data-event-id)["\s:=]+([A-Za-z0-9_-]{3,100})/iu', $window, $eventMatch);
-        preg_match('/(?:tournament|league)(?:Name|_name|-name)?["\s:=]+["\']?([^"\'\}\],]{2,120})/iu', $window, $tournamentMatch);
-        preg_match('/\b(20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\b/u', $window, $startsMatch);
-
-        return [
-            'event_found' => true,
-            'odds' => $odds,
-            'event_id' => $eventMatch[1] ?? null,
-            'tournament' => isset($tournamentMatch[1]) ? trim($tournamentMatch[1]) : null,
-            'starts_at' => $startsMatch[1] ?? null,
-            'score' => $score,
-            'finished' => $finished,
-        ];
+        return $documents;
     }
 
-    private function eventWindow(string $text, string $home, string $away): ?string
+    /** @return array<int, array<string, mixed>> */
+    private function objects(mixed $value): array
     {
-        if ($home === '' || $away === '') {
-            return null;
-        }
-        $homePosition = mb_stripos($text, $home);
-        $awayPosition = mb_stripos($text, $away);
-        if ($homePosition === false || $awayPosition === false || abs($homePosition - $awayPosition) > 5000) {
-            return null;
+        if (! is_array($value)) {
+            return [];
         }
 
-        $start = max(0, min($homePosition, $awayPosition) - 700);
+        $objects = array_is_list($value) ? [] : [$value];
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                $objects = array_merge($objects, $this->objects($item));
+            }
+        }
 
-        return mb_substr($text, $start, 7000);
+        return $objects;
+    }
+
+    private function matchesTeams(array $object, string $home, string $away): bool
+    {
+        $candidateHome = $this->nestedString($object, ['home_team', 'homeTeam', 'home', 'team1']);
+        $candidateAway = $this->nestedString($object, ['away_team', 'awayTeam', 'away', 'team2']);
+
+        return $candidateHome !== null
+            && $candidateAway !== null
+            && $this->normalize($candidateHome) === $this->normalize($home)
+            && $this->normalize($candidateAway) === $this->normalize($away);
+    }
+
+    private function structuredOdds(array $object, string $market): ?float
+    {
+        $wanted = collect($this->marketLabels($market))->map($this->normalize(...))->all();
+        foreach ($this->objects($object['markets'] ?? $object['odds'] ?? []) as $candidate) {
+            $label = $this->nestedString($candidate, ['market', 'label', 'name', 'title', 'selection']);
+            $value = $this->first($candidate, ['odds', 'price', 'value', 'coefficient']);
+            if ($label !== null && is_numeric($value) && in_array($this->normalize($label), $wanted, true)) {
+                $odds = (float) $value;
+
+                return $odds > 1 && $odds < 10000 ? $odds : null;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array{0:int,1:int}|null */
+    private function structuredScore(array $object): ?array
+    {
+        $score = $object['score'] ?? $object['result'] ?? null;
+        $home = is_array($score) ? $this->first($score, ['home', 'homeScore', 'team1']) : null;
+        $away = is_array($score) ? $this->first($score, ['away', 'awayScore', 'team2']) : null;
+        $home ??= $this->first($object, ['home_score', 'homeScore']);
+        $away ??= $this->first($object, ['away_score', 'awayScore']);
+
+        return is_numeric($home) && is_numeric($away)
+            ? [(int) $home, (int) $away]
+            : null;
+    }
+
+    private function nestedString(array $object, array $keys): ?string
+    {
+        $value = $this->first($object, $keys);
+        if (is_array($value)) {
+            $value = $this->first($value, ['name', 'title', 'label']);
+        }
+
+        return $this->stringOrNull($value);
+    }
+
+    private function first(array $object, array $keys): mixed
+    {
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $object)) {
+                return $object[$key];
+            }
+        }
+
+        return null;
+    }
+
+    private function stringOrNull(mixed $value): ?string
+    {
+        return is_scalar($value) && trim((string) $value) !== '' ? trim((string) $value) : null;
+    }
+
+    private function normalize(string $value): string
+    {
+        return mb_strtolower(trim(preg_replace('/[^\p{L}\p{N}+.\-]+/u', ' ', $value) ?? $value));
     }
 
     /** @return list<string> */
@@ -191,22 +446,37 @@ class BetOddsService
         };
     }
 
-    /** @return array{0:int, 1:int}|null */
-    private function score(string $window, string $home, string $away): ?array
+    private function redirectUrl(string $base, string $location): string
     {
-        $home = preg_quote($home, '/');
-        $away = preg_quote($away, '/');
-        foreach ([
-            '/'.$home.'.{0,250}?(\d{1,2})\s*[:\-]\s*(\d{1,2}).{0,250}?'.$away.'/isu',
-            '/'.$away.'.{0,250}?(\d{1,2})\s*[:\-]\s*(\d{1,2}).{0,250}?'.$home.'/isu',
-        ] as $index => $pattern) {
-            if (preg_match($pattern, $window, $match)) {
-                return $index === 0
-                    ? [(int) $match[1], (int) $match[2]]
-                    : [(int) $match[2], (int) $match[1]];
-            }
+        if (filter_var($location, FILTER_VALIDATE_URL) !== false) {
+            return $location;
         }
 
-        return null;
+        $parts = parse_url($base);
+        $origin = ($parts['scheme'] ?? 'https').'://'.($parts['host'] ?? '')
+            .(isset($parts['port']) ? ':'.$parts['port'] : '');
+        if (str_starts_with($location, '/')) {
+            return $origin.$location;
+        }
+
+        $directory = preg_replace('~/[^/]*$~', '/', (string) ($parts['path'] ?? '/')) ?: '/';
+
+        return $origin.$directory.$location;
+    }
+
+    /** @return array<string,mixed> */
+    private function emptyResult(): array
+    {
+        return [
+            'odds' => null,
+            'event_found' => false,
+            'event_id' => null,
+            'tournament' => null,
+            'starts_at' => null,
+            'score' => null,
+            'finished' => false,
+            'http_status' => null,
+            'error' => null,
+        ];
     }
 }

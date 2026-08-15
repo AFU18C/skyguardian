@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -168,6 +169,10 @@ class GroupChannelPublicationController extends Controller
         GroupChannelPublication $publication,
     ): RedirectResponse {
         $this->ensurePublicationBelongsToBot($groupChannelBot, $publication);
+        abort_if(in_array($publication->status, [
+            GroupChannelPublication::STATUS_SENDING,
+            GroupChannelPublication::STATUS_UNCERTAIN,
+        ], true), 409, 'Сначала завершите проверку неопределённой отправки.');
 
         foreach ($publication->media_paths ?? [] as $media) {
             $path = is_array($media) ? ($media['path'] ?? null) : $media;
@@ -182,6 +187,62 @@ class GroupChannelPublicationController extends Controller
             'type' => 'success',
             'title' => 'Удалено',
             'message' => 'Публикация удалена из SkyGuardian.',
+        ]);
+    }
+
+    public function resolve(
+        Request $request,
+        GroupChannelBot $groupChannelBot,
+        GroupChannelPublication $publication,
+    ): RedirectResponse {
+        $this->ensurePublicationBelongsToBot($groupChannelBot, $publication);
+        abort_unless($publication->status === GroupChannelPublication::STATUS_UNCERTAIN, 409);
+        $data = $request->validate([
+            'resolution' => ['required', Rule::in(['sent', 'retry'])],
+            'telegram_message_id' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        if ($data['resolution'] === 'sent') {
+            $messageIds = array_values(array_filter(array_map(
+                'strval',
+                $publication->telegram_message_ids ?? [],
+            )));
+            if ($messageIds === [] && ! isset($data['telegram_message_id'])) {
+                throw ValidationException::withMessages([
+                    'telegram_message_id' => 'Укажите ID опубликованного сообщения Telegram.',
+                ]);
+            }
+            if ($messageIds === []) {
+                $messageIds = [(string) $data['telegram_message_id']];
+            }
+            $sentAt = now();
+            $publication->update([
+                'status' => GroupChannelPublication::STATUS_SENT,
+                'sending_started_at' => null,
+                'sent_at' => $sentAt,
+                'delete_at' => $publication->delete_after_minutes
+                    ? $sentAt->copy()->addMinutes($publication->delete_after_minutes)
+                    : null,
+                'telegram_message_id' => $messageIds[0],
+                'telegram_message_ids' => $messageIds,
+                'last_error' => null,
+            ]);
+        } else {
+            $publication->update([
+                'status' => GroupChannelPublication::STATUS_DRAFT,
+                'sending_started_at' => null,
+                'telegram_message_id' => null,
+                'telegram_message_ids' => null,
+                'last_error' => 'Повтор разрешён администратором после проверки канала.',
+            ]);
+        }
+
+        return back()->with('toast', [
+            'type' => 'success',
+            'title' => 'Неопределённая отправка обработана',
+            'message' => $data['resolution'] === 'sent'
+                ? 'Публикация отмечена как отправленная.'
+                : 'Публикация возвращена в черновики для ручного повтора.',
         ]);
     }
 
@@ -201,6 +262,12 @@ class GroupChannelPublicationController extends Controller
         $type = $data['type'];
         $files = $request->file('media', []);
         $text = trim((string) ($data['text'] ?? ''));
+        $totalBytes = collect($files)->sum(fn ($file): int => max(0, (int) $file->getSize()));
+        $maximumBytes = max(1, (int) config('skyguardian.media.telegram_upload_max_megabytes', 50)) * 1024 * 1024;
+
+        if ($totalBytes > $maximumBytes) {
+            throw new RuntimeException('Общий размер медиа одной публикации не может превышать '.(int) ($maximumBytes / 1024 / 1024).' МБ.');
+        }
 
         if ($type === GroupChannelPublication::TYPE_TEXT && $text === '') {
             throw new RuntimeException('Введите текст публикации.');
@@ -225,6 +292,26 @@ class GroupChannelPublicationController extends Controller
 
         if ($type === GroupChannelPublication::TYPE_ALBUM && (count($files) < 2 || count($files) > 10)) {
             throw new RuntimeException('Альбом должен содержать от 2 до 10 файлов.');
+        }
+
+        if ($type === GroupChannelPublication::TYPE_PHOTO
+            && collect($files)->contains(fn ($file): bool => ! in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'], true))) {
+            throw new RuntimeException('Для фото разрешены только JPEG, PNG и WebP.');
+        }
+
+        if ($type === GroupChannelPublication::TYPE_ALBUM
+            && collect($files)->contains(function ($file): bool {
+                $mime = (string) $file->getMimeType();
+
+                return ! in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)
+                    && ! str_starts_with($mime, 'video/');
+            })) {
+            throw new RuntimeException('Альбом может содержать только JPEG, PNG, WebP и видео.');
+        }
+
+        if ($type === GroupChannelPublication::TYPE_VIDEO
+            && collect($files)->contains(fn ($file): bool => ! str_starts_with((string) $file->getMimeType(), 'video/'))) {
+            throw new RuntimeException('Для видеопубликации выберите видеофайл.');
         }
 
         if ($type === GroupChannelPublication::TYPE_POLL) {

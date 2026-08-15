@@ -93,7 +93,23 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
                 );
 
                 return $result;
-            } catch (Throwable) {
+            } catch (Throwable $error) {
+                if ($this->messageWasAlreadyUpdated($error)) {
+                    $this->remember(
+                        $cacheKey,
+                        $messageId,
+                        $time,
+                        $startedAt,
+                        $regions,
+                        $allRegions,
+                        $details,
+                    );
+
+                    return ['message_id' => $messageId];
+                }
+                if (! $this->canReplaceAfterEditFailure($error)) {
+                    throw $error;
+                }
                 // Telegram may refuse editing an old or deleted post. Send a new one instead.
             }
         }
@@ -186,7 +202,23 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
                 );
 
                 return $result;
-            } catch (Throwable) {
+            } catch (Throwable $error) {
+                if ($this->messageWasAlreadyUpdated($error)) {
+                    $this->remember(
+                        $cacheKey,
+                        $messageId,
+                        $startTime ?? $alert['time'],
+                        $startedAt ?? $this->startedAt($alert['time'])->toIso8601String(),
+                        $activeRegions,
+                        $allRegions,
+                        (array) ($cached['details'] ?? []),
+                    );
+
+                    return ['message_id' => $messageId];
+                }
+                if (! $this->canReplaceAfterEditFailure($error)) {
+                    throw $error;
+                }
                 $result = parent::request($bot, 'sendMessage', [
                     ...$payload,
                     'text' => $text,
@@ -235,15 +267,38 @@ class GroupedAlertTelegramService extends GroupChannelTelegramService
             Cache::forget($cacheKey);
 
             return $result;
-        } catch (Throwable) {
-            Cache::forget($cacheKey);
+        } catch (Throwable $error) {
+            if ($this->messageWasAlreadyUpdated($error)) {
+                Cache::forget($cacheKey);
 
+                return ['message_id' => $messageId];
+            }
+            if (! $this->canReplaceAfterEditFailure($error)) {
+                throw $error;
+            }
+
+            Cache::forget($cacheKey);
             return parent::request($bot, 'sendMessage', [
                 ...$payload,
                 'text' => $text,
                 'parse_mode' => 'HTML',
             ]);
         }
+    }
+
+    private function messageWasAlreadyUpdated(Throwable $error): bool
+    {
+        return str_contains(mb_strtolower($error->getMessage()), 'message is not modified');
+    }
+
+    private function canReplaceAfterEditFailure(Throwable $error): bool
+    {
+        $message = mb_strtolower($error->getMessage());
+
+        return str_contains($message, 'message to edit not found')
+            || str_contains($message, "message can't be edited")
+            || str_contains($message, 'message_id_invalid')
+            || str_contains($message, 'there is no text in the message to edit');
     }
 
     /**

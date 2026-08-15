@@ -18,7 +18,7 @@
                 {{ match($bet->result) {'win' => 'Выигрыш', 'loss' => 'Проигрыш', 'refund' => 'Возврат', default => 'Ожидает'} }}
             </span>
         @else
-            <span class="bet-ai-score">AI <b>{{ $bet->ai_score }}%</b></span>
+            <span class="bet-ai-score">Качество <b>{{ $bet->ai_score }}%</b></span>
         @endif
     </div>
 
@@ -42,6 +42,24 @@
                 </span>
             @endforeach
         </div>
+        @if($bet->status === \App\Models\Bet::STATUS_PUBLICATION_UNCERTAIN)
+            <div class="sg-notice sg-notice-warning bet-manual-result-note">
+                <strong>Telegram не подтвердил отправку.</strong> {{ $bet->publication_error }} Сначала проверьте канал; автоматический повтор заблокирован.
+            </div>
+            <div class="bet-card-actions">
+                <form method="POST" action="{{ route('admin.betting.resolve-publication', $bet) }}">
+                    @csrf
+                    <input type="hidden" name="resolution" value="published">
+                    <label><span>ID сообщения в Telegram</span><input type="number" name="telegram_message_id" min="1" value="{{ $bet->telegram_message_id }}" required></label>
+                    <button class="sg-button sg-button-primary sg-button-small" type="submit">Подтвердить публикацию</button>
+                </form>
+                <form method="POST" action="{{ route('admin.betting.resolve-publication', $bet) }}" data-confirm="Вы проверили канал и уверены, что ставка не опубликована?">
+                    @csrf
+                    <input type="hidden" name="resolution" value="retry">
+                    <button class="sg-button sg-button-secondary sg-button-small" type="submit">Разрешить повтор</button>
+                </form>
+            </div>
+        @else
         <div class="bet-card-actions">
             <form class="bet-approve-form" method="POST" action="{{ route('admin.betting.approve', $bet) }}">@csrf
                 <label><span>Коэффициент публикации</span><input type="number" name="selected_odds" min="1.001" max="9999" step="0.001" value="{{ $bet->selected_odds ?: $bet->primary_odds ?: $bet->reserve_odds }}" placeholder="Укажите свой"></label>
@@ -59,15 +77,16 @@
                     <label class="sg-field"><span>Дата и время</span><input type="datetime-local" name="starts_at" value="{{ optional($bet->starts_at)->format('Y-m-d\TH:i') }}"></label>
                     <label class="sg-field"><span>Ставка</span><input name="market" value="{{ $bet->market }}" required></label>
                     <label class="sg-field"><span>Свой коэффициент</span><input type="number" name="selected_odds" min="1.001" step="0.001" value="{{ $bet->selected_odds }}"></label>
-                    <label class="sg-field"><span>Оценка AI, %</span><input type="number" name="ai_score" min="1" max="100" value="{{ $bet->ai_score }}" required></label>
+                    <label class="sg-field"><span>Оценка качества, %</span><input type="number" name="ai_score" min="1" max="100" value="{{ $bet->ai_score }}" required></label>
                     <label class="sg-field sg-field-wide"><span>Свой текст публикации (необязательно)</span><textarea name="publication_text" rows="4" placeholder="Если поле пустое, бот сформирует сообщение автоматически">{{ $bet->publication_text }}</textarea></label>
                 </div>
                 <button class="sg-button sg-button-secondary sg-button-small" type="submit">Сохранить изменения</button>
             </form>
         </details>
+        @endif
     @else
         <div class="bet-published-summary"><span>Коэффициент: <b>{{ number_format((float) $bet->selected_odds, 2) }}</b></span><span>Источник: <b>{{ $bet->selected_odds_source ?: '—' }}</b></span>@if($bet->result_sent_at)<span>Результат отправлен {{ $bet->result_sent_at->format('d.m.Y H:i') }}</span>@endif</div>
-        <form class="bet-check-result" method="POST" action="{{ route('admin.betting.check-result', $bet) }}">@csrf<button class="sg-button sg-button-secondary sg-button-small" type="submit">⌕ Проверить результат</button></form>
+        <div class="sg-notice sg-notice-warning bet-manual-result-note">Результат устанавливается администратором вручную по официальному источнику. Автоматическое определение отключено.</div>
         <details class="bet-details"><summary>Редактировать ставку и результат</summary>
             <form class="sg-form bet-edit-form" method="POST" action="{{ route('admin.betting.update', $bet) }}">@csrf @method('PUT')
                 <div class="sg-form-grid">
@@ -76,14 +95,31 @@
                     <label class="sg-field"><span>Дата и время</span><input type="datetime-local" name="starts_at" value="{{ optional($bet->starts_at)->format('Y-m-d\TH:i') }}"></label>
                     <label class="sg-field"><span>Ставка</span><input name="market" value="{{ $bet->market }}" required></label>
                     <label class="sg-field"><span>Коэффициент</span><input type="number" name="selected_odds" min="1.001" step="0.001" value="{{ $bet->selected_odds }}"></label>
-                    <label class="sg-field"><span>Оценка AI, %</span><input type="number" name="ai_score" min="1" max="100" value="{{ $bet->ai_score }}" required></label>
+                    <label class="sg-field"><span>Оценка качества, %</span><input type="number" name="ai_score" min="1" max="100" value="{{ $bet->ai_score }}" required></label>
                     <label class="sg-field sg-field-wide"><span>Текст публикации</span><textarea name="publication_text" rows="4">{{ $bet->publication_text }}</textarea></label>
                     <label class="sg-field"><span>Результат</span><select name="result"><option value="pending" @selected($bet->result === 'pending')>Ожидает</option><option value="win" @selected($bet->result === 'win')>Выигрыш</option><option value="loss" @selected($bet->result === 'loss')>Проигрыш</option><option value="refund" @selected($bet->result === 'refund')>Возврат</option></select></label>
                     <label class="sg-field"><span>Комментарий к результату</span><input name="result_note" value="{{ $bet->result_note }}"></label>
                 </div>
                 <button class="sg-button sg-button-secondary sg-button-small" type="submit">Сохранить изменения</button>
             </form>
-            @if(in_array($bet->result, ['win', 'loss', 'refund'], true))
+            @if($bet->result_publication_status === \App\Models\Bet::RESULT_PUBLICATION_UNCERTAIN)
+                <div class="sg-notice sg-notice-warning bet-manual-result-note">
+                    <strong>Telegram не подтвердил результат.</strong> {{ $bet->result_publication_error }} Сначала проверьте канал; автоматический повтор заблокирован.
+                </div>
+                <div class="bet-card-actions">
+                    <form method="POST" action="{{ route('admin.betting.resolve-result-publication', $bet) }}">
+                        @csrf
+                        <input type="hidden" name="resolution" value="sent">
+                        <label><span>ID сообщения с результатом</span><input type="number" name="telegram_message_id" min="1" value="{{ $bet->result_message_id }}" required></label>
+                        <button class="sg-button sg-button-primary sg-button-small" type="submit">Подтвердить отправку</button>
+                    </form>
+                    <form method="POST" action="{{ route('admin.betting.resolve-result-publication', $bet) }}" data-confirm="Вы проверили канал и уверены, что результат не опубликован?">
+                        @csrf
+                        <input type="hidden" name="resolution" value="retry">
+                        <button class="sg-button sg-button-secondary sg-button-small" type="submit">Разрешить повтор</button>
+                    </form>
+                </div>
+            @elseif(in_array($bet->result, ['win', 'loss', 'refund'], true) && !$bet->result_sent_at)
                 <form class="bet-result-form" method="POST" action="{{ route('admin.betting.send-result', $bet) }}">@csrf
                     <label class="sg-field"><span>Канал результата</span><select name="publication_bot_id"><option value="">Канал ставки</option>@foreach($bots as $bot)<option value="{{ $bot->id }}">{{ $bot->group_name }}</option>@endforeach</select></label>
                     <label class="sg-field"><span>Свой текст (необязательно)</span><textarea name="text" rows="3" placeholder="Если поле пустое, бот сформирует сообщение автоматически"></textarea></label>

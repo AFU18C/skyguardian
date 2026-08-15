@@ -36,7 +36,7 @@ class SiteLoginSettingsController extends Controller
             'login_accent_color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'login_background_color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'login_panel_color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
-            'login_logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp,svg', 'max:4096'],
+            'login_logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
             'login_background' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:8192'],
             'remove_login_logo' => ['nullable', 'boolean'],
             'remove_login_background' => ['nullable', 'boolean'],

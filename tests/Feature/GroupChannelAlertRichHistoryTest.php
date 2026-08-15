@@ -97,7 +97,6 @@ class GroupChannelAlertRichHistoryTest extends TestCase
             ->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 99101,
                 'callback_query' => [
@@ -201,7 +200,6 @@ class GroupChannelAlertRichHistoryTest extends TestCase
             ->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => random_int(100000, 999999),
                 'message' => [

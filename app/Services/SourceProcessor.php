@@ -62,19 +62,24 @@ class SourceProcessor
             $copiedCount = 0;
             $failedCount = 0;
             $copyError = null;
-            $lastProcessedId = $messageIds ? max($messageIds) : null;
+            $lastProcessedId = null;
             $pendingCopy = $source->pending_copy;
 
             if ($messageIds && $source->destination_peer) {
+                $lastProcessedId = max($messageIds);
                 $mapButtonUrl = $this->mapButtonUrl($source);
-                $copyResult = $mapButtonUrl !== null
-                    ? $this->copyMessagesWithMapButtons($source, $messages, $mapButtonUrl)
-                    : $this->telethon->call('copy_messages', $account, [
+                if ($mapButtonUrl !== null) {
+                    $copyResult = $this->copyMessagesWithMapButtons($source, $messages, $mapButtonUrl);
+                } else {
+                    $settings = $this->copySettings($source);
+                    $copyResult = $this->telethon->call('copy_messages', $account, [
                         'source_peer' => $source->source_peer,
                         'destination_peer' => $source->destination_peer,
                         'message_ids' => $messageIds,
-                        'settings' => $this->copySettings($source),
+                        'settings' => $settings,
+                        'request_id' => $this->copyRequestId($source, $messageIds, $settings),
                     ]);
+                }
                 $copiedCount = (int) ($copyResult['copied_count'] ?? count($messageIds));
                 $failedCount = (int) ($copyResult['failed_count'] ?? 0);
                 $pendingCopy = data_get($copyResult, 'partial_delivery');
@@ -92,6 +97,8 @@ class SourceProcessor
                 if ($buttonError !== '') {
                     $copyError = trim(($copyError !== null ? $copyError.' ' : '').'Кнопка карты: '.$buttonError);
                 }
+            } elseif ($messageIds) {
+                $copyError = 'Канал назначения не настроен. Курсор сохранён, сообщения не пропущены.';
             }
 
             $changes = [
@@ -148,6 +155,7 @@ class SourceProcessor
                 'destination_peer' => $source->destination_peer,
                 'message_ids' => $messageIds,
                 'settings' => $settings,
+                'request_id' => $this->copyRequestId($source, $messageIds, $settings),
             ]);
             $groupCopied = (int) ($copyResult['copied_count'] ?? count($messageIds));
             $groupFailed = (int) ($copyResult['failed_count'] ?? 0);
@@ -175,10 +183,11 @@ class SourceProcessor
             }
 
             try {
-                $latest = $this->telethon->call('latest_message_id', $account, [
-                    'peer' => $source->destination_peer,
-                ]);
-                $destinationMessageId = (int) ($latest['latest_message_id'] ?? 0);
+                $destinationIds = collect($copyResult['destination_message_ids'] ?? [])
+                    ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->values();
+                $destinationMessageId = (int) ($destinationIds->last() ?? 0);
 
                 if ($destinationMessageId < 1) {
                     $buttonErrors[] = 'Не удалось определить опубликованное сообщение.';
@@ -239,6 +248,27 @@ class SourceProcessor
         $url = trim((string) $this->ruleValue($source, 'map_button_url', ''));
 
         return $url !== '' ? $url : null;
+    }
+
+    /**
+     * Keep the same key when a daemon response is lost after Telegram accepted
+     * the copy. A changed source group or copy rule intentionally gets a new key.
+     *
+     * @param  array<int, int>  $messageIds
+     * @param  array<string, mixed>  $settings
+     */
+    private function copyRequestId(Source $source, array $messageIds, array $settings): string
+    {
+        sort($messageIds, SORT_NUMERIC);
+
+        return hash('sha256', json_encode([
+            'source_id' => $source->id,
+            'technical_account_id' => $source->technical_account_id,
+            'source_peer' => $source->source_peer,
+            'destination_peer' => $source->destination_peer,
+            'message_ids' => $messageIds,
+            'settings' => $settings,
+        ], JSON_THROW_ON_ERROR));
     }
 
     private function copySettings(Source $source): array

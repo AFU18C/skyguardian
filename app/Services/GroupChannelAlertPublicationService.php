@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\TelegramDeliveryUncertainException;
 use App\Models\GroupChannelAlertCard;
 use App\Models\GroupChannelAlertEvent;
 use App\Models\GroupChannelAlertState;
@@ -9,6 +10,7 @@ use App\Models\GroupChannelBot;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -161,7 +163,6 @@ class GroupChannelAlertPublicationService
             $lockedBot->alertEvents()
                 ->whereIn('status', [
                     GroupChannelAlertEvent::STATUS_PENDING,
-                    GroupChannelAlertEvent::STATUS_SENDING,
                     GroupChannelAlertEvent::STATUS_ERROR,
                 ])
                 ->delete();
@@ -249,15 +250,10 @@ class GroupChannelAlertPublicationService
     private function deliverPending(GroupChannelBot $bot): int
     {
         $events = $bot->alertEvents()
-            ->where(function ($query): void {
-                $query->whereIn('status', [
-                    GroupChannelAlertEvent::STATUS_PENDING,
-                    GroupChannelAlertEvent::STATUS_ERROR,
-                ])->orWhere(function ($query): void {
-                    $query->where('status', GroupChannelAlertEvent::STATUS_SENDING)
-                        ->where('sending_started_at', '<=', now()->subMinutes(10));
-                });
-            })
+            ->whereIn('status', [
+                GroupChannelAlertEvent::STATUS_PENDING,
+                GroupChannelAlertEvent::STATUS_ERROR,
+            ])
             ->where('attempts', '<', 10)
             ->orderBy('event_at')
             ->orderBy('id')
@@ -303,30 +299,16 @@ class GroupChannelAlertPublicationService
             ]);
         }) as $batch) {
             $ids = $batch->pluck('id')->all();
-            $claimed = GroupChannelAlertEvent::query()
-                ->whereIn('id', $ids)
-                ->where(function ($query): void {
-                    $query->whereIn('status', [
-                        GroupChannelAlertEvent::STATUS_PENDING,
-                        GroupChannelAlertEvent::STATUS_ERROR,
-                    ])->orWhere(function ($query): void {
-                        $query->where('status', GroupChannelAlertEvent::STATUS_SENDING)
-                            ->where('sending_started_at', '<=', now()->subMinutes(10));
-                    });
-                })
-                ->update([
-                    'status' => GroupChannelAlertEvent::STATUS_SENDING,
-                    'sending_started_at' => now(),
-                    'last_error' => null,
-                    'attempts' => DB::raw('attempts + 1'),
-                ]);
-
-            if ($claimed !== count($ids)) {
+            $deliveryBatchId = (string) Str::uuid();
+            if (! $this->claimEventBatch($ids, $deliveryBatchId)) {
                 continue;
             }
 
+            $deliveryAcknowledged = false;
+            $messageId = null;
+
             try {
-                $this->telegram->request($bot, 'sendMessage', [
+                $response = $this->telegram->request($bot, 'sendMessage', [
                     'chat_id' => $bot->chat_id,
                     'text' => $this->renderMessage($bot, $batch),
                     'disable_notification' => (bool) $bot->moduleSetting(
@@ -336,17 +318,56 @@ class GroupChannelAlertPublicationService
                     ),
                 ]);
 
+                if (! is_array($response) || ! is_numeric($response['message_id'] ?? null)) {
+                    throw new TelegramDeliveryUncertainException(
+                        'Telegram не вернул ID сообщения тревоги. Автоматический повтор заблокирован.',
+                    );
+                }
+
+                $messageId = (int) $response['message_id'];
+                $deliveryAcknowledged = true;
                 GroupChannelAlertEvent::query()->whereIn('id', $ids)->update([
                     'status' => GroupChannelAlertEvent::STATUS_SENT,
                     'sending_started_at' => null,
+                    'delivery_batch_id' => null,
+                    'telegram_message_id' => $messageId,
                     'sent_at' => now(),
                     'last_error' => null,
                 ]);
                 $sent += count($ids);
+            } catch (TelegramDeliveryUncertainException $e) {
+                GroupChannelAlertEvent::query()->whereIn('id', $ids)->update([
+                    'status' => GroupChannelAlertEvent::STATUS_UNCERTAIN,
+                    'sending_started_at' => null,
+                    'telegram_message_id' => $messageId,
+                    'last_error' => $e->getMessage(),
+                ]);
+
+                throw $e;
             } catch (Throwable $e) {
+                if ($deliveryAcknowledged) {
+                    try {
+                        GroupChannelAlertEvent::query()->whereIn('id', $ids)->update([
+                            'status' => GroupChannelAlertEvent::STATUS_UNCERTAIN,
+                            'sending_started_at' => null,
+                            'telegram_message_id' => $messageId,
+                            'last_error' => 'Telegram подтвердил отправку, но состояние не удалось сохранить: '.$e->getMessage(),
+                        ]);
+                    } catch (Throwable $quarantineError) {
+                        report($quarantineError);
+                    }
+
+                    throw new TelegramDeliveryUncertainException(
+                        'Telegram подтвердил отправку события тревоги, но SkyGuardian не смог сохранить его состояние. Автоматический повтор заблокирован.',
+                        $e,
+                    );
+                }
+
                 GroupChannelAlertEvent::query()->whereIn('id', $ids)->update([
                     'status' => GroupChannelAlertEvent::STATUS_ERROR,
                     'sending_started_at' => null,
+                    'delivery_batch_id' => null,
+                    'telegram_message_id' => null,
                     'last_error' => $e->getMessage(),
                 ]);
 
@@ -355,6 +376,35 @@ class GroupChannelAlertPublicationService
         }
 
         return $sent;
+    }
+
+    /** @param  array<int, int>  $ids */
+    private function claimEventBatch(array $ids, string $deliveryBatchId): bool
+    {
+        return DB::transaction(function () use ($ids, $deliveryBatchId): bool {
+            $events = GroupChannelAlertEvent::query()
+                ->whereIn('id', $ids)
+                ->lockForUpdate()
+                ->get(['id', 'status']);
+
+            if ($events->count() !== count($ids)
+                || $events->contains(fn (GroupChannelAlertEvent $event): bool => ! in_array($event->status, [
+                    GroupChannelAlertEvent::STATUS_PENDING,
+                    GroupChannelAlertEvent::STATUS_ERROR,
+                ], true))) {
+                return false;
+            }
+
+            return GroupChannelAlertEvent::query()
+                ->whereIn('id', $ids)
+                ->update([
+                    'status' => GroupChannelAlertEvent::STATUS_SENDING,
+                    'sending_started_at' => now(),
+                    'delivery_batch_id' => $deliveryBatchId,
+                    'last_error' => null,
+                    'attempts' => DB::raw('attempts + 1'),
+                ]) === count($ids);
+        });
     }
 
     /**
@@ -408,10 +458,18 @@ class GroupChannelAlertPublicationService
                     'alert_type' => $first->alert_type,
                     'snapshot_hash' => $hash,
                     'telegram_message_id' => null,
+                    'delivery_status' => GroupChannelAlertCard::STATUS_SENT,
                     'started_at' => $startedAt,
                     'published_at' => null,
                 ]);
 
+                continue;
+            }
+
+            if ($card && in_array($card->delivery_status, [
+                GroupChannelAlertCard::STATUS_SENDING,
+                GroupChannelAlertCard::STATUS_UNCERTAIN,
+            ], true)) {
                 continue;
             }
 
@@ -432,6 +490,27 @@ class GroupChannelAlertPublicationService
                 $now,
                 $isRefresh,
             );
+            $trackingCard = GroupChannelAlertCard::query()->updateOrCreate(
+                [
+                    'group_channel_bot_id' => $bot->id,
+                    'scope_region_uid' => $first->scope_region_uid,
+                    'alert_type' => $first->alert_type,
+                ],
+                [
+                    'snapshot_hash' => $card?->snapshot_hash
+                        ?? hash('sha256', 'pending|'.$hash),
+                    'pending_snapshot_hash' => $hash,
+                    'telegram_message_id' => $card?->telegram_message_id,
+                    'pending_telegram_message_id' => null,
+                    'delivery_status' => GroupChannelAlertCard::STATUS_SENDING,
+                    'sending_started_at' => now(),
+                    'last_error' => null,
+                    'started_at' => $cycleStartedAt,
+                    'published_at' => $card?->published_at,
+                ],
+            );
+            $deliveryAcknowledged = false;
+            $messageId = null;
 
             try {
                 $response = $this->telegram->request($bot, 'sendMessage', [
@@ -443,57 +522,81 @@ class GroupChannelAlertPublicationService
                         false,
                     ),
                 ]);
+
+                if (! is_array($response) || ! is_numeric($response['message_id'] ?? null)) {
+                    throw new TelegramDeliveryUncertainException(
+                        'Telegram не вернул ID активной карточки тревоги. Автоматический повтор заблокирован.',
+                    );
+                }
+
+                $messageId = (int) $response['message_id'];
+                $deliveryAcknowledged = true;
+                $trackingCard->update([
+                    'snapshot_hash' => $hash,
+                    'pending_snapshot_hash' => null,
+                    'telegram_message_id' => $messageId,
+                    'pending_telegram_message_id' => null,
+                    'delivery_status' => GroupChannelAlertCard::STATUS_SENT,
+                    'sending_started_at' => null,
+                    'last_error' => null,
+                    'started_at' => $cycleStartedAt,
+                    'published_at' => $now,
+                ]);
+            } catch (TelegramDeliveryUncertainException $e) {
+                $trackingCard->update([
+                    'delivery_status' => GroupChannelAlertCard::STATUS_UNCERTAIN,
+                    'sending_started_at' => null,
+                    'last_error' => $e->getMessage(),
+                ]);
+
+                throw $e;
             } catch (Throwable $e) {
-                GroupChannelAlertCard::query()->updateOrCreate(
-                    [
-                        'group_channel_bot_id' => $bot->id,
-                        'scope_region_uid' => $first->scope_region_uid,
-                        'alert_type' => $first->alert_type,
-                    ],
-                    [
-                        'snapshot_hash' => hash('sha256', 'retry|'.$hash),
-                        'telegram_message_id' => $card?->telegram_message_id,
-                        'started_at' => $cycleStartedAt,
-                        'published_at' => $card?->published_at,
-                    ],
-                );
+                if ($deliveryAcknowledged) {
+                    $trackingCard->update([
+                        'pending_telegram_message_id' => $messageId,
+                        'delivery_status' => GroupChannelAlertCard::STATUS_UNCERTAIN,
+                        'sending_started_at' => null,
+                        'last_error' => 'Telegram подтвердил отправку, но состояние не удалось сохранить: '.$e->getMessage(),
+                    ]);
+
+                    throw new TelegramDeliveryUncertainException(
+                        'Telegram подтвердил отправку карточки, но SkyGuardian не смог сохранить её состояние. Автоматический повтор заблокирован.',
+                        $e,
+                    );
+                }
+
+                $trackingCard->update([
+                    'snapshot_hash' => hash('sha256', 'retry|'.$hash),
+                    'pending_snapshot_hash' => null,
+                    'pending_telegram_message_id' => null,
+                    'delivery_status' => GroupChannelAlertCard::STATUS_ERROR,
+                    'sending_started_at' => null,
+                    'last_error' => $e->getMessage(),
+                ]);
 
                 throw $e;
             }
 
-            $messageId = is_array($response) && is_numeric($response['message_id'] ?? null)
-                ? (int) $response['message_id']
-                : null;
             $oldMessageId = $card?->telegram_message_id;
-
             if ($oldMessageId && $oldMessageId !== $messageId
                 && ! $this->safeDeleteMessage($bot, $oldMessageId)) {
-                if ($messageId) {
-                    $this->safeDeleteMessage($bot, $messageId);
-                }
-
-                throw new RuntimeException('Не удалось удалить предыдущую активную карточку тревоги.');
+                $trackingCard->update([
+                    'last_error' => 'Новая карточка опубликована, но предыдущую не удалось удалить автоматически.',
+                ]);
             }
-
-            GroupChannelAlertCard::query()->updateOrCreate(
-                [
-                    'group_channel_bot_id' => $bot->id,
-                    'scope_region_uid' => $first->scope_region_uid,
-                    'alert_type' => $first->alert_type,
-                ],
-                [
-                    'snapshot_hash' => $hash,
-                    'telegram_message_id' => $messageId,
-                    'started_at' => $cycleStartedAt,
-                    'published_at' => $now,
-                ],
-            );
 
             $sent++;
         }
 
         foreach ($cards as $key => $card) {
             if (! isset($changedScopes[$key])) {
+                continue;
+            }
+
+            if (in_array($card->delivery_status, [
+                GroupChannelAlertCard::STATUS_SENDING,
+                GroupChannelAlertCard::STATUS_UNCERTAIN,
+            ], true)) {
                 continue;
             }
 
@@ -512,6 +615,13 @@ class GroupChannelAlertPublicationService
             ->get();
 
         foreach ($cards as $card) {
+            if (in_array($card->delivery_status, [
+                GroupChannelAlertCard::STATUS_SENDING,
+                GroupChannelAlertCard::STATUS_UNCERTAIN,
+            ], true)) {
+                continue;
+            }
+
             if ($bot->chat_id && $card->telegram_message_id
                 && ! $this->safeDeleteMessage($bot, $card->telegram_message_id)) {
                 continue;

@@ -259,7 +259,7 @@
                     <div class="sg-form-grid">
                         <div class="sg-field">
                             <label for="site-logo">Логотип</label>
-                            <input id="site-logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                            <input id="site-logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp">
                             @if(!empty($settings['logo_path']))
                                 <div class="site-brand-preview">
                                     <img src="{{ Storage::disk('public')->url($settings['logo_path']) }}" alt="Логотип">
@@ -269,7 +269,7 @@
                         </div>
                         <div class="sg-field">
                             <label for="site-favicon">Favicon</label>
-                            <input id="site-favicon" name="favicon" type="file" accept="image/png,image/x-icon,image/svg+xml">
+                            <input id="site-favicon" name="favicon" type="file" accept="image/png,image/x-icon">
                             @if(!empty($settings['favicon_path']))
                                 <div class="site-brand-preview">
                                     <img src="{{ Storage::disk('public')->url($settings['favicon_path']) }}" alt="Favicon">

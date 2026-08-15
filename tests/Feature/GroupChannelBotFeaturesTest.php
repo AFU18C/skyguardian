@@ -113,7 +113,6 @@ class GroupChannelBotFeaturesTest extends TestCase
 
         $this->postJson(route('group-channel.webhook', [
             'fingerprint' => $bot->token_fingerprint,
-            'secret' => $bot->webhook_secret,
         ]), [
             'update_id' => 1,
             'message' => [
@@ -136,7 +135,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 1,
                 'message' => [
@@ -170,7 +168,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 10,
                 'message' => [
@@ -212,7 +209,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 11,
                 'message' => [
@@ -250,7 +246,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 3,
                 'message' => [
@@ -288,7 +283,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 2,
                 'chat_join_request' => [
@@ -336,7 +330,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         ];
         $url = route('group-channel.webhook', [
             'fingerprint' => $bot->token_fingerprint,
-            'secret' => $bot->webhook_secret,
         ]);
 
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
@@ -373,7 +366,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         ];
         $url = route('group-channel.webhook', [
             'fingerprint' => $bot->token_fingerprint,
-            'secret' => $bot->webhook_secret,
         ]);
 
         Http::fake([
@@ -392,6 +384,17 @@ class GroupChannelBotFeaturesTest extends TestCase
             'status' => GroupChannelWebhookUpdate::STATUS_FAILED,
             'attempts' => 1,
         ]);
+
+        $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
+            ->postJson($url, $payload)
+            ->assertOk();
+        $this->assertDatabaseHas('group_channel_webhook_updates', [
+            'telegram_update_id' => 510,
+            'status' => GroupChannelWebhookUpdate::STATUS_FAILED,
+            'attempts' => 1,
+        ]);
+
+        $this->travel(15)->seconds();
 
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson($url, $payload)
@@ -417,7 +420,6 @@ class GroupChannelBotFeaturesTest extends TestCase
         $this->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 520,
                 'callback_query' => [

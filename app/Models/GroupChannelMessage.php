@@ -21,6 +21,9 @@ class GroupChannelMessage extends Model
         'telegram_created_at',
         'delete_at',
         'deleted_at_telegram',
+        'deletion_attempts',
+        'next_delete_attempt_at',
+        'delete_failed_at',
     ];
 
     protected function casts(): array
@@ -30,6 +33,9 @@ class GroupChannelMessage extends Model
             'telegram_created_at' => 'datetime',
             'delete_at' => 'datetime',
             'deleted_at_telegram' => 'datetime',
+            'deletion_attempts' => 'integer',
+            'next_delete_attempt_at' => 'datetime',
+            'delete_failed_at' => 'datetime',
         ];
     }
 

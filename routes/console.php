@@ -4,6 +4,19 @@ use App\Models\Source;
 use App\Services\SourcePollingSettings;
 use Illuminate\Support\Facades\Schedule;
 
+Schedule::command('skyguardian:health:heartbeat')
+    ->everyMinute()
+    ->withoutOverlapping(2);
+
+Schedule::command('skyguardian:data:prune')
+    ->dailyAt('04:20')
+    ->withoutOverlapping(30)
+    ->onOneServer();
+
+Schedule::command('skyguardian:deliveries:mark-uncertain')
+    ->everyMinute()
+    ->withoutOverlapping(2);
+
 foreach ([Source::TYPE_NEWS, Source::TYPE_AIR_ALERT] as $type) {
     Schedule::command("skyguardian:sources:process --type={$type} --limit=40")
         ->everySecond()

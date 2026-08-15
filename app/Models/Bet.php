@@ -11,11 +11,21 @@ class Bet extends Model
 
     public const STATUS_PUBLISHING = 'publishing';
 
+    public const STATUS_PUBLICATION_UNCERTAIN = 'publication_uncertain';
+
     public const STATUS_REJECTED = 'rejected';
 
     public const STATUS_PUBLISHED = 'published';
 
     public const RESULTS = ['win', 'loss', 'refund', 'pending'];
+
+    public const RESULT_PUBLICATION_SENDING = 'sending';
+
+    public const RESULT_PUBLICATION_UNCERTAIN = 'uncertain';
+
+    public const RESULT_PUBLICATION_SENT = 'sent';
+
+    public const RESULT_PUBLICATION_ERROR = 'error';
 
     protected $fillable = [
         'fingerprint', 'status', 'sport', 'event_name', 'home_team', 'away_team', 'tournament',
@@ -23,14 +33,16 @@ class Bet extends Model
         'reserve_odds', 'selected_odds', 'selected_odds_source', 'ai_score', 'ai_reason',
         'telegram_sources', 'search_sources', 'odds_snapshot', 'odds_checked_at', 'publication_bot_id',
         'publication_text',
+        'publication_error',
         'telegram_message_id', 'published_at', 'result', 'result_note', 'result_checked_at',
-        'result_message_id', 'result_sent_at', 'edit_history',
+        'result_message_id', 'result_sent_at', 'result_publication_status',
+        'result_publication_error', 'edit_history',
     ];
 
     protected static function booted(): void
     {
         static::saving(function (self $bet): void {
-            $bet->publication_guard = in_array($bet->status, [self::STATUS_PUBLISHING, self::STATUS_PUBLISHED], true)
+            $bet->publication_guard = in_array($bet->status, [self::STATUS_PUBLISHING, self::STATUS_PUBLICATION_UNCERTAIN, self::STATUS_PUBLISHED], true)
                 ? $bet->fingerprint
                 : null;
         });

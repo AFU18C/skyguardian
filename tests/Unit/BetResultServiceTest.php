@@ -2,10 +2,11 @@
 
 namespace Tests\Unit;
 
-use App\Services\BetOddsService;
+use App\Models\Bet;
+use App\Models\BettingSetting;
 use App\Services\BetResultService;
 use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class BetResultServiceTest extends TestCase
 {
@@ -14,7 +15,7 @@ class BetResultServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new BetResultService(new BetOddsService);
+        $this->service = new BetResultService;
     }
 
     #[Test]
@@ -29,5 +30,14 @@ class BetResultServiceTest extends TestCase
     {
         $this->assertSame('refund', $this->service->settle('ТБ 3', 2, 1));
         $this->assertSame('win', $this->service->settle('ТБ 2.5', 2, 1));
+    }
+
+    #[Test]
+    public function automatic_result_lookup_is_disabled(): void
+    {
+        $result = $this->service->check(new Bet, new BettingSetting);
+
+        $this->assertSame('pending', $result['result']);
+        $this->assertStringContainsString('отключено', $result['result_note']);
     }
 }

@@ -13,17 +13,19 @@ class GroupChannelWebhookController extends Controller
     public function __invoke(
         Request $request,
         string $fingerprint,
-        string $secret,
         GroupChannelWebhookUpdateService $service,
+        ?string $legacySecret = null,
     ): Response {
-        GroupChannelBot::query()
+        $registeredBot = GroupChannelBot::query()
             ->where('token_fingerprint', $fingerprint)
-            ->where('webhook_secret', $secret)
             ->firstOrFail();
 
         $headerSecret = $request->header('X-Telegram-Bot-Api-Secret-Token');
         abort_unless(
-            is_string($headerSecret) && hash_equals($secret, $headerSecret),
+            is_string($headerSecret)
+                && is_string($registeredBot->webhook_secret)
+                && hash_equals($registeredBot->webhook_secret, $headerSecret)
+                && ($legacySecret === null || hash_equals($registeredBot->webhook_secret, $legacySecret)),
             403,
         );
 
@@ -35,7 +37,6 @@ class GroupChannelWebhookController extends Controller
 
         $botQuery = GroupChannelBot::query()
             ->where('token_fingerprint', $fingerprint)
-            ->where('webhook_secret', $secret)
             ->where('is_active', true);
         $historyBotId = $this->historyBotId($update);
 

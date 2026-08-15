@@ -227,51 +227,6 @@ class GroupChannelController extends Controller
         }
     }
 
-    public function registerWebhook(GroupChannelBot $groupChannelBot): RedirectResponse
-    {
-        try {
-            $this->ensureTokenMetadata($groupChannelBot);
-            $url = route('group-channel.webhook', [
-                'fingerprint' => $groupChannelBot->token_fingerprint,
-                'secret' => $groupChannelBot->webhook_secret,
-            ]);
-            $this->telegram->request($groupChannelBot, 'setWebhook', [
-                'url' => $url,
-                'secret_token' => $groupChannelBot->webhook_secret,
-                'allowed_updates' => json_encode([
-                    'message',
-                    'edited_message',
-                    'chat_join_request',
-                    'callback_query',
-                    'my_chat_member',
-                ]),
-                'drop_pending_updates' => false,
-            ]);
-
-            GroupChannelBot::query()
-                ->where('token_fingerprint', $groupChannelBot->token_fingerprint)
-                ->update([
-                    'webhook_registered_at' => now(),
-                    'webhook_last_error' => null,
-                ]);
-
-            return back()->with('toast', [
-                'type' => 'success',
-                'title' => 'Webhook включён',
-                'message' => 'Бот принимает события для всех добавленных групп и каналов.',
-            ]);
-        } catch (Throwable $e) {
-            report($e);
-            $groupChannelBot->update(['webhook_last_error' => $e->getMessage()]);
-
-            return back()->with('toast', [
-                'type' => 'error',
-                'title' => 'Ошибка webhook',
-                'message' => $e->getMessage(),
-            ]);
-        }
-    }
-
     public function destroy(GroupChannelBot $groupChannelBot): RedirectResponse
     {
         $groupChannelBot->delete();

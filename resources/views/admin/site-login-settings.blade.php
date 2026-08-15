@@ -49,7 +49,7 @@
                         <div class="sg-form-grid">
                             <div class="sg-field">
                                 <label for="login-logo">Отдельный логотип авторизации</label>
-                                <input id="login-logo" name="login_logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+                                <input id="login-logo" name="login_logo" type="file" accept="image/png,image/jpeg,image/webp">
                                 <small>Если не загружен, используется общий логотип сайта или знак SG.</small>
                                 @if(!empty($settings['login_logo_path']))
                                     <div class="site-brand-preview">

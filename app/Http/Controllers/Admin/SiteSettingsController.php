@@ -53,8 +53,8 @@ class SiteSettingsController extends Controller
             'language' => ['required', Rule::in(['ru', 'uk'])],
             'timezone' => ['required', Rule::in(['Europe/Kyiv', 'UTC'])],
             'theme' => ['required', Rule::in(['classic', 'light', 'dark'])],
-            'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp,svg', 'max:4096'],
-            'favicon' => ['nullable', 'file', 'mimes:png,ico,svg', 'max:1024'],
+            'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
+            'favicon' => ['nullable', 'file', 'mimes:png,ico', 'max:1024'],
             'remove_logo' => ['nullable', 'boolean'],
             'remove_favicon' => ['nullable', 'boolean'],
         ]);

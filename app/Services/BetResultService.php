@@ -7,25 +7,13 @@ use App\Models\BettingSetting;
 
 class BetResultService
 {
-    public function __construct(private readonly BetOddsService $sources) {}
-
     public function check(Bet $bet, BettingSetting $settings): array
     {
-        foreach ([$settings->primary_source_url, $settings->reserve_source_url] as $url) {
-            $source = $this->sources->inspect($url, $bet->toArray());
-            if (! $source['finished'] || ! is_array($source['score'])) {
-                continue;
-            }
-            $score = $source['score'];
-
-            return [
-                'result' => $this->settle($bet->market, $score[0], $score[1]),
-                'result_note' => "Итоговый счёт {$score[0]}:{$score[1]}",
-                'result_checked_at' => now(),
-            ];
-        }
-
-        return ['result' => 'pending', 'result_note' => 'Официальный результат ещё недоступен.', 'result_checked_at' => now()];
+        return [
+            'result' => 'pending',
+            'result_note' => 'Автоматическое определение отключено. Проверьте официальный источник и установите результат вручную.',
+            'result_checked_at' => now(),
+        ];
     }
 
     public function settle(string $market, int $home, int $away): string

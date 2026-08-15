@@ -37,6 +37,10 @@
             <span class="sg-nav-icon">◆</span>
             <span>Ставки</span>
         </a>
+        <a href="{{ route('admin.security.show') }}" @class(['is-active' => request()->routeIs('admin.security.*')])>
+            <span class="sg-nav-icon">⌾</span>
+            <span>Безопасность</span>
+        </a>
     </nav>
 
     <div class="sg-sidebar-status">

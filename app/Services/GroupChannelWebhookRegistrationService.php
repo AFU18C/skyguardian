@@ -24,23 +24,25 @@ class GroupChannelWebhookRegistrationService
     {
         $this->ensureTokenMetadata($bot);
         $this->ensureChatId($bot);
+        $newSecret = Str::random(48);
 
         $this->telegram->request($bot, 'setWebhook', [
             'url' => route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]),
-            'secret_token' => $bot->webhook_secret,
+            'secret_token' => $newSecret,
             'allowed_updates' => json_encode(self::ALLOWED_UPDATES, JSON_THROW_ON_ERROR),
             'drop_pending_updates' => false,
         ]);
 
         GroupChannelBot::query()
             ->where('token_fingerprint', $bot->token_fingerprint)
-            ->update([
+            ->get()
+            ->each(fn (GroupChannelBot $matchingBot) => $matchingBot->update([
+                'webhook_secret' => $newSecret,
                 'webhook_registered_at' => now(),
                 'webhook_last_error' => null,
-            ]);
+            ]));
 
         $bot->refresh();
     }

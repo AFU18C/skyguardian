@@ -132,20 +132,30 @@ class SourceMapButtonSettingsTest extends TestCase
         ]]);
 
         foreach ([[11, 901], [12, 902]] as [$sourceMessageId, $destinationMessageId]) {
-            $telethon->shouldReceive('call')->once()->ordered()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
+            $expectedPayload = [
                 'source_peer' => '@source',
                 'destination_peer' => '@SkyGuardianUa',
                 'message_ids' => [$sourceMessageId],
                 'settings' => $settings,
-            ])->andReturn([
+            ];
+            $telethon->shouldReceive('call')->once()->ordered()->with(
+                'copy_messages',
+                Mockery::type(TechnicalAccount::class),
+                Mockery::on(function (array $payload) use ($expectedPayload): bool {
+                    $requestId = $payload['request_id'] ?? null;
+                    unset($payload['request_id']);
+
+                    return $payload === $expectedPayload
+                        && is_string($requestId)
+                        && preg_match('/^[a-f0-9]{64}$/', $requestId) === 1;
+                }),
+            )->andReturn([
                 'copied_count' => 1,
                 'failed_count' => 0,
                 'last_processed_id' => $sourceMessageId,
                 'partial_delivery' => null,
+                'destination_message_ids' => [$destinationMessageId],
             ]);
-            $telethon->shouldReceive('call')->once()->ordered()->with('latest_message_id', Mockery::type(TechnicalAccount::class), [
-                'peer' => '@SkyGuardianUa',
-            ])->andReturn(['latest_message_id' => $destinationMessageId]);
         }
 
         $result = (new SourceProcessor($telethon, new OperationGate, new SourceScheduler))->process($source);

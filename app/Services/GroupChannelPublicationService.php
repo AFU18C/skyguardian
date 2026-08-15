@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\TelegramDeliveryUncertainException;
 use App\Models\GroupChannelPublication;
 use RuntimeException;
 use Throwable;
@@ -32,10 +33,16 @@ class GroupChannelPublicationService
         }
 
         $this->claimForSending($publication);
+        $deliveryAcknowledged = false;
+        $messageIds = [];
 
         try {
             $result = $this->sendByType($publication);
             $messageIds = $this->messageIds($result);
+            if ($messageIds === []) {
+                throw new TelegramDeliveryUncertainException('Telegram принял запрос, но не вернул ID сообщения. Автоматический повтор заблокирован.');
+            }
+            $deliveryAcknowledged = true;
             $reactionError = $this->applyReactions($publication, $messageIds);
             $sentAt = now();
 
@@ -50,7 +57,30 @@ class GroupChannelPublicationService
                 'telegram_message_ids' => array_map('strval', $messageIds),
                 'last_error' => $reactionError,
             ]);
+        } catch (TelegramDeliveryUncertainException $e) {
+            $publication->update([
+                'status' => GroupChannelPublication::STATUS_UNCERTAIN,
+                'sending_started_at' => null,
+                'last_error' => $e->getMessage(),
+            ]);
+
+            throw $e;
         } catch (Throwable $e) {
+            if ($deliveryAcknowledged) {
+                $publication->update([
+                    'status' => GroupChannelPublication::STATUS_UNCERTAIN,
+                    'sending_started_at' => null,
+                    'telegram_message_id' => isset($messageIds[0]) ? (string) $messageIds[0] : null,
+                    'telegram_message_ids' => array_map('strval', $messageIds),
+                    'last_error' => 'Telegram подтвердил отправку, но состояние не удалось сохранить: '.$e->getMessage(),
+                ]);
+
+                throw new TelegramDeliveryUncertainException(
+                    'Telegram подтвердил публикацию, но SkyGuardian не смог сохранить её состояние. Автоматический повтор заблокирован.',
+                    $e,
+                );
+            }
+
             $publication->update([
                 'status' => GroupChannelPublication::STATUS_ERROR,
                 'sending_started_at' => null,
@@ -68,11 +98,17 @@ class GroupChannelPublicationService
         $messageIds = $publication->telegram_message_ids ?: array_filter([$publication->telegram_message_id]);
 
         if (! $bot || ! $bot->is_active || ! $bot->chat_id || $messageIds === []) {
-            throw new RuntimeException('Недостаточно данных для удаления публикации.');
+            $message = 'Недостаточно данных для удаления публикации.';
+            $this->recordDeletionFailure($publication, $message);
+
+            throw new RuntimeException($message);
         }
 
         if (! $bot->moduleEnabled('auto_delete_publications')) {
-            throw new RuntimeException('Модуль автоудаления выключен для этого чата.');
+            $message = 'Модуль автоудаления выключен для этого чата.';
+            $this->recordDeletionFailure($publication, $message);
+
+            throw new RuntimeException($message);
         }
 
         $remainingIds = array_values(array_map('strval', $messageIds));
@@ -101,6 +137,9 @@ class GroupChannelPublicationService
         if ($remainingIds === []) {
             $publication->update([
                 'deleted_at_telegram' => now(),
+                'deletion_attempts' => 0,
+                'next_delete_attempt_at' => null,
+                'delete_failed_at' => null,
                 'last_error' => null,
             ]);
 
@@ -108,9 +147,20 @@ class GroupChannelPublicationService
         }
 
         $message = 'Не удалены сообщения: '.implode('; ', $errors);
-        $publication->update(['last_error' => $message]);
+        $this->recordDeletionFailure($publication, $message);
 
         throw new RuntimeException($message);
+    }
+
+    private function recordDeletionFailure(GroupChannelPublication $publication, string $message): void
+    {
+        $attempts = $publication->deletion_attempts + 1;
+        $publication->update([
+            'deletion_attempts' => $attempts,
+            'next_delete_attempt_at' => $attempts >= 10 ? null : now()->addSeconds(min(3600, 15 * (2 ** max(0, $attempts - 1)))),
+            'delete_failed_at' => $attempts >= 10 ? now() : null,
+            'last_error' => $message,
+        ]);
     }
 
     private function claimForSending(GroupChannelPublication $publication): void
@@ -123,10 +173,7 @@ class GroupChannelPublicationService
                     GroupChannelPublication::STATUS_DRAFT,
                     GroupChannelPublication::STATUS_SCHEDULED,
                     GroupChannelPublication::STATUS_ERROR,
-                ])->orWhere(function ($query): void {
-                    $query->where('status', GroupChannelPublication::STATUS_SENDING)
-                        ->where('sending_started_at', '<=', now()->subMinutes(10));
-                });
+                ]);
             })
             ->update([
                 'status' => GroupChannelPublication::STATUS_SENDING,
@@ -192,11 +239,15 @@ class GroupChannelPublicationService
                 $bot,
                 collect($paths)->map(function (mixed $item, int $index) use ($publication): array {
                     $path = is_array($item) ? (string) ($item['path'] ?? '') : (string) $item;
+                    $mime = is_array($item) ? (string) ($item['mime'] ?? '') : '';
                     $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
                     return [
                         'path' => $path,
-                        'type' => in_array($extension, ['mp4', 'mov', 'm4v', 'webm'], true) ? 'video' : 'photo',
+                        'type' => (str_starts_with($mime, 'video/')
+                            || in_array($extension, ['mp4', 'mov', 'm4v', 'webm'], true))
+                                ? 'video'
+                                : 'photo',
                         'caption' => $index === 0 ? $publication->text : null,
                     ];
                 })->all(),

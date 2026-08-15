@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Exceptions\TelegramDeliveryUncertainException;
 use App\Models\GroupChannelBot;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -12,10 +14,25 @@ class GroupChannelTelegramService
 {
     public function request(GroupChannelBot $bot, string $method, array $payload = []): mixed
     {
-        $response = $this->client($bot)
-            ->post($method, $this->normalizePayload($bot, $method, $payload));
+        try {
+            $response = $this->client($bot)
+                ->post($method, $this->normalizePayload($bot, $method, $payload));
+        } catch (ConnectionException $e) {
+            if ($this->createsMessage($method)) {
+                throw new TelegramDeliveryUncertainException(previous: $e);
+            }
+
+            throw new RuntimeException('Не удалось подключиться к Telegram API.', 0, $e);
+        }
         $body = $response->json();
 
+        if ($response->serverError()) {
+            if ($this->createsMessage($method)) {
+                throw new TelegramDeliveryUncertainException('Telegram вернул временную серверную ошибку. Сообщение могло быть принято; автоматический повтор заблокирован.');
+            }
+
+            throw new RuntimeException('Telegram API временно недоступен: HTTP '.$response->status());
+        }
         if (! $response->successful() || ! ($body['ok'] ?? false)) {
             throw new RuntimeException($body['description'] ?? 'Ошибка Telegram API: HTTP '.$response->status());
         }
@@ -39,9 +56,16 @@ class GroupChannelTelegramService
         $request = $this->client($bot)
             ->asMultipart()
             ->attach($field, fopen($absolutePath, 'rb'), basename($absolutePath));
-        $response = $request->post($method, $payload);
+        try {
+            $response = $request->post($method, $payload);
+        } catch (ConnectionException $e) {
+            throw new TelegramDeliveryUncertainException(previous: $e);
+        }
         $body = $response->json();
 
+        if ($response->serverError()) {
+            throw new TelegramDeliveryUncertainException('Telegram вернул временную серверную ошибку после загрузки. Публикация могла быть принята; автоматический повтор заблокирован.');
+        }
         if (! $response->successful() || ! ($body['ok'] ?? false)) {
             throw new RuntimeException($body['description'] ?? 'Ошибка Telegram API: HTTP '.$response->status());
         }
@@ -76,11 +100,18 @@ class GroupChannelTelegramService
             ], fn (mixed $value): bool => $value !== null && $value !== '');
         }
 
-        $response = $request->post('sendMediaGroup', array_merge($payload, [
-            'media' => json_encode($media, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        ]));
+        try {
+            $response = $request->post('sendMediaGroup', array_merge($payload, [
+                'media' => json_encode($media, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]));
+        } catch (ConnectionException $e) {
+            throw new TelegramDeliveryUncertainException(previous: $e);
+        }
         $body = $response->json();
 
+        if ($response->serverError()) {
+            throw new TelegramDeliveryUncertainException('Telegram вернул временную серверную ошибку после отправки альбома. Публикация могла быть принята; автоматический повтор заблокирован.');
+        }
         if (! $response->successful() || ! ($body['ok'] ?? false)) {
             throw new RuntimeException($body['description'] ?? 'Ошибка Telegram API: HTTP '.$response->status());
         }
@@ -88,9 +119,11 @@ class GroupChannelTelegramService
         return is_array($body['result'] ?? null) ? $body['result'] : [];
     }
 
-    private function normalizePayload(GroupChannelBot $bot, string $method, array $payload): array
+    protected function normalizePayload(GroupChannelBot $bot, string $method, array $payload): array
     {
-        $payload = $this->withAlertMapButton($bot, $method, $payload);
+        if ($this->shouldConfigureAlertMapButton()) {
+            $payload = $this->withAlertMapButton($bot, $method, $payload);
+        }
 
         if ($method !== 'sendPoll' || ! isset($payload['options'])) {
             return $payload;
@@ -114,6 +147,11 @@ class GroupChannelTelegramService
         );
 
         return $payload;
+    }
+
+    protected function shouldConfigureAlertMapButton(): bool
+    {
+        return true;
     }
 
     private function withAlertMapButton(GroupChannelBot $bot, string $method, array $payload): array
@@ -188,5 +226,19 @@ class GroupChannelTelegramService
         return Http::baseUrl('https://api.telegram.org/bot'.$bot->bot_token)
             ->acceptJson()
             ->timeout(30);
+    }
+
+    private function createsMessage(string $method): bool
+    {
+        return in_array($method, [
+            'sendMessage',
+            'sendPhoto',
+            'sendVideo',
+            'sendDocument',
+            'sendMediaGroup',
+            'sendPoll',
+            'copyMessage',
+            'forwardMessage',
+        ], true);
     }
 }

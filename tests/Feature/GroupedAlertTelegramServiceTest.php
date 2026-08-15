@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 use Tests\TestCase;
 
 class GroupedAlertTelegramServiceTest extends TestCase
@@ -135,6 +136,44 @@ class GroupedAlertTelegramServiceTest extends TestCase
         } finally {
             CarbonImmutable::setTestNow();
         }
+    }
+
+    public function test_transient_edit_failure_is_not_replaced_with_a_duplicate_post(): void
+    {
+        config(['cache.default' => 'array']);
+        Cache::flush();
+        Http::fake(function (Request $request) {
+            if (str_ends_with($request->url(), '/editMessageText')) {
+                return Http::response([], 500);
+            }
+
+            return Http::response([
+                'ok' => true,
+                'result' => ['message_id' => 801],
+            ]);
+        });
+
+        $bot = $this->bot();
+        $service = app(GroupedAlertTelegramService::class);
+        $service->request($bot, 'sendMessage', [
+            'chat_id' => $bot->chat_id,
+            'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Харківська область — Харківський район\n⚠️ Повітряна тривога\n🕒 Початок: 22:14",
+        ]);
+
+        try {
+            $service->request($bot, 'sendMessage', [
+                'chat_id' => $bot->chat_id,
+                'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Харківська область — Харківський район\n📍 Харківська область — м. Харків\n⚠️ Повітряна тривога\n🕒 Початок: 22:19",
+            ]);
+            $this->fail('A transient edit failure was expected.');
+        } catch (RuntimeException) {
+            $this->assertTrue(true);
+        }
+
+        Http::assertSentCount(2);
+        $requests = Http::recorded();
+        $this->assertStringEndsWith('/sendMessage', $requests[0][0]->url());
+        $this->assertStringEndsWith('/editMessageText', $requests[1][0]->url());
     }
 
     private function bot(): GroupChannelBot

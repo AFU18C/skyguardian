@@ -43,6 +43,12 @@ class GroupChannelWebhookUpdateService
                 return null;
             }
 
+            if ($update->status === GroupChannelWebhookUpdate::STATUS_DEAD
+                || ($update->status === GroupChannelWebhookUpdate::STATUS_FAILED
+                    && $update->next_attempt_at?->isFuture())) {
+                return null;
+            }
+
             if (
                 $update->status === GroupChannelWebhookUpdate::STATUS_PROCESSING
                 && $update->updated_at->gt(now()->subMinutes(2))
@@ -53,6 +59,7 @@ class GroupChannelWebhookUpdateService
             $update->forceFill([
                 'status' => GroupChannelWebhookUpdate::STATUS_PROCESSING,
                 'attempts' => $update->attempts + 1,
+                'next_attempt_at' => null,
                 'last_error' => null,
             ])->save();
 
@@ -76,6 +83,7 @@ class GroupChannelWebhookUpdateService
             $claimed->forceFill([
                 'status' => GroupChannelWebhookUpdate::STATUS_PROCESSED,
                 'processed_at' => now(),
+                'next_attempt_at' => null,
                 'last_error' => null,
             ])->save();
             $bot->update([
@@ -83,8 +91,14 @@ class GroupChannelWebhookUpdateService
                 'webhook_last_error' => null,
             ]);
         } catch (Throwable $e) {
+            $dead = $claimed->attempts >= 10;
+            $backoffSeconds = min(3600, 15 * (2 ** max(0, $claimed->attempts - 1)));
             $claimed->forceFill([
-                'status' => GroupChannelWebhookUpdate::STATUS_FAILED,
+                'status' => $dead
+                    ? GroupChannelWebhookUpdate::STATUS_DEAD
+                    : GroupChannelWebhookUpdate::STATUS_FAILED,
+                'next_attempt_at' => $dead ? null : now()->addSeconds($backoffSeconds),
+                'dead_lettered_at' => $dead ? now() : null,
                 'last_error' => $e->getMessage(),
             ])->save();
             throw $e;

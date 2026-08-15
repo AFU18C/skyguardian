@@ -20,6 +20,8 @@ class GroupChannelAlertEvent extends Model
 
     public const STATUS_ERROR = 'error';
 
+    public const STATUS_UNCERTAIN = 'uncertain';
+
     protected $fillable = [
         'group_channel_bot_id',
         'event_key',
@@ -34,6 +36,8 @@ class GroupChannelAlertEvent extends Model
         'status',
         'attempts',
         'sending_started_at',
+        'delivery_batch_id',
+        'telegram_message_id',
         'sent_at',
         'last_error',
     ];
@@ -50,6 +54,7 @@ class GroupChannelAlertEvent extends Model
             'started_at' => UtcDateTime::class,
             'attempts' => 'integer',
             'sending_started_at' => UtcDateTime::class,
+            'telegram_message_id' => 'integer',
             'sent_at' => UtcDateTime::class,
         ];
     }

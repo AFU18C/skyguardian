@@ -35,7 +35,7 @@
             <div class="sg-topbar-right">
                 <div class="sg-admin-identity">
                     <div class="sg-avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 1)) }}</div>
-                    <div><strong>{{ auth()->user()->name }}</strong><span>Администратор</span></div>
+                    <div><strong>{{ auth()->user()->name }}</strong><span>{{ auth()->user()->roleLabel() }}</span></div>
                 </div>
                 <form method="POST" action="{{ route('admin.logout') }}">@csrf<button class="sg-link-button" type="submit">Выйти</button></form>
             </div>

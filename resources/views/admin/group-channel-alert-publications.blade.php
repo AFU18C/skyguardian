@@ -6,6 +6,16 @@
     $mapButtonEnabled = (bool) $bot->moduleSetting($module, 'map_button_enabled', true);
     $mapButtonText = (string) $bot->moduleSetting($module, 'map_button_text', \App\Models\GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_TEXT);
     $mapButtonUrl = (string) $bot->moduleSetting($module, 'map_button_url', \App\Models\GroupChannelBot::DEFAULT_ALERT_MAP_BUTTON_URL);
+    $uncertainAlertEvents = $bot->alertEvents()
+        ->where('status', \App\Models\GroupChannelAlertEvent::STATUS_UNCERTAIN)
+        ->latest('event_at')
+        ->limit(20)
+        ->get();
+    $uncertainAlertCards = $bot->alertCards()
+        ->where('delivery_status', \App\Models\GroupChannelAlertCard::STATUS_UNCERTAIN)
+        ->latest()
+        ->limit(20)
+        ->get();
     $formatAlertsTimestamp = static function (string $attribute) use ($bot): ?string {
         $value = $bot->getRawOriginal($attribute);
 
@@ -22,6 +32,64 @@
 @endif
 @if($bot->alerts_api_last_error)
     <div class="sg-inline-error">{{ $bot->alerts_api_last_error }}</div>
+@endif
+@if($uncertainAlertEvents->isNotEmpty() || $uncertainAlertCards->isNotEmpty())
+    <div class="sg-inline-error">
+        Telegram не подтвердил одну или несколько отправок. Автоматический повтор остановлен, чтобы не создавать дубликаты. Сначала проверьте канал вручную.
+    </div>
+
+    @foreach($uncertainAlertEvents as $alertEvent)
+        <div class="sg-switch-row">
+            <div>
+                <strong>Событие тревоги #{{ $alertEvent->id }} · {{ $alertEvent->region_name }}</strong>
+                @if($alertEvent->telegram_message_id)
+                    <small>Telegram ID: {{ $alertEvent->telegram_message_id }}</small>
+                @endif
+                <small>{{ $alertEvent->last_error }}</small>
+            </div>
+            <div class="sg-record-actions">
+                <form method="POST" action="{{ route('admin.group-channel.alert-events.resolve', [$bot, $alertEvent]) }}" data-confirm="Вы проверили канал и нашли эту публикацию?">
+                    @csrf
+                    <input type="hidden" name="resolution" value="sent">
+                    <button class="sg-button sg-button-small sg-button-primary" type="submit">Подтвердить отправку</button>
+                </form>
+                <form method="POST" action="{{ route('admin.group-channel.alert-events.resolve', [$bot, $alertEvent]) }}" data-confirm="Вы уверены, что публикации в канале нет?">
+                    @csrf
+                    <input type="hidden" name="resolution" value="retry">
+                    <button class="sg-button sg-button-small sg-button-secondary" type="submit">Разрешить повтор</button>
+                </form>
+            </div>
+        </div>
+    @endforeach
+
+    @foreach($uncertainAlertCards as $alertCard)
+        <div class="sg-switch-row">
+            <div>
+                <strong>Активная карточка · {{ \App\Models\GroupChannelBot::ALERT_REGIONS[$alertCard->scope_region_uid] ?? $alertCard->scope_region_uid }}</strong>
+                <small>{{ $alertCard->last_error }}</small>
+            </div>
+            <div class="sg-record-actions">
+                <form method="POST" action="{{ route('admin.group-channel.alert-cards.resolve', [$bot, $alertCard]) }}" data-confirm="Вы проверили канал и нашли эту карточку?">
+                    @csrf
+                    <input type="hidden" name="resolution" value="sent">
+                    <input
+                        type="number"
+                        name="telegram_message_id"
+                        min="1"
+                        value="{{ $alertCard->pending_telegram_message_id }}"
+                        placeholder="ID сообщения"
+                        required
+                    >
+                    <button class="sg-button sg-button-small sg-button-primary" type="submit">Подтвердить отправку</button>
+                </form>
+                <form method="POST" action="{{ route('admin.group-channel.alert-cards.resolve', [$bot, $alertCard]) }}" data-confirm="Вы уверены, что новой карточки в канале нет?">
+                    @csrf
+                    <input type="hidden" name="resolution" value="retry">
+                    <button class="sg-button sg-button-small sg-button-secondary" type="submit">Разрешить повтор</button>
+                </form>
+            </div>
+        </div>
+    @endforeach
 @endif
 
 <dl class="sg-record-data">

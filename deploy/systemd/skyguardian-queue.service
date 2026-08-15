@@ -1,0 +1,29 @@
+[Unit]
+Description=SkyGuardian Laravel queue worker
+After=network-online.target mysql.service skyguardian-telethon.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/skyguardian
+ExecStart=/usr/bin/php artisan queue:work database --queue=default,betting --sleep=2 --tries=1 --timeout=300 --max-time=3600
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=330
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/skyguardian/storage /var/www/skyguardian/bootstrap/cache /var/www/skyguardian-deploy/shared/playwright
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

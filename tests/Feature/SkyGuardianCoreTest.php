@@ -167,7 +167,7 @@ class SkyGuardianCoreTest extends TestCase
                 ['id' => 12, 'text' => 'two'],
             ],
         ]);
-        $telethon->shouldReceive('call')->once()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
+        $copyPayload = [
             'source_peer' => '@source',
             'destination_peer' => '@destination',
             'message_ids' => [11, 12],
@@ -181,7 +181,19 @@ class SkyGuardianCoreTest extends TestCase
                 'blocked_keywords' => ['казино', 'ставки'],
                 'resume_partial' => null,
             ],
-        ])->andReturn(['copied_count' => 2]);
+        ];
+        $telethon->shouldReceive('call')->once()->with(
+            'copy_messages',
+            Mockery::type(TechnicalAccount::class),
+            Mockery::on(function (array $payload) use ($copyPayload): bool {
+                $requestId = $payload['request_id'] ?? null;
+                unset($payload['request_id']);
+
+                return $payload === $copyPayload
+                    && is_string($requestId)
+                    && preg_match('/^[a-f0-9]{64}$/', $requestId) === 1;
+            }),
+        )->andReturn(['copied_count' => 2]);
 
         $processor = new SourceProcessor($telethon, new OperationGate, new SourceScheduler);
         $result = $processor->process($source);
@@ -220,7 +232,7 @@ class SkyGuardianCoreTest extends TestCase
                 ['id' => 12, 'text' => 'broken'],
             ],
         ]);
-        $telethon->shouldReceive('call')->once()->with('copy_messages', Mockery::type(TechnicalAccount::class), [
+        $copyPayload = [
             'source_peer' => '@source',
             'destination_peer' => '@destination',
             'message_ids' => [11, 12],
@@ -234,7 +246,19 @@ class SkyGuardianCoreTest extends TestCase
                 'blocked_keywords' => [],
                 'resume_partial' => null,
             ],
-        ])->andReturn([
+        ];
+        $telethon->shouldReceive('call')->once()->with(
+            'copy_messages',
+            Mockery::type(TechnicalAccount::class),
+            Mockery::on(function (array $payload) use ($copyPayload): bool {
+                $requestId = $payload['request_id'] ?? null;
+                unset($payload['request_id']);
+
+                return $payload === $copyPayload
+                    && is_string($requestId)
+                    && preg_match('/^[a-f0-9]{64}$/', $requestId) === 1;
+            }),
+        )->andReturn([
             'copied_count' => 1,
             'failed_count' => 1,
             'last_processed_id' => 11,
@@ -250,6 +274,34 @@ class SkyGuardianCoreTest extends TestCase
         $this->assertSame(1, $result['messages_failed']);
         $this->assertSame(11, $source->last_message_id);
         $this->assertSame('Не скопировано сообщений: 1. broken media', $source->last_error);
+    }
+
+    public function test_messages_are_not_skipped_while_destination_is_not_configured(): void
+    {
+        $account = $this->createAccount($this->createApi());
+        $source = Source::query()->create([
+            'technical_account_id' => $account->id,
+            'type' => Source::TYPE_NEWS,
+            'name' => 'Новости без назначения',
+            'source_peer' => '@source',
+            'destination_peer' => null,
+            'is_active' => true,
+            'last_message_id' => 10,
+        ]);
+
+        $telethon = Mockery::mock(TelethonClient::class);
+        $telethon->shouldReceive('call')->once()->with('fetch_messages', Mockery::type(TechnicalAccount::class), [
+            'peer' => '@source',
+            'min_id' => 10,
+            'limit' => 100,
+        ])->andReturn(['messages' => [['id' => 11, 'text' => 'must remain pending']]]);
+
+        $result = (new SourceProcessor($telethon, new OperationGate, new SourceScheduler))->process($source);
+
+        $this->assertSame(1, $result['messages_found']);
+        $this->assertSame(0, $result['messages_copied']);
+        $this->assertSame(10, $source->fresh()->last_message_id);
+        $this->assertStringContainsString('Курсор сохранён', (string) $source->fresh()->last_error);
     }
 
     public function test_account_and_source_limits_are_enforced(): void

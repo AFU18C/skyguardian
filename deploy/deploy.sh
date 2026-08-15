@@ -36,7 +36,8 @@ sudo install -d -o www-data -g www-data -m 775 \
     "$SHARED_DIR/storage/framework/cache" \
     "$SHARED_DIR/storage/framework/sessions" \
     "$SHARED_DIR/storage/framework/views" \
-    "$SHARED_DIR/storage/logs/archive"
+    "$SHARED_DIR/storage/logs/archive" \
+    "$SHARED_DIR/playwright"
 
 if [ -d "$APP_LINK/storage" ] && [ ! -f "$SHARED_DIR/.storage-imported" ]; then
     sudo rsync -a "$APP_LINK/storage/" "$SHARED_DIR/storage/"
@@ -87,6 +88,9 @@ python3 -m venv .venv
 .venv/bin/pip install --disable-pip-version-check -r telethon/requirements.txt
 
 npm ci --no-audit --no-fund
+sudo "$BUILD_DIR/node_modules/.bin/playwright" install-deps chromium
+sudo -u www-data env PLAYWRIGHT_BROWSERS_PATH="$SHARED_DIR/playwright" \
+    "$BUILD_DIR/node_modules/.bin/playwright" install chromium
 npm run build
 
 # Laravel caches may contain absolute paths. Finalize the immutable release
@@ -118,6 +122,12 @@ upsert_env LOG_LEVEL info
 upsert_env SESSION_SECURE_COOKIE true
 upsert_env SESSION_HTTP_ONLY true
 upsert_env SESSION_SAME_SITE lax
+upsert_env APP_ENV production
+upsert_env APP_DEBUG false
+upsert_env APP_URL https://skyguardian.pp.ua
+upsert_env QUEUE_CONNECTION database
+upsert_env DB_QUEUE_RETRY_AFTER 330
+upsert_env PLAYWRIGHT_BROWSERS_PATH "$SHARED_DIR/playwright"
 
 sudo chown github-runner:www-data "$SHARED_DIR/.env"
 sudo chmod 640 "$SHARED_DIR/.env"
@@ -139,6 +149,7 @@ sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-telethon.service" /etc/systemd/
 sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-scheduler.service" /etc/systemd/system/skyguardian-scheduler.service
 sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-group-channel-telethon.service" /etc/systemd/system/skyguardian-group-channel-telethon.service
 sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-group-channel-delete.service" /etc/systemd/system/skyguardian-group-channel-delete.service
+sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-queue.service" /etc/systemd/system/skyguardian-queue.service
 sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-backup.service" /etc/systemd/system/skyguardian-backup.service
 sudo cp "$RELEASE_DIR/deploy/systemd/skyguardian-backup.timer" /etc/systemd/system/skyguardian-backup.timer
 
@@ -175,6 +186,7 @@ sudo systemctl enable \
     skyguardian-scheduler.service \
     skyguardian-group-channel-telethon.service \
     skyguardian-group-channel-delete.service \
+    skyguardian-queue.service \
     skyguardian-backup.timer
 
 atomic_link() {
@@ -203,7 +215,8 @@ rollback() {
         skyguardian-telethon.service \
         skyguardian-scheduler.service \
         skyguardian-group-channel-telethon.service \
-        skyguardian-group-channel-delete.service || true
+        skyguardian-group-channel-delete.service \
+        skyguardian-queue.service || true
     sudo systemctl reload php8.3-fpm || true
 
     return "$result"
@@ -222,10 +235,14 @@ sudo systemctl restart \
     skyguardian-telethon.service \
     skyguardian-scheduler.service \
     skyguardian-group-channel-telethon.service \
-    skyguardian-group-channel-delete.service
+    skyguardian-group-channel-delete.service \
+    skyguardian-queue.service
+sudo -u www-data php artisan skyguardian:webhooks:migrate-url --no-interaction
+sudo -u www-data php artisan skyguardian:health:heartbeat --no-interaction
 sudo systemctl start skyguardian-backup.timer
 
 sudo systemctl reload php8.3-fpm
+bash "$RELEASE_DIR/deploy/nginx/install-performance-config.sh"
 sudo nginx -t
 sudo systemctl reload nginx
 
@@ -241,6 +258,7 @@ sudo systemctl --no-pager --full status \
     skyguardian-scheduler.service \
     skyguardian-group-channel-telethon.service \
     skyguardian-group-channel-delete.service \
+    skyguardian-queue.service \
     skyguardian-backup.timer
 
 SWITCHED=0

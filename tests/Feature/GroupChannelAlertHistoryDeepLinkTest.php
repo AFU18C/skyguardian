@@ -53,7 +53,6 @@ class GroupChannelAlertHistoryDeepLinkTest extends TestCase
             ->withHeader('X-Telegram-Bot-Api-Secret-Token', $bot->webhook_secret)
             ->postJson(route('group-channel.webhook', [
                 'fingerprint' => $bot->token_fingerprint,
-                'secret' => $bot->webhook_secret,
             ]), [
                 'update_id' => 99001,
                 'message' => [

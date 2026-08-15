@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\TelegramDeliveryUncertainException;
+use App\Models\GroupChannelAlertCard;
 use App\Models\GroupChannelAlertEvent;
 use App\Models\GroupChannelBot;
 use App\Services\GroupChannelAlertPublicationService;
@@ -297,6 +299,47 @@ class GroupChannelAlertPublicationTest extends TestCase
         $this->assertSame(0, $unchanged['queued']);
         $this->assertSame(0, $unchanged['sent']);
         Http::assertSentCount(1);
+    }
+
+    public function test_ambiguous_alert_deliveries_are_quarantined_and_never_retried_automatically(): void
+    {
+        Http::fake(['*' => Http::response([], 500)]);
+        $bot = $this->alertBot();
+        $service = app(GroupChannelAlertPublicationService::class);
+        $alert = $this->alert(14, 'Київська область', 'oblast', 8801);
+        $service->processSnapshot($bot, []);
+
+        try {
+            $service->processSnapshot($bot->fresh(), [$alert]);
+            $this->fail('An ambiguous Telegram delivery was expected.');
+        } catch (TelegramDeliveryUncertainException) {
+            $this->assertTrue(true);
+        }
+
+        $card = $bot->alertCards()->firstOrFail();
+        $this->assertSame(GroupChannelAlertCard::STATUS_UNCERTAIN, $card->delivery_status);
+        $this->assertNotNull($card->pending_snapshot_hash);
+        Http::assertSentCount(1);
+
+        $unchanged = $service->processSnapshot($bot->fresh(), [$alert]);
+        $this->assertSame(0, $unchanged['sent']);
+        Http::assertSentCount(1);
+
+        try {
+            $service->processSnapshot($bot->fresh(), []);
+            $this->fail('An ambiguous Telegram delivery was expected.');
+        } catch (TelegramDeliveryUncertainException) {
+            $this->assertTrue(true);
+        }
+
+        $event = $bot->alertEvents()->firstOrFail();
+        $this->assertSame(GroupChannelAlertEvent::STATUS_UNCERTAIN, $event->status);
+        $this->assertNotNull($event->delivery_batch_id);
+        Http::assertSentCount(2);
+
+        $noRetry = $service->processSnapshot($bot->fresh(), []);
+        $this->assertSame(0, $noRetry['sent']);
+        Http::assertSentCount(2);
     }
 
     public function test_all_supported_location_levels_and_notes_are_published(): void

@@ -25,19 +25,25 @@ class BetParser
         [$home, $away] = $teams;
         $event = $home.' — '.$away;
         $startsAt = $this->startsAt($text, $message['date'] ?? null);
+        $sourceType = ($message['source_type'] ?? 'telegram') === 'website' ? 'website' : 'telegram';
         $eventDay = $startsAt
             ? (new \DateTimeImmutable($startsAt))->format('Y-m-d')
             : ($this->messageDay($message['date'] ?? null) ?? 'unknown-date');
         $fingerprint = hash('sha256', mb_strtolower($event.'|'.$market.'|'.$eventDay));
-        $score = 78 + ($telegramOdds ? 5 : 0) + (! empty($message['date']) ? 4 : 0);
+        $tournament = $this->tournament($text);
+        $score = 62
+            + ($telegramOdds ? 10 : 0)
+            + ($startsAt ? 10 : 0)
+            + ($tournament ? 6 : 0)
+            + (! empty($message['date']) ? 4 : 0);
 
-        $sourceType = ($message['source_type'] ?? 'telegram') === 'website' ? 'website' : 'telegram';
         $source = $sourceType === 'website'
             ? [
                 'type' => 'website',
                 'name' => $message['source_name'] ?? 'Сайт',
                 'url' => $message['url'] ?? null,
                 'date' => $message['date'] ?? null,
+                'fetched_at' => $message['fetched_at'] ?? null,
                 'text' => mb_substr($text, 0, 2000),
             ]
             : [
@@ -58,12 +64,14 @@ class BetParser
             'event_name' => $event,
             'home_team' => $home,
             'away_team' => $away,
-            'tournament' => $this->tournament($text),
+            'tournament' => $tournament,
             'starts_at' => $startsAt,
             'market' => $market,
             'telegram_odds' => $telegramOdds,
-            'ai_score' => min(97, $score),
-            'ai_reason' => 'Событие и рынок распознаны в публикации. Оценка учитывает полноту данных и подтверждение в нескольких источниках.',
+            // Legacy column names are kept for a zero-downtime database migration.
+            // The value is a transparent completeness score, not an AI prediction.
+            'ai_score' => min(96, $score),
+            'ai_reason' => 'Оценка качества учитывает распознанные команды, рынок, дату матча, коэффициент, турнир и независимые источники.',
             'telegram_sources' => $sourceType === 'telegram' ? [$source] : [],
             'search_sources' => [$source],
         ];

@@ -20,6 +20,8 @@ class GroupChannelPublication extends Model
 
     public const STATUS_ERROR = 'error';
 
+    public const STATUS_UNCERTAIN = 'uncertain';
+
     public const TYPE_TEXT = 'text';
 
     public const TYPE_PHOTO = 'photo';
@@ -57,6 +59,9 @@ class GroupChannelPublication extends Model
         'sent_at',
         'delete_at',
         'deleted_at_telegram',
+        'deletion_attempts',
+        'next_delete_attempt_at',
+        'delete_failed_at',
         'telegram_message_id',
         'telegram_message_ids',
         'last_error',
@@ -82,6 +87,9 @@ class GroupChannelPublication extends Model
             'sent_at' => 'datetime',
             'delete_at' => 'datetime',
             'deleted_at_telegram' => 'datetime',
+            'deletion_attempts' => 'integer',
+            'next_delete_attempt_at' => 'datetime',
+            'delete_failed_at' => 'datetime',
             'delete_after_minutes' => 'integer',
         ];
     }

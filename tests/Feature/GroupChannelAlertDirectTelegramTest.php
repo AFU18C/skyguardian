@@ -99,7 +99,7 @@ class GroupChannelAlertDirectTelegramTest extends TestCase
 
         app(DirectGroupChannelTelegramService::class)->request($bot, 'sendMessage', [
             'chat_id' => $bot->chat_id,
-            'text' => "🚨 ПОВІТРЯНА ТРИВОГА\n\n📍 Київська область",
+            'text' => "<b>🚨 ПОВІТРЯНА ТРИВОГА</b>\n\n📍 Київська область",
             'reply_markup' => [
                 'inline_keyboard' => [[
                     [

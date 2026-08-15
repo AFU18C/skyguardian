@@ -24,6 +24,13 @@ class DirectGroupChannelTelegramService extends GroupChannelTelegramService
         return parent::request($bot, $method, $payload);
     }
 
+    protected function shouldConfigureAlertMapButton(): bool
+    {
+        // This client preserves the history keyboard and adds the map button
+        // itself before the base payload normalization runs.
+        return false;
+    }
+
     private function withConfiguredMapButton(
         GroupChannelBot $bot,
         string $method,

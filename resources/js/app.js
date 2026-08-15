@@ -195,12 +195,12 @@ ready(() => {
             const canvas = document.createElement('canvas');
             target.replaceChildren(canvas);
             QRCode.toCanvas(canvas, target.dataset.qrUrl, {
-                    width: 220,
-                    errorCorrectionLevel: 'M',
-                    margin: 1,
-                }, (error) => {
-                    if (error) target.textContent = 'Не удалось построить QR-код.';
-                });
+                width: 220,
+                errorCorrectionLevel: 'M',
+                margin: 1,
+            }, (error) => {
+                if (error) target.textContent = 'Не удалось построить QR-код.';
             });
+        });
     }
 });

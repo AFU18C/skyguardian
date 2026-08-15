@@ -112,6 +112,7 @@ class GroupChannelBot extends Model
         return [
             'bot_token' => 'encrypted',
             'alerts_api_token' => 'encrypted',
+            'webhook_secret' => 'encrypted',
             'permissions' => 'array',
             'module_settings' => 'array',
             'last_manual_check_at' => 'datetime',
@@ -158,6 +159,11 @@ class GroupChannelBot extends Model
     public function alertEvents(): HasMany
     {
         return $this->hasMany(GroupChannelAlertEvent::class);
+    }
+
+    public function alertCards(): HasMany
+    {
+        return $this->hasMany(GroupChannelAlertCard::class);
     }
 
     public function moduleEnabled(string $module): bool
