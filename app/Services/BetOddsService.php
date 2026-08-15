@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BettingSetting;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class BetOddsService
 {
@@ -254,8 +255,7 @@ class BetOddsService
     /** @return list<string> */
     private function latinTokens(string $value): array
     {
-        $latin = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', mb_strtolower($value));
-        $latin = is_string($latin) ? $latin : mb_strtolower($value);
+        $latin = Str::transliterate(mb_strtolower($value), '');
 
         return collect(preg_split('/[^a-z0-9]+/i', $latin))
             ->map(fn (string $token): string => mb_strtolower(trim($token)))
