@@ -190,6 +190,21 @@ class BettingModuleTest extends TestCase
         $this->assertDatabaseCount('bets', 0);
     }
 
+    #[Test]
+    public function search_rejects_a_beton_event_without_the_requested_odds(): void
+    {
+        $settings = $this->websiteBettingSettings();
+        $this->mockWebsitePrediction();
+        $this->mock(BetOddsService::class, function ($mock): void {
+            $mock->shouldReceive('lookup')->once()->andReturn($this->oddsResult(eventFound: true, odds: null));
+        });
+
+        $run = app(BetSearchService::class)->run($settings, 'websites');
+
+        $this->assertSame(0, (int) $run->bets_found);
+        $this->assertDatabaseCount('bets', 0);
+    }
+
     private function websiteBettingSettings(): BettingSetting
     {
         $settings = BettingSetting::current();

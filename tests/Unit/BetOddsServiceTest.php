@@ -126,4 +126,24 @@ class BetOddsServiceTest extends TestCase
         $this->assertTrue($result['finished']);
         $this->assertSame('2026-08-14T15:30:00+03:00', $result['starts_at']);
     }
+
+    #[Test]
+    public function it_accepts_a_future_dated_event(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-16 00:20:00', 'Europe/Kyiv'));
+
+        $result = (new BetOddsService)->extract(
+            'Бразильська Серія В 17/08 • 15:30 Сан-Бернарду Ботафого Тотал менше 3.5 1.84',
+            [
+                'home_team' => 'Сан-Бернарду',
+                'away_team' => 'Ботафого',
+                'market' => 'ТМ 3.5',
+            ],
+        );
+        CarbonImmutable::setTestNow();
+
+        $this->assertTrue($result['event_found']);
+        $this->assertFalse($result['finished']);
+        $this->assertSame(1.84, $result['odds']);
+    }
 }
