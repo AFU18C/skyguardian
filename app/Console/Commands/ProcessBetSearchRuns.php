@@ -19,9 +19,7 @@ class ProcessBetSearchRuns extends Command
         $limit = max(1, min(3, (int) $this->option('limit')));
         $failed = 0;
 
-        $settings = BettingSetting::current();
-        $service->revalidateFoundBets($settings);
-        $service->cleanup($settings);
+        $service->cleanup(BettingSetting::current());
 
         BetSearchRun::query()
             ->where(function ($query): void {

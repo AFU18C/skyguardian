@@ -190,29 +190,6 @@ class BettingModuleTest extends TestCase
         $this->assertDatabaseCount('bets', 0);
     }
 
-    #[Test]
-    public function background_recheck_removes_a_bet_after_the_event_finishes(): void
-    {
-        $settings = $this->websiteBettingSettings();
-        $bet = Bet::query()->create(array_merge([
-            'fingerprint' => hash('sha256', 'active-beton-event'),
-            'status' => Bet::STATUS_FOUND,
-            'event_name' => 'Сан-Бернарду — Ботафого',
-            'home_team' => 'Сан-Бернарду',
-            'away_team' => 'Ботафого',
-            'market' => 'ТМ 3.5',
-            'ai_score' => 82,
-        ], $this->oddsResult(eventFound: true)));
-        $bet->update(['odds_checked_at' => now()->subMinutes(6)]);
-        $this->mock(BetOddsService::class, function ($mock): void {
-            $mock->shouldReceive('lookup')->once()->andReturn($this->oddsResult(eventFound: true, finished: true));
-        });
-
-        app(BetSearchService::class)->revalidateFoundBets($settings);
-
-        $this->assertModelMissing($bet);
-    }
-
     private function websiteBettingSettings(): BettingSetting
     {
         $settings = BettingSetting::current();

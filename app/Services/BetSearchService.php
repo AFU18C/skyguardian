@@ -307,36 +307,6 @@ class BetSearchService
             ->delete();
     }
 
-    public function revalidateFoundBets(BettingSetting $settings): void
-    {
-        Bet::query()
-            ->where('status', Bet::STATUS_FOUND)
-            ->where(fn ($query) => $query
-                ->whereNull('odds_checked_at')
-                ->orWhere('odds_checked_at', '<=', now()->subMinutes(5)))
-            ->oldest('odds_checked_at')
-            ->limit(10)
-            ->get()
-            ->each(function (Bet $bet) use ($settings): void {
-                $odds = $this->odds->lookup($bet->toArray(), $settings);
-                $verified = array_merge($bet->toArray(), $odds);
-
-                if ($this->isVerifiedAvailableBet($verified, $settings)) {
-                    $bet->update($odds);
-
-                    return;
-                }
-
-                if ($this->isDefinitivelyUnavailable($odds, $settings)) {
-                    $bet->delete();
-
-                    return;
-                }
-
-                $bet->update(['odds_checked_at' => now()]);
-            });
-    }
-
     /** @param  array<string, mixed>  $bet */
     private function isVerifiedAvailableBet(array $bet, BettingSetting $settings): bool
     {
@@ -352,28 +322,6 @@ class BetSearchService
             }
 
             return true;
-        }
-
-        return false;
-    }
-
-    /** @param  array<string, mixed>  $odds */
-    private function isDefinitivelyUnavailable(array $odds, BettingSetting $settings): bool
-    {
-        foreach ($this->verificationSourceKeys($settings) as $sourceKey) {
-            $source = data_get($odds, "odds_snapshot.{$sourceKey}");
-            if (! is_array($source)) {
-                continue;
-            }
-
-            if (($source['event_found'] ?? false) === true && ($source['finished'] ?? false) === true) {
-                return true;
-            }
-
-            if (($source['event_found'] ?? false) === false
-                && str_contains((string) ($source['error'] ?? ''), 'актуальной линии BETON')) {
-                return true;
-            }
         }
 
         return false;
