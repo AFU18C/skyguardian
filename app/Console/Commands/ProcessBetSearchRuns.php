@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\BetSearchRun;
+use App\Models\BettingSetting;
 use App\Services\BetSearchService;
 use Illuminate\Console\Command;
 use Throwable;
@@ -17,6 +18,8 @@ class ProcessBetSearchRuns extends Command
     {
         $limit = max(1, min(3, (int) $this->option('limit')));
         $failed = 0;
+
+        $service->cleanup(BettingSetting::current());
 
         BetSearchRun::query()
             ->where(function ($query): void {

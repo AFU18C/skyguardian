@@ -45,6 +45,9 @@ jobs:
       - name: Build frontend assets
         run: npm run build
 
+      - name: Check betting browser syntax
+        run: node --check scripts/inspect-betting-event.mjs
+
       - name: Run PHP tests
         run: php artisan test --display-warnings --display-deprecations --fail-on-warning
 

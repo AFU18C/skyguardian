@@ -171,8 +171,16 @@ class BetSearchService
 
             $prepared = [];
             foreach ($accepted as $data) {
-                $prepared[] = array_merge($data, $this->odds->lookup($data, $settings));
+                $verified = array_merge($data, $this->odds->lookup($data, $settings));
+
+                if (! $this->isVerifiedAvailableBet($verified, $settings)) {
+                    continue;
+                }
+
+                $prepared[] = $verified;
             }
+
+            $discardedCount = count($accepted) - count($prepared);
 
             DB::transaction(function () use ($prepared): void {
                 foreach ($prepared as $data) {
@@ -214,10 +222,13 @@ class BetSearchService
             if ($websiteErrors->isNotEmpty()) {
                 $errors->push('Не удалось проверить сайты: '.$websiteErrors->join('; ').'.');
             }
+            if ($discardedCount > 0) {
+                $errors->push("Отклонено отсутствующих или завершённых ставок: {$discardedCount}.");
+            }
             $run->update([
                 'status' => BetSearchRun::STATUS_COMPLETED,
                 'messages_found' => count($response['messages'] ?? []),
-                'bets_found' => count($accepted),
+                'bets_found' => count($prepared),
                 'last_error' => $errors->isEmpty() ? null : $errors->join(' '),
                 'finished_at' => now(),
             ]);
@@ -271,6 +282,12 @@ class BetSearchService
     public function cleanup(BettingSetting $settings): void
     {
         Bet::query()
+            ->where('status', Bet::STATUS_FOUND)
+            ->get()
+            ->reject(fn (Bet $bet): bool => $this->isVerifiedAvailableBet($bet->toArray(), $settings))
+            ->each->delete();
+
+        Bet::query()
             ->where('status', Bet::STATUS_PUBLISHING)
             ->where('updated_at', '<', now()->subMinutes(15))
             ->get()
@@ -288,5 +305,42 @@ class BetSearchService
             ->whereIn('status', [BetSearchRun::STATUS_COMPLETED, BetSearchRun::STATUS_ERROR])
             ->where('created_at', '<', now()->subDays(30))
             ->delete();
+    }
+
+    /** @param  array<string, mixed>  $bet */
+    private function isVerifiedAvailableBet(array $bet, BettingSetting $settings): bool
+    {
+        foreach ($this->verificationSourceKeys($settings) as $sourceKey) {
+            $source = data_get($bet, "odds_snapshot.{$sourceKey}");
+
+            if (! is_array($source)
+                || ($source['event_found'] ?? false) !== true
+                || ($source['finished'] ?? false) === true
+                || ! is_numeric($source['odds'] ?? null)
+                || (float) $source['odds'] <= 1) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    private function verificationSourceKeys(BettingSetting $settings): array
+    {
+        return match (true) {
+            $this->isBetonUrl($settings->primary_source_url) => ['primary'],
+            $this->isBetonUrl($settings->reserve_source_url) => ['reserve'],
+            default => ['primary', 'reserve'],
+        };
+    }
+
+    private function isBetonUrl(?string $url): bool
+    {
+        $host = mb_strtolower((string) parse_url((string) $url, PHP_URL_HOST));
+
+        return $host === 'beton.ua' || str_ends_with($host, '.beton.ua');
     }
 }

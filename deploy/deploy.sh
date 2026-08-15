@@ -36,7 +36,8 @@ sudo install -d -o www-data -g www-data -m 775 \
     "$SHARED_DIR/storage/framework/cache" \
     "$SHARED_DIR/storage/framework/sessions" \
     "$SHARED_DIR/storage/framework/views" \
-    "$SHARED_DIR/storage/logs/archive"
+    "$SHARED_DIR/storage/logs/archive" \
+    "$SHARED_DIR/playwright"
 
 if [ -d "$APP_LINK/storage" ] && [ ! -f "$SHARED_DIR/.storage-imported" ]; then
     sudo rsync -a "$APP_LINK/storage/" "$SHARED_DIR/storage/"
@@ -87,6 +88,9 @@ python3 -m venv .venv
 .venv/bin/pip install --disable-pip-version-check -r telethon/requirements.txt
 
 npm ci --no-audit --no-fund
+sudo "$BUILD_DIR/node_modules/.bin/playwright" install-deps chromium
+sudo -u www-data env PLAYWRIGHT_BROWSERS_PATH="$SHARED_DIR/playwright" \
+    "$BUILD_DIR/node_modules/.bin/playwright" install chromium
 npm run build
 
 # Laravel caches may contain absolute paths. Finalize the immutable release
@@ -118,6 +122,7 @@ upsert_env LOG_LEVEL info
 upsert_env SESSION_SECURE_COOKIE true
 upsert_env SESSION_HTTP_ONLY true
 upsert_env SESSION_SAME_SITE lax
+upsert_env PLAYWRIGHT_BROWSERS_PATH "$SHARED_DIR/playwright"
 
 sudo chown github-runner:www-data "$SHARED_DIR/.env"
 sudo chmod 640 "$SHARED_DIR/.env"
