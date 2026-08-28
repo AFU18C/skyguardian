@@ -1,18 +1,22 @@
 package com.asshunter.game;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.media.AudioAttributes;
+import android.media.SoundPool;
 import android.os.SystemClock;
 import android.util.Base64;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -21,530 +25,621 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-/** Landscape, old-Flash-style top-down arcade recreation. */
 public class GameView extends View {
-    private static final float VW = 1000f;
-    private static final float VH = 700f;
-    private static final int MENU = 0;
-    private static final int PLAY = 1;
-    private static final int CAUGHT = 2;
-    private static final int GAME_OVER = 3;
+    private static final int MODE_MENU = 0;
+    private static final int MODE_GAME = 1;
+    private static final int MODE_GAME_OVER = 2;
 
-    private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Random rnd = new Random();
+    private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final Paint shadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Random random = new Random();
+    private final List<Bullet> bullets = new ArrayList<>();
     private final List<Enemy> enemies = new ArrayList<>();
-    private final List<Shot> shots = new ArrayList<>();
+    private final SharedPreferences prefs;
+
     private final Bitmap portrait;
+    private final Bitmap menuArt;
+    private final Bitmap playerSheet;
+    private final Bitmap enemySheet;
+    private final Bitmap tileSheet;
+    private final Bitmap environmentSheet;
+    private final Bitmap startButtonArt;
 
-    private int state = MENU;
-    private int score = 0;
-    private int record = 0;
-    private int lives = 5;
-    private int ammo = 2;
-    private float hunterX = 500f;
-    private float hunterY = 365f;
-    private float facingX = 0f;
-    private float facingY = -1f;
-    private float spawnTimer = .45f;
-    private float caughtTimer = 0f;
+    private final Rect playerIdle = new Rect(0, 0, 206, 116);
+    private final Rect playerIdle2 = new Rect(206, 0, 412, 116);
+    private final Rect playerShot = new Rect(618, 812, 824, 928);
+    private final Rect enemyWalk1 = new Rect(420, 339, 560, 452);
+    private final Rect enemyWalk2 = new Rect(560, 339, 700, 452);
+    private final Rect tileCenter = new Rect(323, 219, 647, 438);
+    private final Rect envLeaves = new Rect(1, 1, 168, 159);
+    private final Rect envBush = new Rect(170, 1, 283, 113);
+    private final Rect envRock = new Rect(285, 31, 332, 77);
+    private final Rect envGrass = new Rect(170, 115, 231, 167);
+
+    private final RectF startButton = new RectF();
+    private final RectF reloadButton = new RectF();
+
+    private final SoundPool sounds;
+    private final int sndShot;
+    private final int sndReload;
+    private final int sndHit;
+    private final int sndCatch;
+
     private long lastFrame = SystemClock.elapsedRealtime();
-    private boolean left, right, up, down;
-    private boolean touchFireDown;
+    private int mode = MODE_MENU;
+    private int score = 0;
+    private int record;
+    private int lives = 3;
+    private int ammo = 2;
 
-    private final RectF startRect = new RectF(655, 540, 935, 625);
-    private final RectF fireRect = new RectF(815, 530, 970, 675);
-    private final RectF reloadRect = new RectF(820, 445, 965, 510);
-    private final RectF leftRect = new RectF(35, 555, 120, 640);
-    private final RectF rightRect = new RectF(205, 555, 290, 640);
-    private final RectF upRect = new RectF(120, 505, 205, 590);
-    private final RectF downRect = new RectF(120, 590, 205, 675);
+    private float playerX;
+    private float playerY;
+    private float aimRadians = (float) Math.PI;
+    private float playerRotation = 0f;
+    private float spawnTimer = 0.55f;
+    private float shotCooldown = 0f;
+    private float walkClock = 0f;
 
-    private static final float HUNTER_SPEED = 250f;
-    private static final float SHOT_SPEED = 690f;
-    private static final float CATCH_TIME = 1.45f;
+    private boolean caught = false;
+    private float caughtTimer = 0f;
+    private Enemy catcher;
 
-    public GameView(Context context) {
-        super(context);
-        setFocusable(true);
-        setFocusableInTouchMode(true);
-        requestFocus();
-        p.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
-        stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(4f);
-        stroke.setStrokeJoin(Paint.Join.ROUND);
-        stroke.setStrokeCap(Paint.Cap.ROUND);
-        portrait = decode(EmbeddedImages.portraitBase64());
-    }
+    private int movePointerId = -1;
+    private float stickBaseX;
+    private float stickBaseY;
+    private float stickX;
+    private float stickY;
+    private float moveX;
+    private float moveY;
 
-    private Bitmap decode(String text) {
-        try {
-            byte[] b = Base64.decode(text, Base64.DEFAULT);
-            return BitmapFactory.decodeByteArray(b, 0, b.length);
-        } catch (Throwable t) {
-            return null;
-        }
-    }
+    private final float[] decoX = {0.06f, 0.16f, 0.30f, 0.52f, 0.70f, 0.86f, 0.95f};
+    private final float[] decoY = {0.12f, 0.78f, 0.24f, 0.84f, 0.15f, 0.72f, 0.35f};
 
-    private static class Enemy {
-        float x, y, speed, wobble;
-        Enemy(float x, float y, float speed, float wobble) {
-            this.x = x; this.y = y; this.speed = speed; this.wobble = wobble;
-        }
-    }
+    private static final float PLAYER_SPEED = 315f;
+    private static final float BULLET_SPEED = 1050f;
+    private static final float ENEMY_SPEED_MIN = 92f;
+    private static final float ENEMY_SPEED_MAX = 138f;
+    private static final float CATCH_DURATION = 1.25f;
 
-    private static class Shot {
+    private static class Bullet {
         float x, y, vx, vy;
-        Shot(float x, float y, float vx, float vy) {
+        Bullet(float x, float y, float vx, float vy) {
             this.x = x; this.y = y; this.vx = vx; this.vy = vy;
         }
     }
 
-    @Override protected void onDraw(Canvas c) {
-        super.onDraw(c);
+    private static class Enemy {
+        float x, y, speed, phase;
+        Enemy(float x, float y, float speed, float phase) {
+            this.x = x; this.y = y; this.speed = speed; this.phase = phase;
+        }
+    }
+
+    public GameView(Context context) {
+        super(context);
+        setFocusable(true);
+        paint.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+        shadowPaint.setTypeface(paint.getTypeface());
+
+        portrait = decodePortrait(EmbeddedImages.portraitBase64());
+        menuArt = BitmapFactory.decodeResource(getResources(), R.drawable.main_menu);
+        playerSheet = BitmapFactory.decodeResource(getResources(), R.drawable.player);
+        enemySheet = BitmapFactory.decodeResource(getResources(), R.drawable.enemy);
+        tileSheet = BitmapFactory.decodeResource(getResources(), R.drawable.tiles);
+        environmentSheet = BitmapFactory.decodeResource(getResources(), R.drawable.environment);
+        startButtonArt = BitmapFactory.decodeResource(getResources(), R.drawable.start_button);
+
+        prefs = context.getSharedPreferences("ass_hunter_hd", Context.MODE_PRIVATE);
+        record = prefs.getInt("record", 0);
+
+        AudioAttributes attrs = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build();
+        sounds = new SoundPool.Builder().setMaxStreams(5).setAudioAttributes(attrs).build();
+        sndShot = sounds.load(context, R.raw.shot, 1);
+        sndReload = sounds.load(context, R.raw.reload, 1);
+        sndHit = sounds.load(context, R.raw.hit, 1);
+        sndCatch = sounds.load(context, R.raw.catch_sound, 1);
+    }
+
+    private Bitmap decodePortrait(String base64) {
+        try {
+            byte[] data = Base64.decode(base64, Base64.DEFAULT);
+            return BitmapFactory.decodeByteArray(data, 0, data.length);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        playerX = w * 0.50f;
+        playerY = h * 0.52f;
+        float bw = Math.min(w * 0.25f, 360f);
+        float bh = Math.min(h * 0.15f, 105f);
+        startButton.set(w * 0.73f - bw / 2f, h * 0.72f, w * 0.73f + bw / 2f, h * 0.72f + bh);
+        float rr = Math.min(w, h) * 0.065f;
+        reloadButton.set(w - rr * 2.35f, h - rr * 2.20f, w - rr * 0.35f, h - rr * 0.20f);
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
         long now = SystemClock.elapsedRealtime();
-        float dt = Math.min(.033f, (now - lastFrame) / 1000f);
+        float dt = Math.min(0.033f, Math.max(0f, (now - lastFrame) / 1000f));
         lastFrame = now;
 
-        float s = Math.min(getWidth() / VW, getHeight() / VH);
-        float ox = (getWidth() - VW * s) * .5f;
-        float oy = (getHeight() - VH * s) * .5f;
-        c.drawColor(Color.rgb(20, 20, 16));
-        c.save();
-        c.translate(ox, oy);
-        c.scale(s, s);
-
-        if (state == MENU) {
-            drawMenu(c);
+        if (mode == MODE_MENU) {
+            drawMenu(canvas);
         } else {
-            if (state == PLAY) updatePlay(dt);
-            else if (state == CAUGHT) updateCaught(dt);
-            drawPlayfield(c);
-            if (state == CAUGHT) drawCaught(c);
-            if (state == GAME_OVER) drawGameOver(c);
+            if (mode == MODE_GAME) updateGame(dt);
+            drawGame(canvas);
+            if (mode == MODE_GAME_OVER) drawGameOver(canvas);
         }
-        c.restore();
         postInvalidateOnAnimation();
     }
 
-    private void updatePlay(float dt) {
-        float mx = 0f, my = 0f;
-        if (left) mx -= 1f;
-        if (right) mx += 1f;
-        if (up) my -= 1f;
-        if (down) my += 1f;
-        if (mx != 0f || my != 0f) {
-            float len = (float)Math.sqrt(mx * mx + my * my);
-            mx /= len; my /= len;
-            hunterX += mx * HUNTER_SPEED * dt;
-            hunterY += my * HUNTER_SPEED * dt;
-            facingX = mx; facingY = my;
+    private void drawMenu(Canvas canvas) {
+        int w = getWidth();
+        int h = getHeight();
+        paint.setShader(new LinearGradient(0, 0, 0, h, Color.rgb(229, 235, 214), Color.rgb(159, 190, 126), Shader.TileMode.CLAMP));
+        canvas.drawRect(0, 0, w, h, paint);
+        paint.setShader(null);
+
+        if (menuArt != null) {
+            Rect src = new Rect(0, 145, menuArt.getWidth(), menuArt.getHeight());
+            canvas.drawBitmap(menuArt, src, new Rect(0, 0, w, h), paint);
         }
-        hunterX = clamp(hunterX, 95, 905);
-        hunterY = clamp(hunterY, 110, 565);
+
+        // Replace only the hunter's face; keep the original illustrated body, hat and shotgun.
+        drawPortraitOval(canvas, w * 0.383f, h * 0.655f, w * 0.425f, h * 0.775f, 0f, true);
+
+        drawOutlinedText(canvas, "RECORD: " + record, w * 0.74f, h * 0.60f, Math.min(w, h) * 0.060f, Color.rgb(255, 218, 42), Paint.Align.CENTER);
+
+        if (startButtonArt != null) {
+            canvas.drawBitmap(startButtonArt, null, startButton, paint);
+        } else {
+            paint.setColor(Color.argb(235, 255, 214, 44));
+            canvas.drawRoundRect(startButton, 22f, 22f, paint);
+        }
+        drawOutlinedText(canvas, "START GAME", startButton.centerX(), startButton.centerY() + startButton.height() * 0.16f,
+                Math.min(w, h) * 0.070f, Color.WHITE, Paint.Align.CENTER);
+
+        paint.setColor(Color.argb(175, 25, 46, 21));
+        RectF hint = new RectF(w * 0.70f, h * 0.89f, w * 0.96f, h * 0.965f);
+        canvas.drawRoundRect(hint, 18f, 18f, paint);
+        paint.setColor(Color.WHITE);
+        paint.setTextAlign(Paint.Align.CENTER);
+        paint.setTextSize(Math.min(w, h) * 0.027f);
+        canvas.drawText("LEFT THUMB: MOVE   •   RIGHT SIDE: AIM / FIRE", hint.centerX(), hint.centerY() + paint.getTextSize() * 0.35f, paint);
+    }
+
+    private void startGame() {
+        mode = MODE_GAME;
+        score = 0;
+        lives = 3;
+        ammo = 2;
+        bullets.clear();
+        enemies.clear();
+        caught = false;
+        catcher = null;
+        caughtTimer = 0f;
+        playerX = getWidth() * 0.50f;
+        playerY = getHeight() * 0.52f;
+        aimRadians = (float) Math.PI;
+        playerRotation = 0f;
+        spawnTimer = 0.55f;
+        movePointerId = -1;
+        moveX = moveY = 0f;
+        lastFrame = SystemClock.elapsedRealtime();
+    }
+
+    private void updateGame(float dt) {
+        if (caught) {
+            caughtTimer += dt;
+            if (caughtTimer >= CATCH_DURATION) {
+                caught = false;
+                caughtTimer = 0f;
+                catcher = null;
+                enemies.clear();
+                bullets.clear();
+                lives--;
+                spawnTimer = 0.8f;
+                if (lives <= 0) mode = MODE_GAME_OVER;
+            }
+            return;
+        }
+
+        shotCooldown = Math.max(0f, shotCooldown - dt);
+        walkClock += dt;
+
+        playerX += moveX * PLAYER_SPEED * dt;
+        playerY += moveY * PLAYER_SPEED * dt;
+        float mx = getWidth() * 0.08f;
+        float my = getHeight() * 0.12f;
+        playerX = clamp(playerX, mx, getWidth() - mx);
+        playerY = clamp(playerY, my, getHeight() - my);
+
+        if (Math.abs(moveX) + Math.abs(moveY) > 0.12f) {
+            aimRadians = (float) Math.atan2(moveY, moveX);
+            playerRotation = (float) Math.toDegrees(aimRadians) - 180f;
+        }
 
         spawnTimer -= dt;
-        if (spawnTimer <= 0f && enemies.size() < 8) {
-            spawnTimer = .62f + rnd.nextFloat() * .50f;
+        if (spawnTimer <= 0f && enemies.size() < 5) {
             spawnEnemy();
+            spawnTimer = Math.max(0.52f, 1.08f - score / 8000f) + random.nextFloat() * 0.45f;
         }
 
-        Iterator<Shot> si = shots.iterator();
-        while (si.hasNext()) {
-            Shot sh = si.next();
-            sh.x += sh.vx * dt;
-            sh.y += sh.vy * dt;
-            if (sh.x < -30 || sh.x > VW + 30 || sh.y < -30 || sh.y > VH + 30) si.remove();
+        Iterator<Bullet> bit = bullets.iterator();
+        while (bit.hasNext()) {
+            Bullet b = bit.next();
+            b.x += b.vx * dt;
+            b.y += b.vy * dt;
+            if (b.x < -60 || b.x > getWidth() + 60 || b.y < -60 || b.y > getHeight() + 60) bit.remove();
         }
 
-        for (Enemy e : enemies) {
-            float dx = hunterX - e.x;
-            float dy = hunterY - e.y;
-            float d = (float)Math.sqrt(dx * dx + dy * dy);
-            if (d < 1f) d = 1f;
-            e.wobble += dt * 7f;
-            float px = -dy / d;
-            float py = dx / d;
-            e.x += dx / d * e.speed * dt + px * (float)Math.sin(e.wobble) * 10f * dt;
-            e.y += dy / d * e.speed * dt + py * (float)Math.sin(e.wobble) * 10f * dt;
-            if (d < 44f) {
-                state = CAUGHT;
+        Iterator<Enemy> eit = enemies.iterator();
+        while (eit.hasNext()) {
+            Enemy e = eit.next();
+            float dx = playerX - e.x;
+            float dy = playerY - e.y;
+            float d = (float) Math.sqrt(dx * dx + dy * dy);
+            if (d < 58f) {
+                catcher = e;
+                caught = true;
                 caughtTimer = 0f;
-                left = right = up = down = false;
-                shots.clear();
-                return;
+                moveX = moveY = 0f;
+                sounds.play(sndCatch, 0.85f, 0.85f, 1, 0, 1f);
+                break;
             }
+            if (d > 0.001f) {
+                e.x += dx / d * e.speed * dt;
+                e.y += dy / d * e.speed * dt;
+            }
+            e.phase += dt * 8f;
         }
 
-        outer:
-        for (int a = shots.size() - 1; a >= 0; a--) {
-            Shot sh = shots.get(a);
-            for (int b = enemies.size() - 1; b >= 0; b--) {
-                Enemy e = enemies.get(b);
-                float dx = sh.x - e.x, dy = sh.y - e.y;
-                if (dx * dx + dy * dy < 28f * 28f) {
-                    shots.remove(a);
-                    enemies.remove(b);
-                    score += 100;
-                    if (score > record) record = score;
-                    continue outer;
+        if (!caught) {
+            outer:
+            for (int bi = bullets.size() - 1; bi >= 0; bi--) {
+                Bullet b = bullets.get(bi);
+                for (int ei = enemies.size() - 1; ei >= 0; ei--) {
+                    Enemy e = enemies.get(ei);
+                    float dx = b.x - e.x;
+                    float dy = b.y - e.y;
+                    if (dx * dx + dy * dy < 34f * 34f) {
+                        bullets.remove(bi);
+                        enemies.remove(ei);
+                        score += 100;
+                        if (score > record) {
+                            record = score;
+                            prefs.edit().putInt("record", record).apply();
+                        }
+                        sounds.play(sndHit, 0.75f, 0.75f, 1, 0, 1f);
+                        continue outer;
+                    }
                 }
             }
         }
     }
 
-    private void updateCaught(float dt) {
-        caughtTimer += dt;
-        if (caughtTimer >= CATCH_TIME) {
-            lives--;
-            enemies.clear();
-            shots.clear();
-            ammo = 2;
-            hunterX = 500f;
-            hunterY = 365f;
-            facingX = 0f;
-            facingY = -1f;
-            spawnTimer = .75f;
-            if (lives <= 0) state = GAME_OVER;
-            else state = PLAY;
-        }
-    }
-
     private void spawnEnemy() {
-        int side = rnd.nextInt(4);
+        int side = random.nextInt(4);
         float x, y;
-        if (side == 0) { x = 45; y = 105 + rnd.nextFloat() * 420; }
-        else if (side == 1) { x = 955; y = 105 + rnd.nextFloat() * 420; }
-        else if (side == 2) { x = 110 + rnd.nextFloat() * 780; y = 75; }
-        else { x = 110 + rnd.nextFloat() * 780; y = 570; }
-        enemies.add(new Enemy(x, y, 85 + rnd.nextFloat() * 45, rnd.nextFloat() * 6.28f));
+        float pad = 70f;
+        if (side == 0) { x = -pad; y = getHeight() * (0.15f + random.nextFloat() * 0.70f); }
+        else if (side == 1) { x = getWidth() + pad; y = getHeight() * (0.15f + random.nextFloat() * 0.70f); }
+        else if (side == 2) { x = getWidth() * (0.12f + random.nextFloat() * 0.76f); y = -pad; }
+        else { x = getWidth() * (0.12f + random.nextFloat() * 0.76f); y = getHeight() + pad; }
+        enemies.add(new Enemy(x, y, ENEMY_SPEED_MIN + random.nextFloat() * (ENEMY_SPEED_MAX - ENEMY_SPEED_MIN), random.nextFloat() * 6.28f));
     }
 
-    private void shoot() {
-        if (state != PLAY || ammo <= 0) return;
+    private void fireAt(float tx, float ty) {
+        if (mode != MODE_GAME || caught || ammo <= 0 || shotCooldown > 0f) return;
+        float dx = tx - playerX;
+        float dy = ty - playerY;
+        float d = (float) Math.sqrt(dx * dx + dy * dy);
+        if (d < 1f) return;
+        aimRadians = (float) Math.atan2(dy, dx);
+        playerRotation = (float) Math.toDegrees(aimRadians) - 180f;
+        float ux = dx / d;
+        float uy = dy / d;
+        bullets.add(new Bullet(playerX + ux * 55f, playerY + uy * 55f, ux * BULLET_SPEED, uy * BULLET_SPEED));
         ammo--;
-        float len = (float)Math.sqrt(facingX * facingX + facingY * facingY);
-        if (len < .1f) { facingX = 0; facingY = -1; len = 1; }
-        float fx = facingX / len, fy = facingY / len;
-        shots.add(new Shot(hunterX + fx * 34f, hunterY + fy * 34f, fx * SHOT_SPEED, fy * SHOT_SPEED));
+        shotCooldown = 0.18f;
+        sounds.play(sndShot, 1f, 1f, 2, 0, 1f);
     }
 
     private void reload() {
-        if (state == PLAY) ammo = 2;
+        if (mode == MODE_GAME && !caught && ammo < 2) {
+            ammo = 2;
+            sounds.play(sndReload, 0.9f, 0.9f, 1, 0, 1f);
+        }
     }
 
-    private void beginGame() {
-        state = PLAY;
-        score = 0;
-        lives = 5;
-        ammo = 2;
-        enemies.clear();
-        shots.clear();
-        hunterX = 500f;
-        hunterY = 365f;
-        facingX = 0f;
-        facingY = -1f;
-        spawnTimer = .45f;
-        caughtTimer = 0f;
-        left = right = up = down = false;
+    private void drawGame(Canvas canvas) {
+        drawMap(canvas);
+
+        for (Enemy e : enemies) drawEnemy(canvas, e);
+        for (Bullet b : bullets) drawBullet(canvas, b);
+        drawPlayer(canvas);
+
+        if (caught) drawCaught(canvas);
+        drawHud(canvas);
+        drawTouchUi(canvas);
     }
 
-    private void drawMenu(Canvas c) {
-        drawJungle(c, true);
-        drawMenuHunter(c, 275, 390, 1.52f);
+    private void drawMap(Canvas canvas) {
+        int w = getWidth();
+        int h = getHeight();
+        paint.setColor(Color.rgb(151, 184, 72));
+        canvas.drawRect(0, 0, w, h, paint);
 
-        p.setTextAlign(Paint.Align.CENTER);
-        p.setColor(Color.rgb(190, 38, 29));
-        p.setTypeface(Typeface.create("serif", Typeface.ITALIC));
-        p.setTextSize(50);
-        c.drawText("Watch out behind you", 700, 120, p);
-        p.setTextSize(92);
-        c.drawText("hunter!", 708, 202, p);
-
-        p.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
-        p.setColor(Color.rgb(255, 245, 0));
-        p.setTextSize(40);
-        c.drawText("RECORD: " + record, 675, 290, p);
-
-        drawTargetIcon(c, 835, 390, 64);
-
-        p.setColor(Color.rgb(255, 246, 0));
-        p.setTextSize(50);
-        p.setTextAlign(Paint.Align.CENTER);
-        c.drawText("START GAME", startRect.centerX(), startRect.centerY() + 17, p);
-
-        p.setColor(Color.argb(225, 255, 230, 30));
-        c.drawRoundRect(new RectF(565, 450, 900, 520), 8, 8, p);
-        p.setColor(Color.rgb(30, 55, 35));
-        p.setTextSize(19);
-        p.setTextAlign(Paint.Align.LEFT);
-        c.drawText("ARROWS / D-PAD  -  MOVE", 585, 477, p);
-        c.drawText("FIRE  -  SHOOT     RELOAD  -  2 SHELLS", 585, 505, p);
-        p.setTextAlign(Paint.Align.LEFT);
-    }
-
-    private void drawPlayfield(Canvas c) {
-        drawJungle(c, false);
-
-        for (int i = 0; i < 5; i++) {
-            float x = 38 + i * 59;
-            if (i < lives) drawMiniLife(c, x, 34, 22, true);
-            else drawMiniLife(c, x, 34, 22, false);
+        if (tileSheet != null) {
+            canvas.drawBitmap(tileSheet, tileCenter, new Rect(0, 0, w, h), paint);
         }
 
-        p.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
-        p.setTextAlign(Paint.Align.RIGHT);
-        p.setColor(Color.WHITE);
-        p.setTextSize(30);
-        c.drawText(String.format("%05d", score), 955, 52, p);
-
-        for (Shot sh : shots) drawPellet(c, sh.x, sh.y);
-        for (Enemy e : enemies) drawEnemyTopDown(c, e.x, e.y, e.wobble);
-        drawHunterTopDown(c, hunterX, hunterY, facingX, facingY, 1f);
-
-        p.setTextAlign(Paint.Align.RIGHT);
-        p.setColor(Color.WHITE);
-        p.setTextSize(18);
-        c.drawText("REMAINING", 965, 610, p);
-        for (int i = 0; i < 2; i++) drawShell(c, 880 + i * 38, 640, i < ammo);
-
-        drawTouchControls(c);
-        p.setTextAlign(Paint.Align.LEFT);
+        if (environmentSheet != null) {
+            for (int i = 0; i < decoX.length; i++) {
+                Rect src = (i % 3 == 0) ? envLeaves : (i % 3 == 1 ? envBush : envGrass);
+                float size = Math.min(w, h) * (i % 3 == 0 ? 0.28f : 0.18f);
+                float x = decoX[i] * w;
+                float y = decoY[i] * h;
+                canvas.drawBitmap(environmentSheet, src, new RectF(x - size / 2, y - size / 2, x + size / 2, y + size / 2), paint);
+            }
+            float rock = Math.min(w, h) * 0.09f;
+            canvas.drawBitmap(environmentSheet, envRock, new RectF(w * 0.36f - rock, h * 0.25f - rock, w * 0.36f + rock, h * 0.25f + rock), paint);
+            canvas.drawBitmap(environmentSheet, envRock, new RectF(w * 0.74f - rock * .7f, h * 0.71f - rock * .7f, w * 0.74f + rock * .7f, h * 0.71f + rock * .7f), paint);
+        }
     }
 
-    private void drawJungle(Canvas c, boolean menu) {
-        p.setColor(Color.rgb(159, 190, 83));
-        c.drawRect(0, 0, VW, VH, p);
+    private void drawPlayer(Canvas canvas) {
+        float pw = Math.min(getWidth(), getHeight()) * 0.25f;
+        float ph = pw * 116f / 206f;
+        Rect src = ((int) (walkClock * 7f) & 1) == 0 ? playerIdle : playerIdle2;
+        canvas.save();
+        canvas.rotate(playerRotation, playerX, playerY);
+        if (playerSheet != null) {
+            canvas.drawBitmap(playerSheet, src, new RectF(playerX - pw * 0.50f, playerY - ph * 0.50f, playerX + pw * 0.50f, playerY + ph * 0.50f), paint);
+        }
+        canvas.restore();
+    }
 
-        p.setColor(Color.rgb(184, 205, 105));
-        for (int y = 90; y < 620; y += 70) {
-            for (int x = 65 + ((y / 70) % 2) * 27; x < 960; x += 92) c.drawCircle(x, y, 5, p);
+    private void drawEnemy(Canvas canvas, Enemy e) {
+        float ew = Math.min(getWidth(), getHeight()) * 0.125f;
+        float eh = ew * 113f / 140f;
+        Rect src = ((int) (e.phase) & 1) == 0 ? enemyWalk1 : enemyWalk2;
+        float angle = (float) Math.toDegrees(Math.atan2(playerY - e.y, playerX - e.x)) + 90f;
+        canvas.save();
+        canvas.rotate(angle, e.x, e.y);
+        if (enemySheet != null) {
+            canvas.drawBitmap(enemySheet, src, new RectF(e.x - ew / 2, e.y - eh / 2, e.x + ew / 2, e.y + eh / 2), paint);
+        }
+        canvas.restore();
+    }
+
+    private void drawBullet(Canvas canvas, Bullet b) {
+        float len = 22f;
+        float d = (float) Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+        float ux = b.vx / d;
+        float uy = b.vy / d;
+        paint.setStrokeWidth(5f);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setColor(Color.rgb(255, 239, 75));
+        canvas.drawLine(b.x - ux * len, b.y - uy * len, b.x + ux * len, b.y + uy * len, paint);
+        paint.setColor(Color.WHITE);
+        paint.setStrokeWidth(2f);
+        canvas.drawLine(b.x - ux * len * .7f, b.y - uy * len * .7f, b.x + ux * len * .7f, b.y + uy * len * .7f, paint);
+    }
+
+    private void drawCaught(Canvas canvas) {
+        float bounce = (float) Math.abs(Math.sin(caughtTimer * 18f));
+        float ew = Math.min(getWidth(), getHeight()) * 0.22f;
+        float eh = ew * 113f / 140f;
+        float y = playerY - 18f - bounce * 24f;
+        if (enemySheet != null) {
+            canvas.drawBitmap(enemySheet, enemyWalk1, new RectF(playerX - ew / 2, y - eh / 2, playerX + ew / 2, y + eh / 2), paint);
+        }
+        paint.setColor(Color.argb(190, 255, 225, 37));
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(7f);
+        float r = Math.min(getWidth(), getHeight()) * (0.10f + bounce * 0.02f);
+        canvas.drawCircle(playerX, playerY, r, paint);
+        paint.setStyle(Paint.Style.FILL);
+        drawOutlinedText(canvas, "CAUGHT!", playerX, playerY - r - 18f, Math.min(getWidth(), getHeight()) * 0.065f, Color.YELLOW, Paint.Align.CENTER);
+    }
+
+    private void drawHud(Canvas canvas) {
+        int w = getWidth();
+        int h = getHeight();
+        float unit = Math.min(w, h);
+
+        // Lives: compact round portrait icons, like the original corner HUD.
+        for (int i = 0; i < 3; i++) {
+            float r = unit * 0.042f;
+            float cx = unit * 0.065f + i * r * 2.35f;
+            float cy = unit * 0.065f;
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(i < lives ? Color.rgb(224, 54, 48) : Color.argb(80, 255, 255, 255));
+            canvas.drawCircle(cx, cy, r + 5f, paint);
+            drawPortraitCircle(canvas, cx, cy, r);
         }
 
-        p.setColor(Color.rgb(202, 195, 145));
-        Path edge = new Path();
-        edge.moveTo(0, 80); edge.cubicTo(140, 55, 160, 120, 280, 75);
-        edge.lineTo(330, 0); edge.lineTo(0, 0); edge.close(); c.drawPath(edge, p);
-        Path bottom = new Path();
-        bottom.moveTo(0, 630); bottom.cubicTo(170, 590, 275, 680, 430, 620);
-        bottom.cubicTo(600, 560, 780, 665, 1000, 610); bottom.lineTo(1000, 700); bottom.lineTo(0,700); bottom.close(); c.drawPath(bottom,p);
+        drawOutlinedText(canvas, String.format("%05d", score), w - unit * 0.055f, unit * 0.075f, unit * 0.070f, Color.WHITE, Paint.Align.RIGHT);
 
-        drawBushCluster(c, 70, 120, 1.15f);
-        drawBushCluster(c, 930, 90, 1.05f);
-        drawBushCluster(c, 80, 565, 1.2f);
-        drawBushCluster(c, 920, 565, 1.25f);
-        drawBushCluster(c, 505, 30, .85f);
-        if (!menu) drawBushCluster(c, 500, 650, .78f);
-
-        drawRock(c, 340, 122, 24);
-        drawRock(c, 735, 570, 19);
-        if (!menu) drawRock(c, 785, 170, 16);
-    }
-
-    private void drawBushCluster(Canvas c, float x, float y, float s) {
-        p.setColor(Color.rgb(29, 82, 27));
-        for (int i = 0; i < 11; i++) {
-            double a = i * Math.PI * 2 / 11.0;
-            c.drawCircle(x + (float)Math.cos(a) * 48 * s, y + (float)Math.sin(a) * 35 * s, 30 * s, p);
+        drawOutlinedText(canvas, "REMAINING", w - unit * 0.22f, h - unit * 0.105f, unit * 0.036f, Color.WHITE, Paint.Align.RIGHT);
+        for (int i = 0; i < 2; i++) {
+            float x = w - unit * (0.18f - i * 0.055f);
+            float y = h - unit * 0.065f;
+            paint.setColor(i < ammo ? Color.rgb(222, 34, 34) : Color.argb(80, 255, 255, 255));
+            canvas.drawRoundRect(new RectF(x - unit * .012f, y - unit * .036f, x + unit * .012f, y + unit * .036f), unit * .008f, unit * .008f, paint);
+            paint.setColor(Color.rgb(248, 211, 65));
+            canvas.drawRect(x - unit * .012f, y + unit * .017f, x + unit * .012f, y + unit * .036f, paint);
         }
-        p.setColor(Color.rgb(55, 129, 37));
-        for (int i = 0; i < 9; i++) {
-            double a = i * Math.PI * 2 / 9.0 + .3;
-            c.drawOval(new RectF(x - 12*s + (float)Math.cos(a)*45*s, y - 28*s + (float)Math.sin(a)*34*s,
-                    x + 12*s + (float)Math.cos(a)*45*s, y + 28*s + (float)Math.sin(a)*34*s), p);
+    }
+
+    private void drawTouchUi(Canvas canvas) {
+        float unit = Math.min(getWidth(), getHeight());
+        if (movePointerId != -1) {
+            float radius = unit * 0.105f;
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(unit * .008f);
+            paint.setColor(Color.argb(105, 255, 255, 255));
+            canvas.drawCircle(stickBaseX, stickBaseY, radius, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.argb(105, 255, 255, 255));
+            canvas.drawCircle(stickX, stickY, radius * .38f, paint);
         }
-        p.setColor(Color.rgb(101, 165, 55));
-        c.drawCircle(x - 16*s, y - 12*s, 7*s, p);
-        c.drawCircle(x + 24*s, y + 5*s, 6*s, p);
+
+        paint.setColor(Color.argb(95, 20, 20, 20));
+        canvas.drawOval(reloadButton, paint);
+        drawOutlinedText(canvas, "R", reloadButton.centerX(), reloadButton.centerY() + reloadButton.height() * .16f,
+                unit * 0.055f, Color.WHITE, Paint.Align.CENTER);
+
+        paint.setColor(Color.argb(80, 0, 0, 0));
+        paint.setTextAlign(Paint.Align.RIGHT);
+        paint.setTextSize(unit * .024f);
+        canvas.drawText("TAP RIGHT SIDE TO FIRE", getWidth() - unit * .035f, getHeight() - unit * .17f, paint);
     }
 
-    private void drawRock(Canvas c, float x, float y, float r) {
-        p.setColor(Color.rgb(128, 124, 103));
-        Path q = new Path();
-        q.moveTo(x-r, y+4); q.lineTo(x-r*.55f,y-r*.7f); q.lineTo(x+r*.2f,y-r); q.lineTo(x+r,y-r*.15f); q.lineTo(x+r*.7f,y+r*.7f); q.lineTo(x-r*.25f,y+r); q.close();
-        c.drawPath(q,p);
-        stroke.setColor(Color.rgb(75,74,65)); stroke.setStrokeWidth(3); c.drawPath(q,stroke);
+    private void drawGameOver(Canvas canvas) {
+        paint.setColor(Color.argb(205, 0, 0, 0));
+        canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
+        float unit = Math.min(getWidth(), getHeight());
+        drawOutlinedText(canvas, "GAME OVER", getWidth() * .5f, getHeight() * .42f, unit * .13f, Color.rgb(245, 68, 47), Paint.Align.CENTER);
+        drawOutlinedText(canvas, "SCORE  " + score + "     RECORD  " + record, getWidth() * .5f, getHeight() * .55f, unit * .052f, Color.WHITE, Paint.Align.CENTER);
+        drawOutlinedText(canvas, "TAP TO PLAY AGAIN", getWidth() * .5f, getHeight() * .69f, unit * .050f, Color.rgb(255, 224, 72), Paint.Align.CENTER);
     }
 
-    private void drawMenuHunter(Canvas c, float x, float y, float s) {
-        c.save();
-        c.translate(x, y);
-        c.scale(s, s);
-
-        p.setColor(Color.rgb(73, 70, 43));
-        Path body = new Path(); body.moveTo(-105,-25); body.lineTo(-80,-150); body.lineTo(-35,-185); body.lineTo(40,-185); body.lineTo(86,-145); body.lineTo(112,15); body.lineTo(75,95); body.lineTo(-70,95); body.close(); c.drawPath(body,p);
-        stroke.setColor(Color.rgb(52,42,25)); stroke.setStrokeWidth(5); c.drawPath(body,stroke);
-        p.setColor(Color.rgb(116, 105, 62));
-        c.drawOval(new RectF(-88,-128,-48,-90),p); c.drawOval(new RectF(40,-120,79,-79),p); c.drawOval(new RectF(-60,-50,-12,-12),p); c.drawOval(new RectF(22,-25,70,15),p);
-
-        p.setColor(Color.rgb(92,83,47));
-        Path col1=new Path(); col1.moveTo(-55,-162); col1.lineTo(-15,-130); col1.lineTo(-40,-80); col1.lineTo(-78,-135); col1.close(); c.drawPath(col1,p);
-        Path col2=new Path(); col2.moveTo(52,-160); col2.lineTo(12,-130); col2.lineTo(40,-82); col2.lineTo(78,-135); col2.close(); c.drawPath(col2,p);
-
-        RectF face = new RectF(-48,-250,48,-150);
-        drawPortraitFace(c, face);
-        stroke.setColor(Color.rgb(67,43,28)); stroke.setStrokeWidth(5); c.drawOval(face,stroke);
-
-        stroke.setColor(Color.argb(190,55,35,24)); stroke.setStrokeWidth(4);
-        c.drawLine(-31,-214,-8,-220,stroke); c.drawLine(31,-214,8,-220,stroke);
-        c.drawLine(0,-211,-5,-184,stroke);
-
-        p.setColor(Color.rgb(169,132,54)); c.drawOval(new RectF(-75,-280,72,-236),p);
-        p.setColor(Color.rgb(183,143,58)); c.drawRoundRect(new RectF(-48,-315,45,-254),18,18,p);
-        p.setColor(Color.rgb(77,58,31)); c.drawRect(-49,-271,47,-254,p);
-        stroke.setColor(Color.rgb(72,49,28)); stroke.setStrokeWidth(5); c.drawOval(new RectF(-75,-280,72,-236),stroke); c.drawRoundRect(new RectF(-48,-315,45,-254),18,18,stroke);
-
-        p.setColor(Color.rgb(220,161,115)); c.drawCircle(-47,-68,20,p); c.drawCircle(16,-52,20,p);
-        p.setColor(Color.rgb(84,58,36)); c.drawRoundRect(new RectF(-56,-74,85,-44),10,10,p);
-        p.setColor(Color.rgb(165,166,162));
-        Path gunTop=new Path(); gunTop.moveTo(30,-72); gunTop.lineTo(182,-43); gunTop.lineTo(182,-18); gunTop.lineTo(25,-46); gunTop.close(); c.drawPath(gunTop,p);
-        Path gunBot=new Path(); gunBot.moveTo(27,-47); gunBot.lineTo(180,-18); gunBot.lineTo(177,7); gunBot.lineTo(22,-22); gunBot.close(); c.drawPath(gunBot,p);
-        stroke.setColor(Color.rgb(43,43,39)); stroke.setStrokeWidth(4); c.drawPath(gunTop,stroke); c.drawPath(gunBot,stroke);
-        p.setColor(Color.rgb(40,40,36)); c.drawOval(new RectF(160,-49,195,-13),p); c.drawOval(new RectF(157,-23,192,14),p);
-        p.setColor(Color.rgb(96,30,27)); for(int i=0;i<6;i++) c.drawRoundRect(new RectF(-75+i*27,56,-58+i*27,98),6,6,p);
-        c.restore();
-    }
-
-    private void drawPortraitFace(Canvas c, RectF dst) {
+    private void drawPortraitCircle(Canvas canvas, float cx, float cy, float r) {
         if (portrait == null) {
-            p.setColor(Color.rgb(224,174,132)); c.drawOval(dst,p); return;
+            paint.setColor(Color.rgb(232, 185, 145));
+            canvas.drawCircle(cx, cy, r, paint);
+            return;
         }
-        int w = portrait.getWidth(), h = portrait.getHeight();
-        Rect src = new Rect((int)(w*.22f), (int)(h*.23f), (int)(w*.78f), (int)(h*.66f));
-        c.save();
-        Path clip = new Path(); clip.addOval(dst, Path.Direction.CW); c.clipPath(clip);
-        c.drawBitmap(portrait, src, dst, p);
-        c.restore();
+        canvas.save();
+        Path p = new Path();
+        p.addCircle(cx, cy, r, Path.Direction.CW);
+        canvas.clipPath(p);
+        Rect src = portraitFaceRect();
+        canvas.drawBitmap(portrait, src, new RectF(cx - r, cy - r, cx + r, cy + r), paint);
+        canvas.restore();
     }
 
-    private void drawTargetIcon(Canvas c, float cx, float cy, float r) {
-        p.setColor(Color.rgb(236, 232, 200)); c.drawCircle(cx,cy,r,p);
-        stroke.setColor(Color.rgb(25,28,28)); stroke.setStrokeWidth(6); c.drawCircle(cx,cy,r,stroke);
-        p.setColor(Color.rgb(229, 188, 145)); c.drawOval(new RectF(cx-r*.45f,cy-r*.32f,cx-r*.03f,cy+r*.40f),p); c.drawOval(new RectF(cx+r*.03f,cy-r*.32f,cx+r*.45f,cy+r*.40f),p);
-        p.setColor(Color.rgb(55,84,121)); c.drawRect(cx-r*.48f,cy-r*.36f,cx+r*.48f,cy-r*.16f,p);
-        stroke.setColor(Color.RED); stroke.setStrokeWidth(4); c.drawCircle(cx,cy+3,r*.28f,stroke); c.drawLine(cx-r*.38f,cy+3,cx+r*.38f,cy+3,stroke); c.drawLine(cx,cy-r*.38f,cx,cy+r*.42f,stroke);
-    }
-
-    private void drawHunterTopDown(Canvas c, float x, float y, float fx, float fy, float s) {
-        c.save(); c.translate(x,y); float ang=(float)Math.toDegrees(Math.atan2(fy,fx))+90f; c.rotate(ang); c.scale(s,s);
-        p.setColor(Color.argb(70,0,0,0)); c.drawOval(new RectF(-30,16,30,42),p);
-        p.setColor(Color.rgb(52,52,34)); c.drawOval(new RectF(-27,-5,27,42),p);
-        p.setColor(Color.rgb(90,85,49)); c.drawRoundRect(new RectF(-34,-31,34,18),15,15,p);
-        p.setColor(Color.rgb(119,107,58)); c.drawOval(new RectF(-48,-28,-18,13),p); c.drawOval(new RectF(18,-28,48,13),p);
-        RectF face=new RectF(-22,-56,22,-18); drawPortraitFace(c,face);
-        p.setColor(Color.rgb(171,132,54)); c.drawOval(new RectF(-33,-65,33,-38),p); p.setColor(Color.rgb(79,58,31)); c.drawRect(-24,-55,24,-48,p);
-        p.setColor(Color.rgb(65,46,30)); c.drawRoundRect(new RectF(-7,-88,7,-18),5,5,p);
-        p.setColor(Color.rgb(170,170,161)); c.drawRoundRect(new RectF(-12,-116,-1,-61),4,4,p); c.drawRoundRect(new RectF(1,-116,12,-61),4,4,p);
-        c.restore();
-    }
-
-    private void drawEnemyTopDown(Canvas c, float x, float y, float phase) {
-        c.save(); c.translate(x,y); c.rotate((float)Math.sin(phase)*7f);
-        p.setColor(Color.argb(55,0,0,0)); c.drawOval(new RectF(-24,14,24,35),p);
-        p.setColor(Color.rgb(232,187,143)); c.drawCircle(0,-23,13,p);
-        p.setColor(Color.rgb(39,88,145)); c.drawRoundRect(new RectF(-17,-14,17,17),8,8,p);
-        p.setColor(Color.rgb(64,45,31)); c.drawOval(new RectF(-20,7,20,28),p);
-        stroke.setColor(Color.rgb(38,32,25)); stroke.setStrokeWidth(5);
-        float leg=(float)Math.sin(phase*2f)*10f;
-        c.drawLine(-8,22,-15-leg,42,stroke); c.drawLine(8,22,15+leg,42,stroke);
-        c.restore();
-    }
-
-    private void drawCaught(Canvas c) {
-        float bounce = (float)Math.sin(caughtTimer * 30f) * 9f;
-        float ex = hunterX + 8f;
-        float ey = hunterY - 28f + bounce;
-        drawEnemyTopDown(c, ex, ey, caughtTimer * 14f);
-        p.setColor(Color.rgb(92,60,37));
-        c.drawOval(new RectF(ex-30, ey+4, ex+30, ey+35), p);
-        p.setColor(Color.WHITE); p.setTypeface(Typeface.create("sans-serif-condensed",Typeface.BOLD)); p.setTextAlign(Paint.Align.CENTER); p.setTextSize(42);
-        c.drawText("WATCH YOUR BACK!", 500, 105, p);
-        p.setColor(Color.rgb(255,235,40));
-        for(int i=0;i<6;i++){ double a=i*Math.PI/3; c.drawCircle(hunterX+(float)Math.cos(a)*58,hunterY+(float)Math.sin(a)*45,7,p); }
-    }
-
-    private void drawGameOver(Canvas c) {
-        p.setColor(Color.argb(190, 25, 20, 15)); c.drawRect(0,0,VW,VH,p);
-        p.setTextAlign(Paint.Align.CENTER); p.setTypeface(Typeface.create("serif",Typeface.BOLD)); p.setColor(Color.rgb(190,38,29)); p.setTextSize(95); c.drawText("GAME OVER",500,280,p);
-        p.setTypeface(Typeface.create("sans-serif-condensed",Typeface.BOLD)); p.setColor(Color.rgb(255,244,0)); p.setTextSize(42); c.drawText("SCORE: "+score,500,355,p); p.setTextSize(34); c.drawText("TAP TO PLAY AGAIN",500,440,p);
-        p.setTextAlign(Paint.Align.LEFT);
-    }
-
-    private void drawTouchControls(Canvas c) {
-        drawTouchButton(c,leftRect,"◀",left); drawTouchButton(c,rightRect,"▶",right); drawTouchButton(c,upRect,"▲",up); drawTouchButton(c,downRect,"▼",down);
-        p.setColor(Color.argb(125,244,75,38)); c.drawRoundRect(fireRect,18,18,p); stroke.setColor(Color.argb(190,90,28,17)); stroke.setStrokeWidth(4); c.drawRoundRect(fireRect,18,18,stroke);
-        p.setColor(Color.WHITE); p.setTextAlign(Paint.Align.CENTER); p.setTextSize(34); c.drawText("FIRE",fireRect.centerX(),fireRect.centerY()+12,p);
-        p.setColor(Color.argb(125,245,235,205)); c.drawRoundRect(reloadRect,12,12,p); p.setColor(Color.rgb(35,35,25)); p.setTextSize(24); c.drawText(ammo==2?"LOADED":"RELOAD",reloadRect.centerX(),reloadRect.centerY()+8,p);
-    }
-
-    private void drawTouchButton(Canvas c, RectF r, String txt, boolean pressed) {
-        p.setColor(Color.argb(pressed?190:115,245,245,235)); c.drawRoundRect(r,18,18,p);
-        p.setColor(Color.rgb(32,45,31)); p.setTextAlign(Paint.Align.CENTER); p.setTextSize(33); c.drawText(txt,r.centerX(),r.centerY()+12,p);
-    }
-
-    private void drawMiniLife(Canvas c, float x, float y, float r, boolean active) {
-        p.setColor(active?Color.rgb(238,235,205):Color.argb(80,238,235,205)); c.drawCircle(x,y,r,p);
-        stroke.setColor(active?Color.rgb(220,45,37):Color.argb(70,220,45,37)); stroke.setStrokeWidth(5); c.drawCircle(x,y,r,stroke);
-        p.setColor(active?Color.rgb(227,182,140):Color.argb(70,227,182,140)); c.drawOval(new RectF(x-r*.48f,y-r*.20f,x-r*.03f,y+r*.42f),p); c.drawOval(new RectF(x+r*.03f,y-r*.20f,x+r*.48f,y+r*.42f),p);
-    }
-
-    private void drawShell(Canvas c, float x, float y, boolean live) {
-        p.setColor(live?Color.rgb(179,44,35):Color.rgb(90,86,73)); c.drawRoundRect(new RectF(x-9,y-22,x+9,y+20),5,5,p); p.setColor(live?Color.rgb(229,184,62):Color.rgb(125,120,99)); c.drawRect(x-9,y+12,x+9,y+22,p);
-    }
-
-    private void drawPellet(Canvas c,float x,float y){ p.setColor(Color.rgb(255,230,75)); c.drawCircle(x,y,5,p); stroke.setColor(Color.rgb(70,55,20)); stroke.setStrokeWidth(2); c.drawCircle(x,y,5,stroke); }
-    private float clamp(float v,float lo,float hi){ return Math.max(lo,Math.min(hi,v)); }
-
-    private float localX(MotionEvent e, int i) {
-        float s=Math.min(getWidth()/VW,getHeight()/VH); float ox=(getWidth()-VW*s)*.5f; return (e.getX(i)-ox)/s;
-    }
-    private float localY(MotionEvent e, int i) {
-        float s=Math.min(getWidth()/VW,getHeight()/VH); float oy=(getHeight()-VH*s)*.5f; return (e.getY(i)-oy)/s;
-    }
-
-    @Override public boolean onTouchEvent(MotionEvent e) {
-        int act=e.getActionMasked();
-        if (act==MotionEvent.ACTION_DOWN && state==MENU) {
-            float x=localX(e,0),y=localY(e,0); if(startRect.contains(x,y)){ beginGame(); return true; }
+    private void drawPortraitOval(Canvas canvas, float l, float t, float r, float b, float rotation, boolean border) {
+        if (portrait == null) return;
+        float cx = (l + r) * .5f;
+        float cy = (t + b) * .5f;
+        canvas.save();
+        canvas.rotate(rotation, cx, cy);
+        Path p = new Path();
+        RectF dest = new RectF(l, t, r, b);
+        p.addOval(dest, Path.Direction.CW);
+        canvas.clipPath(p);
+        canvas.drawBitmap(portrait, portraitFaceRect(), dest, paint);
+        canvas.restore();
+        if (border) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(3f, (r - l) * .055f));
+            paint.setColor(Color.rgb(45, 35, 22));
+            canvas.drawOval(new RectF(l, t, r, b), paint);
+            paint.setStyle(Paint.Style.FILL);
         }
-        if (act==MotionEvent.ACTION_DOWN && state==GAME_OVER) { beginGame(); return true; }
-        if (state!=PLAY) return true;
+    }
 
-        left=right=up=down=false;
-        boolean fireNow=false;
-        for(int i=0;i<e.getPointerCount();i++){
-            float x=localX(e,i), y=localY(e,i);
-            if(leftRect.contains(x,y)) left=true;
-            if(rightRect.contains(x,y)) right=true;
-            if(upRect.contains(x,y)) up=true;
-            if(downRect.contains(x,y)) down=true;
-            if(fireRect.contains(x,y)) fireNow=true;
-            if((act==MotionEvent.ACTION_DOWN||act==MotionEvent.ACTION_POINTER_DOWN) && reloadRect.contains(x,y)) reload();
+    private Rect portraitFaceRect() {
+        if (portrait == null) return new Rect();
+        int w = portrait.getWidth();
+        int h = portrait.getHeight();
+        return new Rect((int) (w * .24f), (int) (h * .03f), (int) (w * .76f), (int) (h * .62f));
+    }
+
+    private void drawOutlinedText(Canvas canvas, String text, float x, float y, float size, int color, Paint.Align align) {
+        shadowPaint.setTextSize(size);
+        shadowPaint.setTextAlign(align);
+        shadowPaint.setTypeface(paint.getTypeface());
+        shadowPaint.setStyle(Paint.Style.STROKE);
+        shadowPaint.setStrokeWidth(Math.max(3f, size * .10f));
+        shadowPaint.setColor(Color.argb(190, 20, 20, 20));
+        canvas.drawText(text, x, y, shadowPaint);
+        shadowPaint.setStyle(Paint.Style.FILL);
+        shadowPaint.setColor(color);
+        canvas.drawText(text, x, y, shadowPaint);
+    }
+
+    private float clamp(float v, float lo, float hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int action = event.getActionMasked();
+        int index = event.getActionIndex();
+
+        if (mode == MODE_MENU) {
+            if (action == MotionEvent.ACTION_UP && startButton.contains(event.getX(), event.getY())) {
+                startGame();
+            }
+            return true;
         }
-        if(fireNow && !touchFireDown) shoot();
-        touchFireDown=fireNow;
-        if(act==MotionEvent.ACTION_UP||act==MotionEvent.ACTION_CANCEL){left=right=up=down=false;touchFireDown=false;}
+
+        if (mode == MODE_GAME_OVER) {
+            if (action == MotionEvent.ACTION_UP) startGame();
+            return true;
+        }
+
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+            float x = event.getX(index);
+            float y = event.getY(index);
+            int id = event.getPointerId(index);
+
+            if (reloadButton.contains(x, y)) {
+                reload();
+                return true;
+            }
+
+            if (x < getWidth() * .46f && y > getHeight() * .35f && movePointerId == -1) {
+                movePointerId = id;
+                stickBaseX = stickX = x;
+                stickBaseY = stickY = y;
+                moveX = moveY = 0f;
+            } else {
+                fireAt(x, y);
+            }
+            return true;
+        }
+
+        if (action == MotionEvent.ACTION_MOVE && movePointerId != -1) {
+            int pIndex = event.findPointerIndex(movePointerId);
+            if (pIndex >= 0) updateStick(event.getX(pIndex), event.getY(pIndex));
+            return true;
+        }
+
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_CANCEL) {
+            int id = event.getPointerId(index);
+            if (id == movePointerId || action == MotionEvent.ACTION_CANCEL) {
+                movePointerId = -1;
+                moveX = moveY = 0f;
+            }
+            return true;
+        }
         return true;
     }
 
-    @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (state==MENU && (keyCode==KeyEvent.KEYCODE_ENTER || keyCode==KeyEvent.KEYCODE_SPACE)) { beginGame(); return true; }
-        if (state==GAME_OVER && (keyCode==KeyEvent.KEYCODE_ENTER || keyCode==KeyEvent.KEYCODE_SPACE)) { beginGame(); return true; }
-        if(state!=PLAY) return super.onKeyDown(keyCode,event);
-        if(keyCode==KeyEvent.KEYCODE_DPAD_LEFT){left=true;return true;}
-        if(keyCode==KeyEvent.KEYCODE_DPAD_RIGHT){right=true;return true;}
-        if(keyCode==KeyEvent.KEYCODE_DPAD_UP){up=true;return true;}
-        if(keyCode==KeyEvent.KEYCODE_DPAD_DOWN){down=true;return true;}
-        if(keyCode==KeyEvent.KEYCODE_SPACE){shoot();return true;}
-        if(keyCode==KeyEvent.KEYCODE_CTRL_LEFT||keyCode==KeyEvent.KEYCODE_CTRL_RIGHT||keyCode==KeyEvent.KEYCODE_ENTER){reload();return true;}
-        return super.onKeyDown(keyCode,event);
-    }
-
-    @Override public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if(keyCode==KeyEvent.KEYCODE_DPAD_LEFT){left=false;return true;}
-        if(keyCode==KeyEvent.KEYCODE_DPAD_RIGHT){right=false;return true;}
-        if(keyCode==KeyEvent.KEYCODE_DPAD_UP){up=false;return true;}
-        if(keyCode==KeyEvent.KEYCODE_DPAD_DOWN){down=false;return true;}
-        return super.onKeyUp(keyCode,event);
+    private void updateStick(float x, float y) {
+        float radius = Math.min(getWidth(), getHeight()) * .105f;
+        float dx = x - stickBaseX;
+        float dy = y - stickBaseY;
+        float d = (float) Math.sqrt(dx * dx + dy * dy);
+        if (d > radius && d > 0f) {
+            dx = dx / d * radius;
+            dy = dy / d * radius;
+        }
+        stickX = stickBaseX + dx;
+        stickY = stickBaseY + dy;
+        moveX = dx / radius;
+        moveY = dy / radius;
     }
 }
