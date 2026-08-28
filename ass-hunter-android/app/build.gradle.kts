@@ -10,7 +10,7 @@ android {
         applicationId = "com.asshunter.game.face"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "4.0"
+        versionCode = 6
+        versionName = "6.0"
     }
 }
