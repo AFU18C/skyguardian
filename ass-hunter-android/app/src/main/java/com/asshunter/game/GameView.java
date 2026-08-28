@@ -47,7 +47,6 @@ public class GameView extends View {
 
     private final Rect playerIdle = new Rect(0, 0, 206, 116);
     private final Rect playerIdle2 = new Rect(206, 0, 412, 116);
-    private final Rect playerShot = new Rect(618, 812, 824, 928);
     private final Rect enemyWalk1 = new Rect(420, 339, 560, 452);
     private final Rect enemyWalk2 = new Rect(560, 339, 700, 452);
     private final Rect tileCenter = new Rect(323, 219, 647, 438);
@@ -69,14 +68,14 @@ public class GameView extends View {
     private int mode = MODE_MENU;
     private int score = 0;
     private int record;
-    private int lives = 3;
+    private int lives = 5;
     private int ammo = 2;
 
     private float playerX;
     private float playerY;
     private float aimRadians = (float) Math.PI;
     private float playerRotation = 0f;
-    private float spawnTimer = 0.55f;
+    private float spawnTimer = 0.95f;
     private float shotCooldown = 0f;
     private float walkClock = 0f;
 
@@ -92,13 +91,17 @@ public class GameView extends View {
     private float moveX;
     private float moveY;
 
+    private float crosshairX;
+    private float crosshairY;
+    private float crosshairTimer;
+
     private final float[] decoX = {0.06f, 0.16f, 0.30f, 0.52f, 0.70f, 0.86f, 0.95f};
     private final float[] decoY = {0.12f, 0.78f, 0.24f, 0.84f, 0.15f, 0.72f, 0.35f};
 
-    private static final float PLAYER_SPEED = 315f;
-    private static final float BULLET_SPEED = 1050f;
-    private static final float ENEMY_SPEED_MIN = 92f;
-    private static final float ENEMY_SPEED_MAX = 138f;
+    private static final float PLAYER_SPEED = 325f;
+    private static final float BULLET_SPEED = 1350f;
+    private static final float ENEMY_SPEED_MIN = 62f;
+    private static final float ENEMY_SPEED_MAX = 92f;
     private static final float CATCH_DURATION = 1.25f;
 
     private static class Bullet {
@@ -192,10 +195,10 @@ public class GameView extends View {
             canvas.drawBitmap(menuArt, src, new Rect(0, 0, w, h), paint);
         }
 
-        // Replace only the hunter's face; keep the original illustrated body, hat and shotgun.
-        drawPortraitOval(canvas, w * 0.383f, h * 0.655f, w * 0.425f, h * 0.775f, 0f, true);
+        drawIntegratedFace(canvas, w * 0.391f, h * 0.697f, w * 0.417f, h * 0.770f);
 
-        drawOutlinedText(canvas, "RECORD: " + record, w * 0.74f, h * 0.60f, Math.min(w, h) * 0.060f, Color.rgb(255, 218, 42), Paint.Align.CENTER);
+        drawOutlinedText(canvas, "RECORD: " + record, w * 0.74f, h * 0.60f,
+                Math.min(w, h) * 0.060f, Color.rgb(255, 218, 42), Paint.Align.CENTER);
 
         if (startButtonArt != null) {
             canvas.drawBitmap(startButtonArt, null, startButton, paint);
@@ -205,20 +208,12 @@ public class GameView extends View {
         }
         drawOutlinedText(canvas, "START GAME", startButton.centerX(), startButton.centerY() + startButton.height() * 0.16f,
                 Math.min(w, h) * 0.070f, Color.WHITE, Paint.Align.CENTER);
-
-        paint.setColor(Color.argb(175, 25, 46, 21));
-        RectF hint = new RectF(w * 0.70f, h * 0.89f, w * 0.96f, h * 0.965f);
-        canvas.drawRoundRect(hint, 18f, 18f, paint);
-        paint.setColor(Color.WHITE);
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(Math.min(w, h) * 0.027f);
-        canvas.drawText("LEFT THUMB: MOVE   •   RIGHT SIDE: AIM / FIRE", hint.centerX(), hint.centerY() + paint.getTextSize() * 0.35f, paint);
     }
 
     private void startGame() {
         mode = MODE_GAME;
         score = 0;
-        lives = 3;
+        lives = 5;
         ammo = 2;
         bullets.clear();
         enemies.clear();
@@ -229,13 +224,14 @@ public class GameView extends View {
         playerY = getHeight() * 0.52f;
         aimRadians = (float) Math.PI;
         playerRotation = 0f;
-        spawnTimer = 0.55f;
+        spawnTimer = 0.95f;
         movePointerId = -1;
         moveX = moveY = 0f;
         lastFrame = SystemClock.elapsedRealtime();
     }
 
     private void updateGame(float dt) {
+        crosshairTimer = Math.max(0f, crosshairTimer - dt);
         if (caught) {
             caughtTimer += dt;
             if (caughtTimer >= CATCH_DURATION) {
@@ -245,7 +241,7 @@ public class GameView extends View {
                 enemies.clear();
                 bullets.clear();
                 lives--;
-                spawnTimer = 0.8f;
+                spawnTimer = 1.25f;
                 if (lives <= 0) mode = MODE_GAME_OVER;
             }
             return;
@@ -267,9 +263,9 @@ public class GameView extends View {
         }
 
         spawnTimer -= dt;
-        if (spawnTimer <= 0f && enemies.size() < 5) {
+        if (spawnTimer <= 0f && enemies.size() < 4) {
             spawnEnemy();
-            spawnTimer = Math.max(0.52f, 1.08f - score / 8000f) + random.nextFloat() * 0.45f;
+            spawnTimer = Math.max(0.95f, 1.45f - score / 12000f) + random.nextFloat() * 0.55f;
         }
 
         Iterator<Bullet> bit = bullets.iterator();
@@ -277,16 +273,15 @@ public class GameView extends View {
             Bullet b = bit.next();
             b.x += b.vx * dt;
             b.y += b.vy * dt;
-            if (b.x < -60 || b.x > getWidth() + 60 || b.y < -60 || b.y > getHeight() + 60) bit.remove();
+            if (b.x < -80 || b.x > getWidth() + 80 || b.y < -80 || b.y > getHeight() + 80) bit.remove();
         }
 
-        Iterator<Enemy> eit = enemies.iterator();
-        while (eit.hasNext()) {
-            Enemy e = eit.next();
+        for (Enemy e : enemies) {
             float dx = playerX - e.x;
             float dy = playerY - e.y;
             float d = (float) Math.sqrt(dx * dx + dy * dy);
-            if (d < 58f) {
+            float catchRadius = Math.min(getWidth(), getHeight()) * 0.075f;
+            if (d < catchRadius) {
                 catcher = e;
                 caught = true;
                 caughtTimer = 0f;
@@ -298,10 +293,11 @@ public class GameView extends View {
                 e.x += dx / d * e.speed * dt;
                 e.y += dy / d * e.speed * dt;
             }
-            e.phase += dt * 8f;
+            e.phase += dt * 7f;
         }
 
         if (!caught) {
+            float hitRadius = Math.min(getWidth(), getHeight()) * 0.105f;
             outer:
             for (int bi = bullets.size() - 1; bi >= 0; bi--) {
                 Bullet b = bullets.get(bi);
@@ -309,7 +305,7 @@ public class GameView extends View {
                     Enemy e = enemies.get(ei);
                     float dx = b.x - e.x;
                     float dy = b.y - e.y;
-                    if (dx * dx + dy * dy < 34f * 34f) {
+                    if (dx * dx + dy * dy < hitRadius * hitRadius) {
                         bullets.remove(bi);
                         enemies.remove(ei);
                         score += 100;
@@ -328,16 +324,44 @@ public class GameView extends View {
     private void spawnEnemy() {
         int side = random.nextInt(4);
         float x, y;
-        float pad = 70f;
-        if (side == 0) { x = -pad; y = getHeight() * (0.15f + random.nextFloat() * 0.70f); }
-        else if (side == 1) { x = getWidth() + pad; y = getHeight() * (0.15f + random.nextFloat() * 0.70f); }
-        else if (side == 2) { x = getWidth() * (0.12f + random.nextFloat() * 0.76f); y = -pad; }
-        else { x = getWidth() * (0.12f + random.nextFloat() * 0.76f); y = getHeight() + pad; }
+        float pad = 80f;
+        if (side == 0) { x = -pad; y = getHeight() * (0.17f + random.nextFloat() * 0.66f); }
+        else if (side == 1) { x = getWidth() + pad; y = getHeight() * (0.17f + random.nextFloat() * 0.66f); }
+        else if (side == 2) { x = getWidth() * (0.13f + random.nextFloat() * 0.74f); y = -pad; }
+        else { x = getWidth() * (0.13f + random.nextFloat() * 0.74f); y = getHeight() + pad; }
         enemies.add(new Enemy(x, y, ENEMY_SPEED_MIN + random.nextFloat() * (ENEMY_SPEED_MAX - ENEMY_SPEED_MIN), random.nextFloat() * 6.28f));
     }
 
+    private Enemy findAimAssistTarget(float tx, float ty) {
+        Enemy best = null;
+        float bestDist2 = Float.MAX_VALUE;
+        float radius = Math.min(getWidth(), getHeight()) * 0.36f;
+        float radius2 = radius * radius;
+        for (Enemy e : enemies) {
+            float dx = e.x - tx;
+            float dy = e.y - ty;
+            float d2 = dx * dx + dy * dy;
+            if (d2 < radius2 && d2 < bestDist2) {
+                bestDist2 = d2;
+                best = e;
+            }
+        }
+        return best;
+    }
+
     private void fireAt(float tx, float ty) {
-        if (mode != MODE_GAME || caught || ammo <= 0 || shotCooldown > 0f) return;
+        if (mode != MODE_GAME || caught || shotCooldown > 0f) return;
+        if (ammo <= 0) {
+            reload();
+            return;
+        }
+
+        Enemy assisted = findAimAssistTarget(tx, ty);
+        if (assisted != null) {
+            tx = assisted.x;
+            ty = assisted.y;
+        }
+
         float dx = tx - playerX;
         float dy = ty - playerY;
         float d = (float) Math.sqrt(dx * dx + dy * dy);
@@ -348,7 +372,10 @@ public class GameView extends View {
         float uy = dy / d;
         bullets.add(new Bullet(playerX + ux * 55f, playerY + uy * 55f, ux * BULLET_SPEED, uy * BULLET_SPEED));
         ammo--;
-        shotCooldown = 0.18f;
+        shotCooldown = 0.15f;
+        crosshairX = tx;
+        crosshairY = ty;
+        crosshairTimer = 0.16f;
         sounds.play(sndShot, 1f, 1f, 2, 0, 1f);
     }
 
@@ -361,11 +388,10 @@ public class GameView extends View {
 
     private void drawGame(Canvas canvas) {
         drawMap(canvas);
-
         for (Enemy e : enemies) drawEnemy(canvas, e);
         for (Bullet b : bullets) drawBullet(canvas, b);
         drawPlayer(canvas);
-
+        if (crosshairTimer > 0f) drawCrosshair(canvas);
         if (caught) drawCaught(canvas);
         drawHud(canvas);
         drawTouchUi(canvas);
@@ -376,10 +402,7 @@ public class GameView extends View {
         int h = getHeight();
         paint.setColor(Color.rgb(151, 184, 72));
         canvas.drawRect(0, 0, w, h, paint);
-
-        if (tileSheet != null) {
-            canvas.drawBitmap(tileSheet, tileCenter, new Rect(0, 0, w, h), paint);
-        }
+        if (tileSheet != null) canvas.drawBitmap(tileSheet, tileCenter, new Rect(0, 0, w, h), paint);
 
         if (environmentSheet != null) {
             for (int i = 0; i < decoX.length; i++) {
@@ -396,42 +419,49 @@ public class GameView extends View {
     }
 
     private void drawPlayer(Canvas canvas) {
-        float pw = Math.min(getWidth(), getHeight()) * 0.25f;
+        float pw = Math.min(getWidth(), getHeight()) * 0.28f;
         float ph = pw * 116f / 206f;
         Rect src = ((int) (walkClock * 7f) & 1) == 0 ? playerIdle : playerIdle2;
         canvas.save();
         canvas.rotate(playerRotation, playerX, playerY);
-        if (playerSheet != null) {
-            canvas.drawBitmap(playerSheet, src, new RectF(playerX - pw * 0.50f, playerY - ph * 0.50f, playerX + pw * 0.50f, playerY + ph * 0.50f), paint);
-        }
+        if (playerSheet != null) canvas.drawBitmap(playerSheet, src,
+                new RectF(playerX - pw * 0.50f, playerY - ph * 0.50f, playerX + pw * 0.50f, playerY + ph * 0.50f), paint);
         canvas.restore();
     }
 
     private void drawEnemy(Canvas canvas, Enemy e) {
-        float ew = Math.min(getWidth(), getHeight()) * 0.125f;
+        float ew = Math.min(getWidth(), getHeight()) * 0.16f;
         float eh = ew * 113f / 140f;
         Rect src = ((int) (e.phase) & 1) == 0 ? enemyWalk1 : enemyWalk2;
         float angle = (float) Math.toDegrees(Math.atan2(playerY - e.y, playerX - e.x)) + 90f;
         canvas.save();
         canvas.rotate(angle, e.x, e.y);
-        if (enemySheet != null) {
-            canvas.drawBitmap(enemySheet, src, new RectF(e.x - ew / 2, e.y - eh / 2, e.x + ew / 2, e.y + eh / 2), paint);
-        }
+        if (enemySheet != null) canvas.drawBitmap(enemySheet, src,
+                new RectF(e.x - ew / 2, e.y - eh / 2, e.x + ew / 2, e.y + eh / 2), paint);
         canvas.restore();
     }
 
     private void drawBullet(Canvas canvas, Bullet b) {
-        float len = 22f;
+        float len = 26f;
         float d = (float) Math.sqrt(b.vx * b.vx + b.vy * b.vy);
         float ux = b.vx / d;
         float uy = b.vy / d;
-        paint.setStrokeWidth(5f);
+        paint.setStrokeWidth(7f);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setColor(Color.rgb(255, 239, 75));
         canvas.drawLine(b.x - ux * len, b.y - uy * len, b.x + ux * len, b.y + uy * len, paint);
-        paint.setColor(Color.WHITE);
         paint.setStrokeWidth(2f);
-        canvas.drawLine(b.x - ux * len * .7f, b.y - uy * len * .7f, b.x + ux * len * .7f, b.y + uy * len * .7f, paint);
+    }
+
+    private void drawCrosshair(Canvas canvas) {
+        float r = Math.min(getWidth(), getHeight()) * 0.028f;
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f);
+        paint.setColor(Color.argb(200, 255, 255, 255));
+        canvas.drawCircle(crosshairX, crosshairY, r, paint);
+        canvas.drawLine(crosshairX - r * 1.4f, crosshairY, crosshairX + r * 1.4f, crosshairY, paint);
+        canvas.drawLine(crosshairX, crosshairY - r * 1.4f, crosshairX, crosshairY + r * 1.4f, paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawCaught(Canvas canvas) {
@@ -440,15 +470,11 @@ public class GameView extends View {
         float eh = ew * 113f / 140f;
         float y = playerY - 18f - bounce * 24f;
         if (enemySheet != null) {
-            canvas.drawBitmap(enemySheet, enemyWalk1, new RectF(playerX - ew / 2, y - eh / 2, playerX + ew / 2, y + eh / 2), paint);
+            canvas.drawBitmap(enemySheet, enemyWalk1,
+                    new RectF(playerX - ew / 2, y - eh / 2, playerX + ew / 2, y + eh / 2), paint);
         }
-        paint.setColor(Color.argb(190, 255, 225, 37));
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(7f);
-        float r = Math.min(getWidth(), getHeight()) * (0.10f + bounce * 0.02f);
-        canvas.drawCircle(playerX, playerY, r, paint);
-        paint.setStyle(Paint.Style.FILL);
-        drawOutlinedText(canvas, "CAUGHT!", playerX, playerY - r - 18f, Math.min(getWidth(), getHeight()) * 0.065f, Color.YELLOW, Paint.Align.CENTER);
+        drawOutlinedText(canvas, "CAUGHT!", playerX, playerY - ew * .75f,
+                Math.min(getWidth(), getHeight()) * 0.065f, Color.YELLOW, Paint.Align.CENTER);
     }
 
     private void drawHud(Canvas canvas) {
@@ -456,20 +482,20 @@ public class GameView extends View {
         int h = getHeight();
         float unit = Math.min(w, h);
 
-        // Lives: compact round portrait icons, like the original corner HUD.
-        for (int i = 0; i < 3; i++) {
-            float r = unit * 0.042f;
-            float cx = unit * 0.065f + i * r * 2.35f;
-            float cy = unit * 0.065f;
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(i < lives ? Color.rgb(224, 54, 48) : Color.argb(80, 255, 255, 255));
-            canvas.drawCircle(cx, cy, r + 5f, paint);
+        for (int i = 0; i < 5; i++) {
+            float r = unit * 0.034f;
+            float cx = unit * 0.052f + i * r * 2.35f;
+            float cy = unit * 0.052f;
+            paint.setColor(i < lives ? Color.rgb(224, 54, 48) : Color.argb(70, 255, 255, 255));
+            canvas.drawCircle(cx, cy, r + 4f, paint);
             drawPortraitCircle(canvas, cx, cy, r);
         }
 
-        drawOutlinedText(canvas, String.format("%05d", score), w - unit * 0.055f, unit * 0.075f, unit * 0.070f, Color.WHITE, Paint.Align.RIGHT);
+        drawOutlinedText(canvas, String.format("%05d", score), w - unit * 0.055f, unit * 0.075f,
+                unit * 0.070f, Color.WHITE, Paint.Align.RIGHT);
 
-        drawOutlinedText(canvas, "REMAINING", w - unit * 0.22f, h - unit * 0.105f, unit * 0.036f, Color.WHITE, Paint.Align.RIGHT);
+        drawOutlinedText(canvas, "REMAINING", w - unit * 0.22f, h - unit * 0.105f,
+                unit * 0.036f, Color.WHITE, Paint.Align.RIGHT);
         for (int i = 0; i < 2; i++) {
             float x = w - unit * (0.18f - i * 0.055f);
             float y = h - unit * 0.065f;
@@ -486,31 +512,48 @@ public class GameView extends View {
             float radius = unit * 0.105f;
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(unit * .008f);
-            paint.setColor(Color.argb(105, 255, 255, 255));
+            paint.setColor(Color.argb(88, 255, 255, 255));
             canvas.drawCircle(stickBaseX, stickBaseY, radius, paint);
             paint.setStyle(Paint.Style.FILL);
-            paint.setColor(Color.argb(105, 255, 255, 255));
+            paint.setColor(Color.argb(88, 255, 255, 255));
             canvas.drawCircle(stickX, stickY, radius * .38f, paint);
         }
 
-        paint.setColor(Color.argb(95, 20, 20, 20));
+        paint.setColor(Color.argb(85, 20, 20, 20));
         canvas.drawOval(reloadButton, paint);
         drawOutlinedText(canvas, "R", reloadButton.centerX(), reloadButton.centerY() + reloadButton.height() * .16f,
                 unit * 0.055f, Color.WHITE, Paint.Align.CENTER);
-
-        paint.setColor(Color.argb(80, 0, 0, 0));
-        paint.setTextAlign(Paint.Align.RIGHT);
-        paint.setTextSize(unit * .024f);
-        canvas.drawText("TAP RIGHT SIDE TO FIRE", getWidth() - unit * .035f, getHeight() - unit * .17f, paint);
     }
 
     private void drawGameOver(Canvas canvas) {
         paint.setColor(Color.argb(205, 0, 0, 0));
         canvas.drawRect(0, 0, getWidth(), getHeight(), paint);
         float unit = Math.min(getWidth(), getHeight());
-        drawOutlinedText(canvas, "GAME OVER", getWidth() * .5f, getHeight() * .42f, unit * .13f, Color.rgb(245, 68, 47), Paint.Align.CENTER);
-        drawOutlinedText(canvas, "SCORE  " + score + "     RECORD  " + record, getWidth() * .5f, getHeight() * .55f, unit * .052f, Color.WHITE, Paint.Align.CENTER);
-        drawOutlinedText(canvas, "TAP TO PLAY AGAIN", getWidth() * .5f, getHeight() * .69f, unit * .050f, Color.rgb(255, 224, 72), Paint.Align.CENTER);
+        drawOutlinedText(canvas, "GAME OVER", getWidth() * .5f, getHeight() * .42f,
+                unit * .13f, Color.rgb(245, 68, 47), Paint.Align.CENTER);
+        drawOutlinedText(canvas, "SCORE  " + score + "     RECORD  " + record, getWidth() * .5f, getHeight() * .55f,
+                unit * .052f, Color.WHITE, Paint.Align.CENTER);
+        drawOutlinedText(canvas, "TAP TO PLAY AGAIN", getWidth() * .5f, getHeight() * .69f,
+                unit * .050f, Color.rgb(255, 224, 72), Paint.Align.CENTER);
+    }
+
+    private void drawIntegratedFace(Canvas canvas, float l, float t, float r, float b) {
+        if (portrait == null) return;
+        Path p = new Path();
+        RectF dest = new RectF(l, t, r, b);
+        p.addOval(dest, Path.Direction.CW);
+        canvas.save();
+        canvas.clipPath(p);
+        paint.setAlpha(238);
+        canvas.drawBitmap(portrait, portraitFaceOnlyRect(), dest, paint);
+        paint.setAlpha(255);
+        canvas.restore();
+
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.5f, (r - l) * .025f));
+        paint.setColor(Color.argb(75, 45, 28, 18));
+        canvas.drawOval(dest, paint);
+        paint.setStyle(Paint.Style.FILL);
     }
 
     private void drawPortraitCircle(Canvas canvas, float cx, float cy, float r) {
@@ -523,30 +566,15 @@ public class GameView extends View {
         Path p = new Path();
         p.addCircle(cx, cy, r, Path.Direction.CW);
         canvas.clipPath(p);
-        Rect src = portraitFaceRect();
-        canvas.drawBitmap(portrait, src, new RectF(cx - r, cy - r, cx + r, cy + r), paint);
+        canvas.drawBitmap(portrait, portraitFaceRect(), new RectF(cx - r, cy - r, cx + r, cy + r), paint);
         canvas.restore();
     }
 
-    private void drawPortraitOval(Canvas canvas, float l, float t, float r, float b, float rotation, boolean border) {
-        if (portrait == null) return;
-        float cx = (l + r) * .5f;
-        float cy = (t + b) * .5f;
-        canvas.save();
-        canvas.rotate(rotation, cx, cy);
-        Path p = new Path();
-        RectF dest = new RectF(l, t, r, b);
-        p.addOval(dest, Path.Direction.CW);
-        canvas.clipPath(p);
-        canvas.drawBitmap(portrait, portraitFaceRect(), dest, paint);
-        canvas.restore();
-        if (border) {
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(Math.max(3f, (r - l) * .055f));
-            paint.setColor(Color.rgb(45, 35, 22));
-            canvas.drawOval(new RectF(l, t, r, b), paint);
-            paint.setStyle(Paint.Style.FILL);
-        }
+    private Rect portraitFaceOnlyRect() {
+        if (portrait == null) return new Rect();
+        int w = portrait.getWidth();
+        int h = portrait.getHeight();
+        return new Rect((int) (w * .27f), (int) (h * .25f), (int) (w * .73f), (int) (h * .66f));
     }
 
     private Rect portraitFaceRect() {
@@ -579,9 +607,7 @@ public class GameView extends View {
         int index = event.getActionIndex();
 
         if (mode == MODE_MENU) {
-            if (action == MotionEvent.ACTION_UP && startButton.contains(event.getX(), event.getY())) {
-                startGame();
-            }
+            if (action == MotionEvent.ACTION_UP && startButton.contains(event.getX(), event.getY())) startGame();
             return true;
         }
 
