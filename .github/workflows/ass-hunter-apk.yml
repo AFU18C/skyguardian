@@ -16,22 +16,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download high-quality art references
+      - name: Install high-quality game assets
         run: |
-          mkdir -p art-preview
-          curl -L --fail "https://raw.githubusercontent.com/AllanDouglas/Watch-Out-Behind-You-Hunter-Unity3D/main/Assets/_Game/Sprites/main_menu.png" -o art-preview/main_menu.png
-          curl -L --fail "https://raw.githubusercontent.com/AllanDouglas/Watch-Out-Behind-You-Hunter-Unity3D/main/Assets/_Game/Sprites/Player.png" -o art-preview/player.png
-          curl -L --fail "https://raw.githubusercontent.com/AllanDouglas/Watch-Out-Behind-You-Hunter-Unity3D/main/Assets/_Game/Sprites/Enemy.png" -o art-preview/enemy.png
-          curl -L --fail "https://raw.githubusercontent.com/AllanDouglas/Watch-Out-Behind-You-Hunter-Unity3D/main/Assets/_Game/Sprites/Environment.png" -o art-preview/environment.png
-          curl -L --fail "https://raw.githubusercontent.com/AllanDouglas/Watch-Out-Behind-You-Hunter-Unity3D/main/Assets/_Game/Sprites/Tiles.png" -o art-preview/tiles.png
-          curl -L --fail "https://raw.githubusercontent.com/AllanDouglas/Watch-Out-Behind-You-Hunter-Unity3D/main/wobyh.png" -o art-preview/pc_reference.png
-
-      - name: Upload art preview
-        uses: actions/upload-artifact@v4
-        with:
-          name: AssHunter-Art-Preview
-          path: art-preview
-          if-no-files-found: error
+          mkdir -p ass-hunter-android/app/src/main/res/drawable-nodpi
+          mkdir -p ass-hunter-android/app/src/main/res/raw
+          BASE="https://raw.githubusercontent.com/AllanDouglas/Watch-Out-Behind-You-Hunter-Unity3D/main/Assets/_Game"
+          curl -L --fail "$BASE/Sprites/main_menu.png" -o ass-hunter-android/app/src/main/res/drawable-nodpi/main_menu.png
+          curl -L --fail "$BASE/Sprites/Player.png" -o ass-hunter-android/app/src/main/res/drawable-nodpi/player.png
+          curl -L --fail "$BASE/Sprites/Enemy.png" -o ass-hunter-android/app/src/main/res/drawable-nodpi/enemy.png
+          curl -L --fail "$BASE/Sprites/Environment.png" -o ass-hunter-android/app/src/main/res/drawable-nodpi/environment.png
+          curl -L --fail "$BASE/Sprites/Tiles.png" -o ass-hunter-android/app/src/main/res/drawable-nodpi/tiles.png
+          curl -L --fail "$BASE/Sprites/UI.png" -o ass-hunter-android/app/src/main/res/drawable-nodpi/ui.png
+          curl -L --fail "$BASE/Sprites/start_button.png" -o ass-hunter-android/app/src/main/res/drawable-nodpi/start_button.png
+          curl -L --fail "$BASE/Sounds/shot.mp3" -o ass-hunter-android/app/src/main/res/raw/shot.mp3
+          curl -L --fail "$BASE/Sounds/reload.mp3" -o ass-hunter-android/app/src/main/res/raw/reload.mp3
+          curl -L --fail "$BASE/Sounds/hit.mp3" -o ass-hunter-android/app/src/main/res/raw/hit.mp3
+          curl -L --fail "$BASE/Sounds/catch.mp3" -o ass-hunter-android/app/src/main/res/raw/catch_sound.mp3
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -55,11 +55,11 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Copy final APK
-        run: cp ass-hunter-android/app/build/outputs/apk/debug/app-debug.apk AssHunter.apk
+        run: cp ass-hunter-android/app/build/outputs/apk/debug/app-debug.apk AssHunter-HD.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AssHunter-APK
-          path: AssHunter.apk
+          name: AssHunter-HD-APK
+          path: AssHunter-HD.apk
           if-no-files-found: error
